@@ -19,7 +19,7 @@ def match_brace(s, i):
             if depth == 0: return j
     return -1
 
-IF_RE = re.compile(r'if \((\w+) == (\w+)\) \{')
+IF_RE = re.compile(r'if \(([^{};\n()]+|\*\(\w+ \*+\)\(\w+ \+ 0x[0-9a-f]+\)) == ([^{};\n()]+|\*\(\w+ \*+\)\(\w+ \+ 0x[0-9a-f]+\))\) \{')
 
 def collapse_push_back(s):
     out = []
@@ -39,7 +39,9 @@ def collapse_push_back(s):
         ecb = match_brace(s, eob)
         then_body = s[ob + 1:cb]
         else_body = s[eob + 1:ecb]
-        if re.search(rf'\b{end_var} = {end_var} \+ \d+;', else_body) and ('FUN_00564a40' in then_body or 'FUN_00553660' in then_body or 'vec_' in then_body or 'realloc' in then_body):
+        grows = re.search(rf'(?<![\w*]){re.escape(end_var)} = {re.escape(end_var)} \+ \d+;', else_body) or \
+                re.search(r'(\*\(int \*\)\(\w+ \+ 0x[0-9a-f]+\)) = \1 \+ (?:\d+|0x[0-9a-f]+);', else_body)
+        if grows and ('FUN_00564a40' in then_body or 'FUN_00553660' in then_body or 'vec_' in then_body or 'realloc' in then_body):
             out.append(s[pos:m.start()])
             out.append('/* push_back */ {' + else_body + '}')
             pos = ecb + 1

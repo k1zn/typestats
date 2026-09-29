@@ -11,6 +11,8 @@ struct KeyRecord
     enum Flag : quint32 {
         ScanMask     = 0x000000FF,
         Transient    = 0x00000100, // internal, cleared on save
+        Erased       = 0x00000100, // set by Recalculate: the char was later deleted by BackSpace
+        Marked       = 0x00000200, // "Пометить (Ins)"
         Alt          = 0x00000400,
         Ctrl         = 0x00000800,
         Injected     = 0x00001000,
@@ -23,6 +25,7 @@ struct KeyRecord
         SingleChar   = 0x08000000,
         Packet       = 0x10000000,
         DeadKey      = 0x20000000,
+        SegmentStart = 0x40000000, // set by Recalculate: first press after a split pause
         Win          = 0x80000000,
     };
 

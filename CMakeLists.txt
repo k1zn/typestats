@@ -19,6 +19,10 @@ add_library(tscore STATIC ${CORE_SOURCES})
 target_include_directories(tscore PUBLIC src)
 target_link_libraries(tscore PUBLIC Qt6::Core)
 
+# --- command-line statistics (differential test bench) ---
+add_executable(tsstat src/cli/tsstat.cpp)
+target_link_libraries(tsstat PRIVATE tscore)
+
 # --- application ---
 file(GLOB APP_SOURCES CONFIGURE_DEPENDS
     src/platform/*.cpp src/platform/*.h
