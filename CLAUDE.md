@@ -52,10 +52,14 @@ src/core/      только QtCore, тестируемо
   KeyName.*           keyDisplayName(flags, ch) — порт 0x405fe0 — ГОТОВО
   Recalc.*            порт Recalculate: normalize / markErased / build → TextModel
                       (элементы, паузы, текст+стили, маппинги позиция→элемент/клавограмма/запись,
-                      клавограмма KlavRecord). Зоны пальцев (DAT_005b1404) ещё НЕ портированы
+                      клавограмма KlavRecord)
   MainStats.*         17 параметров ListView2 (compute/format/range/speedAndHold/formatTime) — ГОТОВО,
                       СВЕРЕНО с оригиналом (tst_orig)
   Graphs.*            серии графиков (FUN_00403868 + сглаживание 0x43d4cc), `re/graphs.md` — ГОТОВО, сверено побитно
+  IniFile.*           INI как у TIniFile (cp1251 или UTF-8, регистронезависимо); FingerZones.ini, .lng
+  FingerZones.*       зоны пальцев: FingerZones (встроенная «Стандарт», разбор/запись Finger0..7, редактор Tkbd,
+                      равенство), FingerZoneSchemes (FingerZones.ini + adopt() для LoadTsf), fingerSeries() — ГОТОВО,
+                      серия сверена с оригиналом побитно (tst_orig, series.finger)
   KeyList.*           ListView1 «Пауза/Длительность/Клавиша» (0x437d98 + 0x404c44, scrollForPosition 0x414500) —
                       ГОТОВО, сверено
 src/cli/tsstat.cpp  консольная утилита: `tsstat [--split MS] [--only-text] [--by-pauses] [--sel S L] [--text|--runs] f.tsf`
@@ -66,6 +70,7 @@ src/ui/, src/export/, i18n/   пусто
 resources/icons/    оригинальные иконки кнопок (<Form>_<SpeedButtonN>.png) + app.ico/png; resources.qrc
 tests/tst_tsf.cpp   юнит-тесты + golden: подпись и побайтовый round-trip 4 реальных файлов
 tests/tst_recalc.cpp  KeyName, разметка BS/Ctrl+BS, нормализация, текст/фрагменты, статистика на синтетике, golden-прогон
+tests/tst_zones.cpp FingerZones, FingerZoneSchemes, IniFile
 tests/tst_orig.cpp  ядро против записанного вывода оригинала (tests/golden/orig/*.json): ListView2, текст, стили,
                     выделения, ListView1 — 4 файла × 5 наборов опций
 tests/golden/       реальные .tsf пользователя с рабочего стола (801, 824, обыка, цифры13зн)
@@ -120,6 +125,8 @@ python re/scripts/diffstand.py [файлы] --offline                           
   - `strings_data.txt` — строки из .data;
   - `vmt_methods.json` — адреса обработчиков событий форм;
   - `tsf_format.md` — **спецификация формата и хука**;
+  - `finger_zones.md` — **зоны пальцев**: объект 0x5b1078, встроенная схема, FingerZones.ini, .tsf, Tkbd (геометрия, цвета);
+  - `extra_stats.md` — **Form3**: n-граммы, слова, предложения, шаблоны, фильтр, сортировки, формат, ExStats.ini, стенд;
   - `metrics.md` — **формулы основной статистики** (0x4255a8, 0x438304), форматы строк, разметка стёртых;
   - `text_reconstruction.md` — **Recalculate**: нормализация, KeyDisplayName, построение текста/абзацев/стилей,
     фрагменты, комментарии, маппинги, клавограмма.
@@ -164,7 +171,9 @@ python re/scripts/diffstand.py [файлы] --offline                           
 | Расчёт серий графиков для фрагмента (НЕ разобрано) | 0x403868 |
 | «Пометить (Ins)» — ставит флаг 0x200 | 0x419ed4 (SpeedButton13Click) |
 | ListView1 (Пауза/Длительность/Клавиша) заполнение | 0x404c44 (данные через 0x437d98) |
-| Form3 — доп. статистика | 0x43ff3c |
+| Form3 — доп. статистика (расчёт; фильтр 0x43fcac, преобразование имени 0x43f6e8, вывод 0x44559c, сортировка 0x445d38/0x445ac0) | 0x43ff3c |
+| Зоны пальцев: разбор/строка/home/равенство/редактор/встроенная | 0x449fb4 / 0x44b028 / 0x44b1bc / 0x44b2b0 / 0x44a298 / 0x44a1fc |
+| Tkbd: отрисовка клавиатуры / палитры | 0x44910c / 0x449854 |
 | Form4 — гистограммы | 0x451b88 |
 
 Вектор записей: `g_recBegin` / `g_recEnd` @ 0x5b0fe8 / 0x5b0fec, элемент 24 байта `KeyRec`.
@@ -208,16 +217,27 @@ python re/scripts/diffstand.py [файлы] --offline                           
 3a. ~~ListView1, серии графиков~~ — готово (`src/core/KeyList`, `src/core/Graphs`, `re/graphs.md`). Серии стенд читает
    из памяти оригинала; записаны пока только для 824.tsf. Отрисовка графиков (PaintBox1Paint → 0x43c6bc,
    оси/легенда/гистограммы) — на UI-этапе, современными средствами, но с тем же видом.
-4. **СЛЕДУЮЩЕЕ.** Остальные модули ядра, каждый — сначала `re/*.md`, потом `src/core` + сверка стендом:
-   - зоны пальцев: серия `DAT_005b1404` = `DAT_005b1278[scan & 0x7f]`, таблица из `FingerZones.ini`
-     (имя схемы — реестр `FingerZonesName`), Tkbd — клавиатура с зонами;
-   - Form3 «Дополнительная статистика» (0x43ff3c): n-граммы, слова, шаблоны, `ExStats.ini`;
-     финализация модели `FUN_0043ad1c` (слова), `DAT_005b1410 +0xa1/+0xc4`;
-   - Form4 «Дополнительные гистограммы» (0x451b88);
+4. Остальные модули ядра, каждый — сначала `re/*.md`, потом `src/core` + сверка стендом:
+   - ~~зоны пальцев~~ — готово (`re/finger_zones.md`, `src/core/FingerZones`, серия сверена);
+   - **СЛЕДУЮЩЕЕ: Form3** — реверс ЗАВЕРШЁН, всё в `re/extra_stats.md`. Осталось:
+     a) `src/core/ExtraStats.{h,cpp}`: parseTemplate, CharFilter, collect(model, fingers, b, e, kind, pattern, filter)
+        → вхождения (speed, pos, text); rows(вхождения, averages, sortMode, descending); occurrences(text) для ListView2;
+        formatSpeed = FloatToStrF(ffFixed, 8, 2) с округлением Delphi (половина от нуля, разделитель локали, без групп);
+        список шаблонов ExStats.ini (UTF-16 LE BOM / UTF-8 / cp1251);
+     b) юнит-тесты на синтетике (tst_extra.cpp);
+     c) стенд: открыть Form3 кликом по SpeedButton12 (WM_LBUTTONDOWN/UP панели), для каждого типа RadioGroup1 (BM_CLICK)
+        и режима «Средние» прочитать вектор строк `DAT_005b1544..1548` из памяти + текст TntListView1
+        (LVM_GETITEMTEXTW) → `tests/golden/orig/<файл>.json` ключ `extra`; сверка в tst_orig. Запускать на одном файле
+        (824.tsf), в фоне; шаблоны проверить на синтетике и 1–2 шаблонах в стенде;
+     d) tsstat: режим `--extra KIND` для дифф-стенда.
+   - Form4 «Дополнительные гистограммы» (0x451b88; функции 0x44d124, 0x44da90, 0x44e57c, 0x44ed0c, 0x44f52c,
+     0x44fe88 используют `DAT_005b1278`; строки «Длительности сочетаний», «Двойное нажатие на клавишу»,
+     «Та же рука (другой палец)», «Другая рука», «Все клавиши», «Все пальцы» — 0x58ecbe…);
    - журнал `.tsj` (запись с `dt ^ 0x554973`, `FUN_0040b288`); оригинал создаёт пустой `<год>_<месяц>.tsj`
      рядом с exe при каждом старте (стенд его удаляет).
    Для сверки новых модулей стенд дополняется: открыть форму оригинала (кнопка/меню через WM_COMMAND или
-   BM_CLICK) и считать её ListView, либо читать структуры из памяти (`win32remote.read_process`).
+   BM_CLICK, TSpeedButton — кликом по родителю) и считать её ListView, либо читать структуры из памяти
+   (`win32remote.read_process`).
 5. UI по `re/forms_dfm.txt`. Раскладка главного окна:
    - тулбар 57 px в две строки кнопок 23 px;
    - слева сверху вниз: RichEdit (текст, 120), PaintBox1 (график + скроллбар), PaintBox3 (клавограмма, 200);
