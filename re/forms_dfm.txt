@@ -1,0 +1,1284 @@
+===== TFORM1
+object Form1: TForm1
+  Left = 237
+  Top = 134
+  AutoScroll = False
+  Caption = 'Typing statistics v1.43c'
+  ClientHeight = 579
+  ClientWidth = 876
+  Color = 'ident:clBtnFace'
+  Constraints.MinWidth = 220
+  Font.Charset = 'ident:DEFAULT_CHARSET'
+  Font.Color = 'ident:clWindowText'
+  Font.Height = -11
+  Font.Name = 'MS Sans Serif'
+  Font.Style = set()
+  KeyPreview = True
+  OldCreateOrder = False
+  OnCanResize = 'ident:FormCanResize'
+  OnClose = 'ident:FormClose'
+  OnCreate = 'ident:FormCreate'
+  OnDestroy = 'ident:FormDestroy'
+  OnKeyDown = 'ident:FormKeyDown'
+  OnKeyPress = 'ident:FormKeyPress'
+  OnMouseWheel = 'ident:FormMouseWheel'
+  OnResize = 'ident:FormResize'
+  OnShow = 'ident:FormShow'
+  PixelsPerInch = 96
+  TextHeight = 13
+  object Panel18: TPanel
+    Align = 'ident:alClient'
+    object Splitter3: TSplitter
+      Cursor = 'ident:crHSplit'
+      Align = 'ident:alRight'
+      Beveled = True
+      MinSize = 100
+    end
+    object Panel3: TPanel
+      Align = 'ident:alRight'
+      object ListView1: TListView
+        Align = 'ident:alClient'
+        Columns = [{'Caption': 'Пауза', 'Width': 80}, {'Caption': 'Длительность', 'Width': 80}, {'AutoSize': True, 'Caption': 'Клавиша'}]
+        GridLines = True
+        ReadOnly = True
+        RowSelect = True
+        ViewStyle = 'ident:vsReport'
+      end
+      object ListView2: TListView
+        Align = 'ident:alTop'
+        Columns = [{'AutoSize': True, 'Caption': 'Параметр'}, {'Caption': 'Значение', 'Width': 92}]
+        GridLines = True
+        ReadOnly = True
+        RowSelect = True
+        ViewStyle = 'ident:vsReport'
+      end
+    end
+    object Panel6: TPanel
+      Align = 'ident:alClient'
+      BevelOuter = 'ident:bvNone'
+      Constraints.MinHeight = 150
+      object Splitter1: TSplitter
+        Cursor = 'ident:crVSplit'
+        Align = 'ident:alTop'
+        AutoSnap = False
+        Beveled = True
+        Color = 'ident:clBtnFace'
+        MinSize = 20
+        ParentColor = False
+        OnMoved = 'ident:Splitter1Moved'
+      end
+      object Splitter2: TSplitter
+        Cursor = 'ident:crVSplit'
+        Align = 'ident:alBottom'
+        Beveled = True
+        MinSize = 20
+        OnMoved = 'ident:Splitter2Moved'
+      end
+      object Panel1: TPanel
+        Align = 'ident:alClient'
+        BevelOuter = 'ident:bvNone'
+        FullRepaint = False
+        OnCanResize = 'ident:Panel1CanResize'
+        object PaintBox1: TPaintBox
+          Align = 'ident:alClient'
+          Color = 'ident:clBtnFace'
+          ParentColor = False
+          OnDblClick = 'ident:PaintBox1DblClick'
+          OnMouseDown = 'ident:PaintBox1MouseDown'
+          OnMouseMove = 'ident:PaintBox1MouseMove'
+          OnMouseUp = 'ident:PaintBox1MouseUp'
+          OnPaint = 'ident:PaintBox1Paint'
+        end
+        object Panel4: TPanel
+          Align = 'ident:alBottom'
+          AutoSize = True
+          object ScrollBar1: TScrollBar
+            Align = 'ident:alTop'
+            LargeChange = 100
+            PageSize = 0
+            TabStop = False
+            OnScroll = 'ident:ScrollBar1Scroll'
+          end
+        end
+      end
+      object Panel7: TPanel
+        Align = 'ident:alTop'
+        BevelOuter = 'ident:bvNone'
+        object Memo4: TRichEdit
+          Align = 'ident:alClient'
+          HideSelection = False
+          HideScrollBars = False
+          PopupMenu = 'ident:PopupMenu1'
+          ReadOnly = True
+          ScrollBars = 'ident:ssVertical'
+          WantReturns = False
+          OnKeyDown = 'ident:Memo4KeyDown'
+          OnMouseMove = 'ident:Memo4MouseMove'
+          OnSelectionChange = 'ident:Memo4SelectionChange'
+        end
+      end
+      object Panel8: TPanel
+        Align = 'ident:alBottom'
+        BevelOuter = 'ident:bvNone'
+        OnResize = 'ident:Panel8Resize'
+        object PaintBox3: TPaintBox
+          Align = 'ident:alClient'
+          OnDblClick = 'ident:PaintBox3DblClick'
+          OnMouseDown = 'ident:PaintBox3MouseDown'
+          OnMouseMove = 'ident:PaintBox3MouseMove'
+          OnMouseUp = 'ident:PaintBox3MouseUp'
+          OnPaint = 'ident:PaintBox3Paint'
+        end
+      end
+    end
+  end
+  object Panel19: TPanel
+    Align = 'ident:alTop'
+    object SpeedButton3: TSpeedButton
+      Hint = 'Справка'
+      OnClick = 'ident:SpeedButton3Click'
+    end
+    object SpeedButton5: TSpeedButton
+      Hint = 'Сохранить'
+      NumGlyphs = 2
+      OnClick = 'ident:SpeedButton5Click'
+    end
+    object SpeedButton6: TSpeedButton
+      Hint = 'Прочитать'
+      NumGlyphs = 2
+      OnClick = 'ident:SpeedButton6Click'
+    end
+    object SpeedButton1: TSpeedButton
+      Hint = 'Очистить (LCtrl+LWin)'
+      NumGlyphs = 2
+      OnClick = 'ident:Button2Click'
+    end
+    object SpeedButton7: TSpeedButton
+      Hint = 'Экспортировать в Excel'
+      OnClick = 'ident:SpeedButton7Click'
+    end
+    object SpeedButton4: TSpeedButton
+      Hint = 'Оперативная статистика'
+      OnClick = 'ident:ShowOpStat'
+    end
+    object SpeedButton12: TSpeedButton
+      Hint = 'Дополнительная статистика'
+      NumGlyphs = 2
+      OnClick = 'ident:ShowStats'
+    end
+    object Label1: TLabel
+      Caption = 'Пауза разбиения'
+    end
+    object Label2: TLabel
+      Caption = 'мс'
+    end
+    object SpeedButton8: TSpeedButton
+      Hint = 'Создать пресет (Правой кнопкой - удалить)'
+      NumGlyphs = 2
+      OnClick = 'ident:SpeedButton8Click'
+      OnMouseDown = 'ident:SpeedButton8MouseDown'
+    end
+    object SpeedButton2: TSpeedButton
+      Hint = 'Редактировать расстановку'
+      NumGlyphs = 2
+      OnClick = 'ident:SpeedButton2Click'
+    end
+    object Label3: TLabel
+      Caption = 'Пресет'
+    end
+    object Bevel1: TBevel
+      Shape = 'ident:bsLeftLine'
+    end
+    object Bevel2: TBevel
+      Shape = 'ident:bsLeftLine'
+    end
+    object Bevel3: TBevel
+      Shape = 'ident:bsLeftLine'
+    end
+    object Label4: TLabel
+      Caption = 'Пальцы'
+    end
+    object SpeedButton9: TSpeedButton
+      Hint = 'Создать расстановку (Правой кнопкой - удалить)'
+      NumGlyphs = 2
+      OnClick = 'ident:SpeedButton9Click'
+      OnMouseDown = 'ident:SpeedButton9MouseDown'
+    end
+    object SpeedButton10: TSpeedButton
+      Hint = 'Удалить (Del)'
+      Enabled = False
+      OnClick = 'ident:SpeedButton4Click'
+    end
+    object SpeedButton11: TSpeedButton
+      Hint = 'Копировать (Ctrl+C)'
+      OnClick = 'ident:N5Click'
+    end
+    object SpeedButton13: TSpeedButton
+      Hint = 'Копировать без ошибок'
+      OnClick = 'ident:N6Click'
+    end
+    object SpeedButton14: TSpeedButton
+      Hint = 'Отменить (Ctrl+Z)'
+      OnClick = 'ident:SpeedButton14Click'
+    end
+    object SpeedButton15: TSpeedButton
+      Hint = 'Пометить (Ins)'
+      OnClick = 'ident:SpeedButton13Click'
+    end
+    object SpeedButton16: TSpeedButton
+      Hint = ' Настройка оси Y графиков'
+      NumGlyphs = 2
+      OnClick = 'ident:N7Click'
+    end
+    object Bevel4: TBevel
+      Shape = 'ident:bsTopLine'
+    end
+    object SpeedButton17: TSpeedButton
+      Hint = 'Легенда'
+      NumGlyphs = 2
+      OnClick = 'ident:N8Click'
+    end
+    object SpeedButton18: TSpeedButton
+      Hint = 'Удалить нетекстовые клавиши'
+      NumGlyphs = 2
+      OnClick = 'ident:SpeedButton18Click'
+    end
+    object SpeedButton19: TSpeedButton
+      Hint = 'Статистические гистограммы'
+      NumGlyphs = 2
+      OnClick = 'ident:SpeedButton19Click'
+    end
+    object SpeedButton20: TSpeedButton
+      Hint = 'Видео'
+      OnClick = 'ident:SpeedButton20Click'
+    end
+    object SpeedButton21: TSpeedButton
+      Hint = 'Свойства видео'
+      NumGlyphs = 2
+      OnClick = 'ident:SpeedButton21Click'
+    end
+    object SpeedButton22: TSpeedButton
+      Hint = 'Настройки...'
+      OnClick = 'ident:SpeedButton22Click'
+    end
+    object SpeedButton23: TSpeedButton
+      Hint = 'Ввод текста (F4)'
+      NumGlyphs = 2
+      OnClick = 'ident:ShowInpText'
+    end
+    object SpeedButton24: TSpeedButton
+      Hint = 'Выход'
+      OnClick = 'ident:SpeedButton12Click'
+    end
+    object SpeedButton25: TSpeedButton
+      Hint = 'Преобразовать в текущую раскладку'
+      OnClick = 'ident:ConvCurLayout'
+    end
+    object SpeedButton26: TSpeedButton
+      Hint = 'Открыть журнал'
+      NumGlyphs = 2
+      OnClick = 'ident:SpeedButton26Click'
+    end
+    object SpeedButton27: TSpeedButton
+      Hint = 'Сохранить блок'
+      Enabled = False
+      NumGlyphs = 2
+      OnClick = 'ident:SpeedButton27Click'
+    end
+    object CheckBox1: TCheckBox
+      Hint = 'Управление перехватом (F8+F9)'
+      TabStop = False
+      Caption = 'Вкл'
+      Checked = True
+      State = 'ident:cbChecked'
+      OnClick = 'ident:CheckBox1Click'
+    end
+    object CheckBox3: TCheckBox
+      Hint = 'Режим "Один текст"/"Много текстов"'
+      Caption = 'Разбивать по паузам'
+      OnClick = 'ident:CheckBox2Click'
+    end
+    object CheckBox2: TCheckBox
+      Hint = 'Режим отображения'
+      Caption = 'Только текст'
+      Checked = True
+      State = 'ident:cbChecked'
+      OnClick = 'ident:CheckBox2Click'
+    end
+    object UpDown1: TUpDown
+      Associate = 'ident:Edit1'
+      Min = 200
+      Max = 10000
+      Increment = 100
+      Position = 500
+      Thousands = False
+      Wrap = False
+      OnClick = 'ident:UpDown1Click'
+    end
+    object Edit1: TEdit
+      Hint = 'Превышение этого времени считается за паузу в наборе'
+      Text = '500'
+      OnKeyPress = 'ident:Edit1KeyPress'
+    end
+    object ComboBox1: TComboBox
+      Hint = 'Пресеты настроек'
+      Style = 'ident:csDropDownList'
+      ItemHeight = 13
+      OnSelect = 'ident:ComboBox1Select'
+    end
+    object ComboBox4: TComboBox
+      Hint = 'Начальная позиция пальцев и расстановка по зонам'
+      Style = 'ident:csDropDownList'
+      ItemHeight = 13
+      OnSelect = 'ident:ComboBox4Select'
+    end
+    object CheckBox6: TCheckBox
+      Caption = 'Только PCmo'
+      Visible = False
+      OnClick = 'ident:CheckBox6Click'
+    end
+  end
+  object Panel9: TPanel
+    Visible = False
+    object Panel10: TPanel
+      Align = 'ident:alTop'
+      Alignment = 'ident:taLeftJustify'
+      BevelOuter = 'ident:bvSpace'
+      Caption = ' Настройка оси Y'
+      Color = 'ident:clActiveCaption'
+      OnMouseDown = 'ident:Panel10MouseDown'
+      OnMouseMove = 'ident:Panel10MouseMove'
+      object Panel11: TPanel
+        Align = 'ident:alRight'
+        BevelOuter = 'ident:bvSpace'
+        Caption = 'r'
+        Color = 208
+        Ctl3D = False
+        ParentCtl3D = False
+        OnClick = 'ident:Panel11Click'
+      end
+    end
+    object ComboBox2: TComboBox
+      AutoComplete = False
+      ItemHeight = 13
+      ItemIndex = 1
+      Text = '0'
+      OnKeyPress = 'ident:ComboBox5KeyPress'
+      OnSelect = 'ident:ComboBox5Select'
+      Items.Strings = ['Авто', '0']
+    end
+    object Panel13: TPanel
+      Alignment = 'ident:taLeftJustify'
+      Caption = ' Макс'
+    end
+    object Panel12: TPanel
+      Alignment = 'ident:taLeftJustify'
+      Caption = ' Мин'
+    end
+    object ComboBox3: TComboBox
+      AutoComplete = False
+      ItemHeight = 13
+      ItemIndex = 1
+      Text = '0'
+      OnKeyPress = 'ident:ComboBox5KeyPress'
+      OnSelect = 'ident:ComboBox5Select'
+      Items.Strings = ['Авто', '0']
+    end
+    object ComboBox5: TComboBox
+      AutoComplete = False
+      ItemHeight = 13
+      ItemIndex = 0
+      Text = 'Авто'
+      OnKeyPress = 'ident:ComboBox5KeyPress'
+      OnSelect = 'ident:ComboBox5Select'
+      Items.Strings = ['Авто', '100']
+    end
+    object ComboBox6: TComboBox
+      AutoComplete = False
+      ItemHeight = 13
+      ItemIndex = 1
+      Text = '100'
+      OnKeyPress = 'ident:ComboBox5KeyPress'
+      OnSelect = 'ident:ComboBox5Select'
+      Items.Strings = ['Авто', '100']
+    end
+    object Panel15: TPanel
+      Alignment = 'ident:taLeftJustify'
+      Caption = ' Ритмичность'
+    end
+    object Panel14: TPanel
+      Alignment = 'ident:taLeftJustify'
+      Caption = ' Скорость'
+    end
+    object CheckBox4: TCheckBox
+      Caption = 'Авто с округлением'
+      Checked = True
+      State = 'ident:cbChecked'
+      OnClick = 'ident:ComboBox5Select'
+    end
+    object CheckBox5: TCheckBox
+      Caption = 'Зафиксировать'
+      OnClick = 'ident:CheckBox5Click'
+    end
+  end
+  object Panel2: TPanel
+    BevelOuter = 'ident:bvNone'
+    BorderStyle = 'ident:bsSingle'
+    Color = 13172735
+    Ctl3D = False
+    FullRepaint = False
+    ParentCtl3D = False
+    Visible = False
+    object PaintBox2: TPaintBox
+      Align = 'ident:alClient'
+      OnMouseDown = 'ident:PaintBox1MouseDown'
+      OnMouseMove = 'ident:PaintBox2MouseMove'
+      OnMouseUp = 'ident:PaintBox1MouseUp'
+      OnPaint = 'ident:PaintBox2Paint'
+    end
+    object Panel16: TPanel
+      Align = 'ident:alTop'
+      Alignment = 'ident:taLeftJustify'
+      BevelOuter = 'ident:bvSpace'
+      Caption = ' Легенда'
+      Color = 'ident:clActiveCaption'
+      OnDblClick = 'ident:Panel16DblClick'
+      OnMouseDown = 'ident:Panel10MouseDown'
+      OnMouseMove = 'ident:Panel16MouseMove'
+      object Panel17: TPanel
+        Align = 'ident:alRight'
+        BevelOuter = 'ident:bvSpace'
+        Caption = 'r'
+        Color = 208
+        Ctl3D = False
+        ParentCtl3D = False
+        OnClick = 'ident:Panel17Click'
+      end
+    end
+  end
+  object Panel5: TPanel
+    Caption = 'Внимание! Файл повреждён!'
+    Color = 'ident:clMoneyGreen'
+    Visible = False
+  end
+  object Timer1: TTimer
+    Interval = 100
+    OnTimer = 'ident:Timer1Timer'
+  end
+  object OpenDialog1: TOpenDialog
+    DefaultExt = 'tsf'
+    Filter = 'Typing statistics files|*.tsf|Typing statistics journals|*.tsj'
+  end
+  object SaveDialog1: TSaveDialog
+    DefaultExt = 'tsf'
+    Filter = 'Typing statistics files|*.tsf'
+  end
+  object PopupMenu1: TPopupMenu
+    object N4: TMenuItem
+      Caption = 'Удалить'
+      Visible = False
+      OnClick = 'ident:SpeedButton4Click'
+    end
+    object N1: TMenuItem
+      Caption = 'Пометить'
+      Visible = False
+      OnClick = 'ident:SpeedButton13Click'
+    end
+    object N2: TMenuItem
+      Caption = 'Редактировать метку'
+      Visible = False
+      OnClick = 'ident:N2Click'
+    end
+    object N3: TMenuItem
+      Caption = 'Удалить метку'
+      Visible = False
+      OnClick = 'ident:N3Click'
+    end
+    object N5: TMenuItem
+      Caption = 'Копировать'
+      OnClick = 'ident:N5Click'
+    end
+    object N6: TMenuItem
+      Caption = 'Копировать без ошибок'
+      OnClick = 'ident:N6Click'
+    end
+    object N15: TMenuItem
+      Caption = 'Копировать с тегами'
+      OnClick = 'ident:N15Click'
+    end
+  end
+  object ApplicationEvents1: TApplicationEvents
+    OnActivate = 'ident:ApplicationEvents1Activate'
+    OnIdle = 'ident:ApplicationEvents1Idle'
+    OnRestore = 'ident:ApplicationEvents1Restore'
+  end
+  object PopupMenu2: TPopupMenu
+    object N7: TMenuItem
+      Caption = 'Настройка оси Y'
+      GroupIndex = 1
+      OnClick = 'ident:N7Click'
+    end
+    object N8: TMenuItem
+      Caption = 'Показать легенду'
+      GroupIndex = 1
+      Visible = False
+      OnClick = 'ident:N8Click'
+    end
+    object N12: TMenuItem
+      Caption = '-'
+      GroupIndex = 1
+    end
+    object N9: TMenuItem
+      Caption = 'Скорость'
+      Checked = True
+      GroupIndex = 1
+      RadioItem = True
+      OnClick = 'ident:N9Click'
+    end
+    object N10: TMenuItem
+      Caption = 'Ритмичность'
+      GroupIndex = 1
+      RadioItem = True
+      OnClick = 'ident:N9Click'
+    end
+    object N11: TMenuItem
+      Caption = 'Гистограмма'
+      GroupIndex = 1
+      RadioItem = True
+      OnClick = 'ident:N9Click'
+    end
+  end
+  object PopupMenu3: TPopupMenu
+    object N13: TMenuItem
+      Caption = 'О программе...'
+      OnClick = 'ident:N13Click'
+    end
+    object N14: TMenuItem
+      Caption = 'Справка'
+      OnClick = 'ident:N14Click'
+    end
+  end
+  object TrayIcon1: TTrayIcon
+    PopupMenu = 'ident:PopupMenu4'
+    Hide = True
+    RestoreOn = 'ident:imLeftClickUp'
+    PopupMenuOn = 'ident:imRightClickUp'
+    Icons = 'ident:ImageList1'
+    OnRestore = 'ident:TrayIcon1Restore'
+  end
+  object PopupMenu4: TPopupMenu
+    object N16: TMenuItem
+      AutoCheck = True
+      Caption = 'Вкл'
+      Checked = True
+      OnClick = 'ident:N16Click'
+    end
+    object N17: TMenuItem
+      Caption = 'Оперативная статистика'
+      OnClick = 'ident:ShowOpStat'
+    end
+    object N18: TMenuItem
+      Caption = 'Выход'
+      OnClick = 'ident:SpeedButton12Click'
+    end
+  end
+  object ImageList1: TImageList
+    Bitmap = '<binary 4390>'
+  end
+end
+===== TFORM3
+object Form3: TForm3
+  Left = 641
+  Top = 96
+  Width = 314
+  Height = 634
+  HorzScrollBar.Visible = False
+  VertScrollBar.Visible = False
+  BorderIcons = {'biSystemMenu'}
+  Caption = 'Дополнительная статистика'
+  Color = 'ident:clBtnFace'
+  Constraints.MinHeight = 450
+  Constraints.MinWidth = 230
+  Font.Charset = 'ident:DEFAULT_CHARSET'
+  Font.Color = 'ident:clWindowText'
+  Font.Height = -11
+  Font.Name = 'MS Sans Serif'
+  Font.Style = set()
+  OldCreateOrder = False
+  OnCreate = 'ident:FormCreate'
+  OnDestroy = 'ident:FormDestroy'
+  OnResize = 'ident:FormResize'
+  OnShow = 'ident:FormShow'
+  PixelsPerInch = 96
+  TextHeight = 13
+  object Splitter1: TSplitter
+    Cursor = 'ident:crVSplit'
+    Align = 'ident:alBottom'
+    AutoSnap = False
+    MinSize = 100
+    Visible = False
+  end
+  object RadioGroup1: TRadioGroup
+    Align = 'ident:alTop'
+    Caption = 'Тип статистики'
+    ItemIndex = 3
+    Items.Strings = ['Двухсимвольные сочетания', 'Трёхсимвольные сочетания', 'Четырёхсимвольные сочетания', 'Слова', 'Слова с ошибками', 'Предложения', 'Шаблон']
+    OnClick = 'ident:RadioGroup1Click'
+  end
+  object Panel1: TPanel
+    Align = 'ident:alTop'
+    object SpeedButton1: TSpeedButton
+      Hint = 'Копировать'
+      OnClick = 'ident:SpeedButton1Click'
+    end
+    object SpeedButton7: TSpeedButton
+      Hint = 'Экспортировать в Excel'
+      OnClick = 'ident:SpeedButton7Click'
+    end
+    object SpeedButton4: TSpeedButton
+      Hint = 'Поверх всех окон'
+      AllowAllUp = True
+      GroupIndex = 1
+      NumGlyphs = 2
+      OnClick = 'ident:SpeedButton4Click'
+    end
+    object SpeedButton2: TSpeedButton
+      Hint = 'Сохранить'
+      NumGlyphs = 2
+      OnClick = 'ident:SpeedButton2Click'
+    end
+    object CheckBox2: TCheckBox
+      Caption = 'Средние значения'
+      OnClick = 'ident:CheckBox2Click'
+    end
+    object CheckBox1: TCheckBox
+      Caption = 'Заблокировать'
+      OnClick = 'ident:CheckBox1Click'
+    end
+  end
+  object TntListView1: TTntListView
+    Align = 'ident:alClient'
+    Columns = [{'Caption': '▲Скорость', 'Width': 92, 'Caption_UTF7': '+JbIEIQQ6BD4EQAQ+BEEEQgRM'}, {'AutoSize': True, 'Caption': 'Текст', 'Tag': 1, 'Caption_UTF7': '+BCIENQQ6BEEEQg'}]
+    GridLines = True
+    HideSelection = False
+    MultiSelect = True
+    OwnerData = True
+    ReadOnly = True
+    RowSelect = True
+    ViewStyle = 'ident:vsReport'
+    OnColumnClick = 'ident:TntListView1ColumnClick'
+    OnData = 'ident:TntListView1Data'
+    OnSelectItem = 'ident:ListView1SelectItem'
+  end
+  object ListView2: TTntListView
+    Align = 'ident:alBottom'
+    Columns = [{'Caption': 'Скорость', 'Width': 92, 'Caption_UTF7': '+BCEEOgQ+BEAEPgRBBEIETA'}, {'AutoSize': True, 'Caption': 'Текст', 'Caption_UTF7': '+BCIENQQ6BEEEQg'}]
+    GridLines = True
+    HideSelection = False
+    MultiSelect = True
+    OwnerData = True
+    ReadOnly = True
+    RowSelect = True
+    ViewStyle = 'ident:vsReport'
+    Visible = False
+    OnData = 'ident:ListView2Data'
+    OnSelectItem = 'ident:ListView2SelectItem'
+  end
+  object StatusBar1: TStatusBar
+    Panels = []
+    SimplePanel = True
+  end
+  object GroupBox1: TGroupBox
+    Align = 'ident:alTop'
+    Caption = 'Фильтр по символам'
+    object CheckBox3: TCheckBox
+      Caption = 'Только эти'
+      OnClick = 'ident:TntEdit1Change'
+    end
+    object CheckBox4: TCheckBox
+      Caption = 'Один из'
+      OnClick = 'ident:TntEdit1Change'
+    end
+    object CheckBox5: TCheckBox
+      Caption = 'Исключить'
+      OnClick = 'ident:TntEdit1Change'
+    end
+    object TntEdit1: TTntEdit
+      OnChange = 'ident:TntEdit1Change'
+    end
+    object TntEdit2: TTntEdit
+      OnChange = 'ident:TntEdit1Change'
+    end
+    object TntEdit3: TTntEdit
+      OnChange = 'ident:TntEdit1Change'
+    end
+  end
+  object Panel2: TPanel
+    object TntComboBox1: TTntComboBox
+      Align = 'ident:alClient'
+      AutoComplete = False
+      ItemHeight = 15
+      OnChange = 'ident:TntEdit5Change'
+    end
+    object Panel3: TPanel
+      Align = 'ident:alRight'
+      BevelOuter = 'ident:bvNone'
+      object SpeedButton8: TSpeedButton
+        Hint = 'Записать шаблон (Правой кнопкой - удалить)'
+        NumGlyphs = 2
+        OnClick = 'ident:SpeedButton8Click'
+        OnMouseDown = 'ident:SpeedButton8MouseDown'
+      end
+    end
+  end
+  object SaveDialog1: TSaveDialog
+    DefaultExt = 'tsf'
+    Filter = 'txt|*.txt'
+  end
+end
+===== TFORM2
+object Form2: TForm2
+  Left = 369
+  Top = 147
+  BorderIcons = set()
+  BorderStyle = 'ident:bsSingle'
+  Caption = 'Свойства файла'
+  ClientHeight = 198
+  ClientWidth = 259
+  Color = 'ident:clBtnFace'
+  Font.Charset = 'ident:DEFAULT_CHARSET'
+  Font.Color = 'ident:clWindowText'
+  Font.Height = -11
+  Font.Name = 'MS Sans Serif'
+  Font.Style = set()
+  OldCreateOrder = False
+  Position = 'ident:poMainFormCenter'
+  PixelsPerInch = 96
+  TextHeight = 13
+  object Label1: TLabel
+    Caption = 'Автор'
+  end
+  object Label3: TLabel
+    Caption = 'Дата'
+  end
+  object Label4: TLabel
+    Caption = 'Описание'
+  end
+  object Edit1: TEdit
+  end
+  object Edit3: TEdit
+    ReadOnly = True
+  end
+  object Memo1: TMemo
+    WantReturns = False
+  end
+  object BitBtn1: TBitBtn
+    Kind = 'ident:bkOK'
+  end
+  object BitBtn2: TBitBtn
+    Caption = 'Отмена'
+    Kind = 'ident:bkCancel'
+  end
+end
+===== TFORM6
+object Form6: TForm6
+  Left = 461
+  Top = 189
+  BorderIcons = set()
+  BorderStyle = 'ident:bsSingle'
+  Caption = 'Свойства видео'
+  ClientHeight = 142
+  ClientWidth = 140
+  Color = 'ident:clBtnFace'
+  Font.Charset = 'ident:DEFAULT_CHARSET'
+  Font.Color = 'ident:clWindowText'
+  Font.Height = -11
+  Font.Name = 'MS Sans Serif'
+  Font.Style = set()
+  OldCreateOrder = False
+  PixelsPerInch = 96
+  TextHeight = 13
+  object CheckBox1: TCheckBox
+    Caption = 'Прикрепить видео'
+  end
+  object LabeledEdit1: TLabeledEdit
+    EditLabel.Width = 57
+    EditLabel.Height = 13
+    EditLabel.Caption = 'Имя файла'
+    LabelPosition = 'ident:lpAbove'
+    LabelSpacing = 3
+  end
+  object LabeledEdit2: TLabeledEdit
+    EditLabel.Width = 97
+    EditLabel.Height = 13
+    EditLabel.Caption = 'Сдвиг времени, мс'
+    LabelPosition = 'ident:lpAbove'
+    LabelSpacing = 3
+  end
+  object BitBtn1: TBitBtn
+    Kind = 'ident:bkOK'
+  end
+end
+===== TFORM7
+object Form7: TForm7
+  Left = 320
+  Top = 202
+  BorderIcons = {'biSystemMenu'}
+  BorderStyle = 'ident:bsDialog'
+  Caption = 'О программе'
+  ClientHeight = 252
+  ClientWidth = 508
+  Color = 'ident:clBtnFace'
+  Font.Charset = 'ident:DEFAULT_CHARSET'
+  Font.Color = 'ident:clWindowText'
+  Font.Height = -11
+  Font.Name = 'MS Sans Serif'
+  Font.Style = set()
+  OldCreateOrder = False
+  Position = 'ident:poMainFormCenter'
+  OnCreate = 'ident:FormCreate'
+  PixelsPerInch = 96
+  TextHeight = 13
+  object TntLabel1: TTntLabel
+    Alignment = 'ident:taRightJustify'
+    AutoSize = False
+    Caption = 'Заходите к нам на'
+  end
+  object TntLabel2: TTntLabel
+    Alignment = 'ident:taRightJustify'
+    AutoSize = False
+    Caption = 'Заглядывайте на'
+  end
+  object TntLabel3: TTntLabel
+    Alignment = 'ident:taRightJustify'
+    AutoSize = False
+    Caption = 'Пишите'
+  end
+  object TntLabel4: TTntLabel
+    Alignment = 'ident:taRightJustify'
+    AutoSize = False
+    Caption = 'Набирайте'
+  end
+  object TntLabel5: TTntLabel
+    Alignment = 'ident:taRightJustify'
+    AutoSize = False
+    Caption = 'Будьте'
+  end
+  object TntLabel6: TTntLabel
+    Cursor = 'ident:crHandPoint'
+    Caption = 'сайт'
+    OnClick = 'ident:Label5Click'
+  end
+  object TntLabel7: TTntLabel
+    Cursor = 'ident:crHandPoint'
+    Caption = 'форум'
+    OnClick = 'ident:Label7Click'
+  end
+  object TntLabel8: TTntLabel
+    Cursor = 'ident:crHandPoint'
+    Caption = 'письма'
+    OnClick = 'ident:Label8Click'
+  end
+  object TntLabel9: TTntLabel
+    Cursor = 'ident:crHandPoint'
+    Caption = 'вслепую'
+    OnClick = 'ident:Label13Click'
+  end
+  object TntLabel10: TTntLabel
+    Cursor = 'ident:crHandPoint'
+    Caption = 'счастливы'
+    OnClick = 'ident:Label15Click'
+  end
+  object Panel2: TPanel
+    Align = 'ident:alTop'
+    Color = 10539263
+    object Label2: TLabel
+      Caption = 'T'
+      Transparent = True
+    end
+    object Label6: TLabel
+      Caption = 'S'
+      Transparent = True
+    end
+    object Label10: TLabel
+      Caption = 'Анализатор статистики'
+    end
+    object Label11: TLabel
+      Alignment = 'ident:taRightJustify'
+      AutoSize = False
+      Caption = 'Игорь В. Филимонов'
+    end
+    object Label9: TLabel
+      Caption = 'клавиатурного набора'
+    end
+    object Label12: TLabel
+      Alignment = 'ident:taRightJustify'
+      AutoSize = False
+      Caption = 'Первая версия вышла 27 ноября 2008 года'
+      Color = 10539263
+      ParentColor = False
+    end
+  end
+  object TntStaticText1: TTntStaticText
+    AutoSize = False
+    BevelKind = 'ident:bkSoft'
+  end
+end
+===== TFORM8
+object Form8: TForm8
+  Left = 309
+  Top = 186
+  BorderIcons = {'biSystemMenu'}
+  BorderStyle = 'ident:bsDialog'
+  Caption = 'Настройки'
+  ClientHeight = 317
+  ClientWidth = 589
+  Color = 'ident:clBtnFace'
+  Font.Charset = 'ident:DEFAULT_CHARSET'
+  Font.Color = 'ident:clWindowText'
+  Font.Height = -11
+  Font.Name = 'MS Sans Serif'
+  Font.Style = set()
+  OldCreateOrder = False
+  Position = 'ident:poMainFormCenter'
+  OnCreate = 'ident:FormCreate'
+  PixelsPerInch = 96
+  TextHeight = 13
+  object Label3: TLabel
+    Caption = 'Точность времени в списке длительностей'
+  end
+  object Label6: TLabel
+    Caption = 'Основная статистика'
+  end
+  object Label7: TLabel
+    Caption = 'Язык'
+  end
+  object GroupBox1: TGroupBox
+    Caption = 'Глобальные горячие клавиши'
+    object CheckBox1: TCheckBox
+      Caption = 'LCtrl+LWin (Очистить)'
+      Checked = True
+      State = 'ident:cbChecked'
+    end
+    object CheckBox2: TCheckBox
+      Caption = 'F8+F9 (Управление перехватом)'
+      Checked = True
+      State = 'ident:cbChecked'
+    end
+  end
+  object GroupBox2: TGroupBox
+    Caption = 'Размер шрифта'
+    object Label1: TLabel
+      Caption = 'Текст'
+    end
+    object Label2: TLabel
+      Caption = 'Клавограмма'
+    end
+    object UpDown1: TUpDown
+      Associate = 'ident:StaticText1'
+      Min = 8
+      Max = 24
+      Position = 12
+      Wrap = False
+    end
+    object UpDown2: TUpDown
+      Associate = 'ident:StaticText2'
+      Min = 8
+      Max = 24
+      Position = 9
+      Wrap = False
+    end
+    object StaticText1: TStaticText
+      Alignment = 'ident:taCenter'
+      AutoSize = False
+      BevelKind = 'ident:bkFlat'
+      Caption = '12'
+      Color = 'ident:clWhite'
+      ParentColor = False
+    end
+    object StaticText2: TStaticText
+      Alignment = 'ident:taCenter'
+      AutoSize = False
+      BevelKind = 'ident:bkFlat'
+      Caption = '9'
+      Color = 'ident:clWhite'
+      ParentColor = False
+    end
+  end
+  object Button1: TButton
+    Caption = 'Ok'
+    Default = True
+    ModalResult = 1
+  end
+  object Button2: TButton
+    Caption = 'Отмена'
+    ModalResult = 2
+  end
+  object UpDown3: TUpDown
+    Associate = 'ident:StaticText3'
+    Min = 0
+    Max = 3
+    Position = 3
+    Wrap = False
+  end
+  object StaticText3: TStaticText
+    Alignment = 'ident:taCenter'
+    AutoSize = False
+    BevelKind = 'ident:bkFlat'
+    Caption = '3'
+    Color = 'ident:clWhite'
+    ParentColor = False
+  end
+  object GroupBox3: TGroupBox
+    Caption = 'Оперативная статистика'
+    object Label4: TLabel
+      Caption = 'Нижняя скорость '
+    end
+    object Label5: TLabel
+      Caption = 'Верхняя скорость '
+    end
+    object Edit1: TEdit
+      Text = '200'
+    end
+    object Edit2: TEdit
+      Text = '600'
+    end
+  end
+  object CheckListBox1: TCheckListBox
+    ItemHeight = 13
+    Items.Strings = ['Символов', 'Общее время', 'min пауза', 'max пауза', 'Средняя пауза', 'Среднее время удержания', 'Скорость spm', 'Скорость wpm', 'Скорость нетто', 'Скорость брутто', 'Скорость брутто+', 'Скорость брутто*', 'Потери от исправлений', 'Аритмия', 'Исправлений', 'Серий исправлений', 'max без исправлений']
+  end
+  object GroupBox4: TGroupBox
+    Caption = 'Копирование текста с тегами (для вставки в блог)'
+    object CheckBox3: TCheckBox
+      Caption = 'Выделять исправления цветом'
+      Checked = True
+      State = 'ident:cbChecked'
+    end
+    object CheckBox4: TCheckBox
+      Caption = 'Выделять исправления зачёркиванием'
+      Checked = True
+      State = 'ident:cbChecked'
+    end
+    object CheckBox5: TCheckBox
+      Caption = 'Выделять цветом следующий символ'
+      Checked = True
+      State = 'ident:cbChecked'
+    end
+  end
+  object ComboBox1: TComboBox
+    Style = 'ident:csDropDownList'
+    ItemHeight = 13
+  end
+  object CheckBox6: TCheckBox
+    Caption = 'Запускать Ts на одном ядре'
+    Checked = True
+    State = 'ident:cbChecked'
+  end
+  object CheckBox7: TCheckBox
+    Caption = 'Вести журнал'
+  end
+  object CheckBox8: TCheckBox
+    Caption = 'Автокомментарии'
+  end
+  object CheckBox9: TCheckBox
+    Caption = 'Сворачивать в трей'
+  end
+  object CheckBox10: TCheckBox
+    Caption = 'Сворачивать при старте'
+  end
+end
+===== TFORM9
+object Form9: TForm9
+  Left = 437
+  Top = 273
+  Width = 459
+  Height = 108
+  BorderStyle = 'ident:bsSizeToolWin'
+  Caption = 'Ввод текста'
+  Color = 'ident:clBtnFace'
+  Font.Charset = 'ident:DEFAULT_CHARSET'
+  Font.Color = 'ident:clWindowText'
+  Font.Height = -11
+  Font.Name = 'MS Sans Serif'
+  Font.Style = set()
+  FormStyle = 'ident:fsStayOnTop'
+  OldCreateOrder = False
+  PixelsPerInch = 96
+  TextHeight = 13
+  object RichEdit1: TRichEdit
+    Align = 'ident:alClient'
+    ScrollBars = 'ident:ssVertical'
+    OnKeyDown = 'ident:RichEdit1KeyDown'
+  end
+end
+===== TFORM10
+object Form10: TForm10
+  Left = 568
+  Top = 210
+  Width = 168
+  Height = 157
+  BorderStyle = 'ident:bsSizeToolWin'
+  Caption = 'Оперативная статистика'
+  Color = 'ident:clWhite'
+  Font.Charset = 'ident:DEFAULT_CHARSET'
+  Font.Color = 'ident:clWindowText'
+  Font.Height = -37
+  Font.Name = 'Arial'
+  Font.Style = {'fsBold'}
+  FormStyle = 'ident:fsStayOnTop'
+  OldCreateOrder = False
+  OnActivate = 'ident:FormActivate'
+  OnKeyDown = 'ident:FormKeyDown'
+  OnResize = 'ident:FormResize'
+  OnShow = 'ident:FormShow'
+  PixelsPerInch = 96
+  TextHeight = 44
+  object Label1: TLabel
+    Align = 'ident:alClient'
+    Alignment = 'ident:taCenter'
+    AutoSize = False
+    Caption = '0'
+    Color = 'ident:clSilver'
+    ParentColor = False
+  end
+  object Label2: TLabel
+    Align = 'ident:alBottom'
+    Alignment = 'ident:taCenter'
+    AutoSize = False
+    Caption = '0,00%'
+  end
+  object Splitter1: TSplitter
+    Cursor = 'ident:crVSplit'
+    Align = 'ident:alBottom'
+    AutoSnap = False
+    Beveled = True
+    MinSize = 15
+    OnMoved = 'ident:FormResize'
+  end
+  object StatusBar1: TStatusBar
+    Panels = []
+    SimplePanel = True
+  end
+end
+===== TFORM4
+object Form4: TForm4
+  Left = 331
+  Top = 51
+  Width = 644
+  Height = 507
+  Caption = 'Статистические гистограммы'
+  Color = 'ident:clBtnFace'
+  Font.Charset = 'ident:DEFAULT_CHARSET'
+  Font.Color = 'ident:clWindowText'
+  Font.Height = -11
+  Font.Name = 'MS Sans Serif'
+  Font.Style = set()
+  OldCreateOrder = False
+  OnCreate = 'ident:FormCreate'
+  OnResize = 'ident:FormResize'
+  OnShow = 'ident:FormShow'
+  PixelsPerInch = 96
+  TextHeight = 13
+  object PaintBox1: TPaintBox
+    Align = 'ident:alClient'
+    OnDblClick = 'ident:PaintBox1DblClick'
+    OnMouseDown = 'ident:PaintBox1MouseDown'
+    OnMouseMove = 'ident:PaintBox1MouseMove'
+    OnMouseUp = 'ident:PaintBox1MouseUp'
+    OnPaint = 'ident:PaintBox1Paint'
+  end
+  object Panel1: TPanel
+    Align = 'ident:alTop'
+    object TntLabel1: TTntLabel
+      Caption = 'TntLabel1'
+    end
+    object SpeedButton1: TSpeedButton
+      Hint = 'Назад'
+      OnClick = 'ident:SpeedButton1Click'
+    end
+    object SpeedButton2: TSpeedButton
+      Hint = 'Клавиши'
+      OnClick = 'ident:SpeedButton2Click'
+    end
+    object SpeedButton3: TSpeedButton
+      Hint = 'Пальцы'
+      NumGlyphs = 2
+      OnClick = 'ident:SpeedButton3Click'
+    end
+    object SpeedButton12: TSpeedButton
+      Hint = 'Дополнительная статистика'
+      NumGlyphs = 2
+      OnClick = 'ident:SpeedButton12Click'
+    end
+    object SpeedButton4: TSpeedButton
+      Hint = 'Поверх всех окон'
+      AllowAllUp = True
+      GroupIndex = 1
+      NumGlyphs = 2
+      OnClick = 'ident:SpeedButton4Click'
+    end
+  end
+end
+===== TFORM5
+object Form5: TForm5
+  Left = 380
+  Top = 0
+  BorderIcons = {'biSystemMenu', 'biMinimize'}
+  BorderStyle = 'ident:bsToolWindow'
+  Caption = 'Видео'
+  ClientHeight = 334
+  ClientWidth = 534
+  Color = 'ident:clBtnFace'
+  Font.Charset = 'ident:DEFAULT_CHARSET'
+  Font.Color = 'ident:clWindowText'
+  Font.Height = -11
+  Font.Name = 'MS Sans Serif'
+  Font.Style = set()
+  FormStyle = 'ident:fsStayOnTop'
+  OldCreateOrder = False
+  PixelsPerInch = 96
+  TextHeight = 13
+  object PaintBox1: TPaintBox
+    Align = 'ident:alClient'
+    OnPaint = 'ident:PaintBox1Paint'
+  end
+end
+===== TKBD
+object kbd: Tkbd
+  Left = 95
+  Top = 183
+  BorderIcons = {'biSystemMenu'}
+  BorderStyle = 'ident:bsDialog'
+  Caption = 'Клавиатура'
+  ClientHeight = 181
+  ClientWidth = 802
+  Color = 'ident:clBtnFace'
+  Font.Charset = 'ident:DEFAULT_CHARSET'
+  Font.Color = 'ident:clWindowText'
+  Font.Height = -11
+  Font.Name = 'MS Sans Serif'
+  Font.Style = set()
+  KeyPreview = True
+  OldCreateOrder = False
+  Position = 'ident:poMainFormCenter'
+  OnActivate = 'ident:FormActivate'
+  OnDestroy = 'ident:FormDestroy'
+  OnKeyDown = 'ident:FormKeyDown'
+  OnKeyUp = 'ident:FormKeyDown'
+  PixelsPerInch = 96
+  TextHeight = 13
+  object Panel2: TPanel
+    Align = 'ident:alClient'
+    object PaintBox1: TPaintBox
+      Align = 'ident:alClient'
+      OnMouseDown = 'ident:PaintBox1MouseDown'
+      OnPaint = 'ident:PaintBox1Paint'
+    end
+    object PaintBox2: TPaintBox
+      Align = 'ident:alRight'
+      OnMouseDown = 'ident:PaintBox2MouseDown'
+      OnPaint = 'ident:PaintBox2Paint'
+    end
+  end
+end

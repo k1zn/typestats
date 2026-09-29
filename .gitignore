@@ -1,0 +1,5 @@
+build/
+/tools/
+*.user
+re/ghidra_proj/
+*.log

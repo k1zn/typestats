@@ -1,0 +1,1635 @@
+0x18e000 Borland C++ - Copyright 2002 Borland Corporation
+0x18e164 Ьяяяи
+0x18e195 TypingStatistics
+0x18e1c8 яяяяяяяя
+0x18e3d0 ряяяизB
+0x18e3e8 ияяяизB
+0x18e400 аяяяизB
+0x18e418 ШяяяизB
+0x18ea84 сим/мин
+0x18ea92 Внимание!
+0x18ea9c Ошибка открытия файла
+0x18eab2 Этот файл создан в более поздней версии Typing Statistics.
+            Обновите программу, пожалуйста.
+0x18eb19 Текстовая метка
+0x18eb29 Текст метки
+0x18eb35 Стандарт
+0x18eb3e Создание нового пресета настроек
+0x18eb5f Название пресета
+0x18eb70 Вы действительно хотите удалить пресет?
+0x18eb98 Удаление пресета
+0x18eba9 Зоны пальцев и начальная позиция
+0x18ebca Создание расстановки пальцев
+0x18ebe7 Название расстановки
+0x18ebfc Стандартуную расстановку удалить нельзя
+0x18ec24 Ошибка удаления расстановки
+0x18ec40 Вы действительно хотите удалить расстановку?
+0x18ec6d Удаление расстановки пальцев
+0x18ec8a сим. за
+0x18ec92 Журнал
+0x18ec99 Всего:
+0x18eca0 Кол-во
+0x18eca7 Скорость
+0x18ecb0 Текст
+0x18ecb6 Клавиша
+0x18ecbe Длительности сочетаний
+0x18ecd5 Клавиша
+0x18ecdd Палец
+0x18ece8 Прочее
+0x18ecef Двойное нажатие на клавишу
+0x18ed0a Разные клавиши
+0x18ed19 Та же рука (другой палец)
+0x18ed33 Другая рука
+0x18ed57 Прочие
+0x18ed5e Все клавиши
+0x18ed6a Все пальцы
+0x18ed75 /б - строчная русская буква/Б - заглавная русская буква/* - любой символ/0 - цифра/, - знак препинания или спецсимвол/е - ошибка/c - строчная латинская буква/С - заглавная латинская буква/1 - клавиша, нажатая левым мизинцем (аналогично /2 - /9)/( - клавиша, нажатая левой рукой/) - клавиша, нажатая правой рукой
+0x18eebf FingerZones.ini
+0x18eecf Finger
+0x18eed6 Finger
+0x18eee7 intf==0
+0x18eeef c:\program files (x86)\borland\cbuilder6\include\vcl\utilcls.h
+0x18ef2e GetIID() != GUID_NULL
+0x18ef44 c:\program files (x86)\borland\cbuilder6\include\vcl\utilcls.h
+0x18ef83 src->QueryInterface(GetIID(), (LPVOID*)(&intf))
+0x18efb3 c:\program files (x86)\borland\cbuilder6\include\vcl\utilcls.h
+0x18eff2 intf != 0
+0x18effc c:\program files (x86)\borland\cbuilder6\include\vcl\utilcls.h
+0x18f03b intf != 0
+0x18f045 c:\program files (x86)\borland\cbuilder6\include\vcl\utilcls.h
+0x18f084 this->Freeze((long*)&pCount)
+0x18f0a1 D:\FilWork\BCB\TypingStatistics\Work\tom_TLB.h
+0x18f0d0 intf != 0
+0x18f0da c:\program files (x86)\borland\cbuilder6\include\vcl\utilcls.h
+0x18f119 this->Range(cp1, cp2, (Tom_tlb::ITextSelection**)&ppRange)
+0x18f154 D:\FilWork\BCB\TypingStatistics\Work\tom_TLB.h
+0x18f183 intf != 0
+0x18f18d c:\program files (x86)\borland\cbuilder6\include\vcl\utilcls.h
+0x18f1cc intf != 0
+0x18f1d6 c:\program files (x86)\borland\cbuilder6\include\vcl\utilcls.h
+0x18f215 this->get_Font((Tom_tlb::ITextFont**)&pFont)
+0x18f242 D:\FilWork\BCB\TypingStatistics\Work\tom_TLB.h
+0x18f271 intf != 0
+0x18f27b c:\program files (x86)\borland\cbuilder6\include\vcl\utilcls.h
+0x18f2ba intf != 0
+0x18f2c4 c:\program files (x86)\borland\cbuilder6\include\vcl\utilcls.h
+0x18f303 intf != 0
+0x18f30d c:\program files (x86)\borland\cbuilder6\include\vcl\utilcls.h
+0x18f34c intf != 0
+0x18f356 c:\program files (x86)\borland\cbuilder6\include\vcl\utilcls.h
+0x18f395 this->Unfreeze((long*)&pCount)
+0x18f3b4 D:\FilWork\BCB\TypingStatistics\Work\tom_TLB.h
+0x18f3e3 %s @ %s/%d
+0x18f3ee _ASSERTE: 
+0x18f3f9 %s failed - %s/%d
+0x18f40e %s
+Press [Y]es to terminate, [N]o to continue and [C]ancel to Debug
+0x18f456 '%s': %s @ %s/%d
+0x18f467 (%s) Error: %lX (%ld) @ %s/%d
+0x18f485 HRCHECK: 
+0x18f48f Pause
+0x18f495 Caps Lock
+0x18f49f Page Up
+0x18f4a7 Page Down
+0x18f4c2 Right
+0x18f4cd Print Screen
+0x18f4da Insert
+0x18f4e1 Delete
+0x18f4e8 [LWin]
+0x18f4ef [RWin]
+0x18f4f6 SysMenu
+0x18f525 Num Lock
+0x18f52e Scroll Lock
+0x18f53a LShift
+0x18f541 RShift
+0x18f548 [LCtrl]
+0x18f550 [RCtrl]
+0x18f558 [LAlt]
+0x18f55f [RAlt]
+0x18f566 Unrecognized key
+0x18f577 BackSpace
+0x18f5aa Software
+0x18f5b3 Pause
+0x18f5b9 TextOnly
+0x18f5c2 SplitOnEnter
+0x18f5cf UserName
+0x18f5d8 GlobalClear
+0x18f5e4 GlobalOnOff
+0x18f5f0 TextFontSize
+0x18f5fd KlavogrFontSize
+0x18f60d DlitDigits
+0x18f618 MainOption
+0x18f623 CopyBlock1
+0x18f62e CopyBlock2
+0x18f639 CopyBlock3
+0x18f644 OneProcessor
+0x18f651 JournalOn
+0x18f65b AutoComments
+0x18f668 MinimizeToTray
+0x18f677 AutoMinimize
+0x18f684 Software
+0x18f68d UserName
+0x18f696 Profile
+0x18f69e MainWinLeft
+0x18f6aa MainWinTop
+0x18f6b5 Language
+0x18f6be \Software\Classes\.tsf
+0x18f6d5 tsFile
+0x18f6dc Typing statistics file
+0x18f6f3 Открыть
+0x18f6fb \Software\Classes\
+0x18f710 Shell
+0x18f71c command
+0x18f727 " "%1"
+0x18f72e DefaultIcon
+0x18f740 Shell
+0x18f74c command
+0x18f757 " "%1"
+0x18f75e DefaultIcon
+0x18f76e Ts: ON
+0x18f778  Мгновенная скорость       :
+0x18f795  Средняя скорость          :
+0x18f7b2  Классическая скорость     :
+0x18f7cf  Приведённая скорость      :
+0x18f7ec  Мгновенная ритмичность    :
+0x18f809  Средняя ритмичность       :
+0x18f826  Гистограмма аритмии       :
+0x18f843  Гистограмма длительностей :
+0x18f864 Software
+0x18f86d MainWinWidth
+0x18f87a MainWinHeight
+0x18f888 TextWinHeight
+0x18f896 KlavWinHeight
+0x18f8a4 StatWinLeft
+0x18f8b0 StatWinTop
+0x18f8bb StatWinWidth
+0x18f8c8 StatWinHeight
+0x18f8d6 LegendWinLeft
+0x18f8e4 LegendWinTop
+0x18f8f1 LegendMinimized
+0x18f901 VgrCurSpeed
+0x18f90d VgrMedSpeed
+0x18f919 VgrClassicSpeed
+0x18f929 VgrPrivSpeed
+0x18f936 VgrCurRythm
+0x18f942 VgrMedRythm
+0x18f94e VhsPeriod
+0x18f958 VhsPeriodMed
+0x18f965 LegendVisible
+0x18f973 SpeedYmin
+0x18f97d SpeedYmax
+0x18f987 RythmYmin
+0x18f991 RythmYmax
+0x18f99b AutoRound
+0x18f9a5 FixedY
+0x18f9ac PrimaryGraph
+0x18f9b9 FingerZonesName
+0x18f9c9 RightPanelWidth
+0x18f9d9 DlitCol1Width
+0x18f9e7 DlitCol2Width
+0x18f9f5 MainStatCol1Width
+0x18fa07 TextWinLeft
+0x18fa13 TextWinTop
+0x18fa1e TextWinWidth
+0x18fa2b TextWHeight
+0x18fa37 opWinLeft
+0x18fa41 opWinTop
+0x18fa4a opWinWidth
+0x18fa55 opWinHeight
+0x18fa61 opSect2Height
+0x18fa6f opVisible
+0x18fa79 opLoSpeed
+0x18fa83 opHiSpeed
+0x18fa8d Ts: OFF
+0x18fa95 Ts: ON
+0x18faa2 intf==0
+0x18faaa c:\program files (x86)\borland\cbuilder6\include\vcl\utilcls.h
+0x18fae9 GetIID() != GUID_NULL
+0x18faff c:\program files (x86)\borland\cbuilder6\include\vcl\utilcls.h
+0x18fb3e src->QueryInterface(GetIID(), (LPVOID*)(&intf))
+0x18fb6e c:\program files (x86)\borland\cbuilder6\include\vcl\utilcls.h
+0x18fbad intf != 0
+0x18fbb7 c:\program files (x86)\borland\cbuilder6\include\vcl\utilcls.h
+0x18fbf6 intf != 0
+0x18fc00 c:\program files (x86)\borland\cbuilder6\include\vcl\utilcls.h
+0x18fc3f this->Freeze((long*)&pCount)
+0x18fc5c D:\FilWork\BCB\TypingStatistics\Work\tom_TLB.h
+0x18fc8b intf != 0
+0x18fc95 c:\program files (x86)\borland\cbuilder6\include\vcl\utilcls.h
+0x18fcd4 this->Range(cp1, cp2, (Tom_tlb::ITextSelection**)&ppRange)
+0x18fd0f D:\FilWork\BCB\TypingStatistics\Work\tom_TLB.h
+0x18fd3e intf != 0
+0x18fd48 c:\program files (x86)\borland\cbuilder6\include\vcl\utilcls.h
+0x18fd87 intf != 0
+0x18fd91 c:\program files (x86)\borland\cbuilder6\include\vcl\utilcls.h
+0x18fdd0 this->get_Font((Tom_tlb::ITextFont**)&pFont)
+0x18fdfd D:\FilWork\BCB\TypingStatistics\Work\tom_TLB.h
+0x18fe2c intf != 0
+0x18fe36 c:\program files (x86)\borland\cbuilder6\include\vcl\utilcls.h
+0x18fe75 intf != 0
+0x18fe7f c:\program files (x86)\borland\cbuilder6\include\vcl\utilcls.h
+0x18febe intf != 0
+0x18fec8 c:\program files (x86)\borland\cbuilder6\include\vcl\utilcls.h
+0x18ff07 intf != 0
+0x18ff11 c:\program files (x86)\borland\cbuilder6\include\vcl\utilcls.h
+0x18ff50 intf != 0
+0x18ff5a c:\program files (x86)\borland\cbuilder6\include\vcl\utilcls.h
+0x18ff99 intf != 0
+0x18ffa3 c:\program files (x86)\borland\cbuilder6\include\vcl\utilcls.h
+0x18ffe2 intf != 0
+0x18ffec c:\program files (x86)\borland\cbuilder6\include\vcl\utilcls.h
+0x19002b intf != 0
+0x190035 c:\program files (x86)\borland\cbuilder6\include\vcl\utilcls.h
+0x190074 intf != 0
+0x19007e c:\program files (x86)\borland\cbuilder6\include\vcl\utilcls.h
+0x1900bd this->Unfreeze((long*)&pCount)
+0x1900dc D:\FilWork\BCB\TypingStatistics\Work\tom_TLB.h
+0x19010e !";%:?*(-=+\/#@`~[]{}'<>,.
+0x1901a2 tsfVersion
+0x1901b0 autor
+0x1901ba comment
+0x1901c8 signature
+0x1901d2 FingerZonesName
+0x1901e2 Finger
+0x1901fb tsfVersion
+0x190209 autor
+0x190213 comment
+0x190221 signature
+0x19022b FingerZonesName
+0x19023b Finger
+0x190242 AttachedVideo
+0x190250 VideoTimeShift
+0x190266 tsfVersion
+0x190271 %x %s
+0x19027b %d %d
+0x190284 autor
+0x19028b comment
+0x190293 FingerZonesName
+0x1902a3 Finger
+0x1902b2 AttachedVideo
+0x1902c0 VideoTimeShift
+0x1902cf signature
+0x1902ef Software
+0x1902f8 Pause
+0x1902fe TextOnly
+0x190307 SplitOnEnter
+0x190314 GlobalClear
+0x190320 GlobalOnOff
+0x19032c TextFontSize
+0x190339 KlavogrFontSize
+0x190349 DlitDigits
+0x190354 CopyBlock1
+0x19035f CopyBlock2
+0x19036a CopyBlock3
+0x190375 OneProcessor
+0x190382 JournalOn
+0x19038c AutoComments
+0x190399 MinimizeToTray
+0x1903a8 AutoMinimize
+0x1903b5 MainOption
+0x1903c0 MainWinWidth
+0x1903cd MainWinHeight
+0x1903db TextWinHeight
+0x1903e9 KlavWinHeight
+0x1903f7 RightPanelWidth
+0x190407 StatWinLeft
+0x190413 StatWinTop
+0x19041e StatWinWidth
+0x19042b StatWinHeight
+0x190439 LegendMinimized
+0x190449 LegendWinLeft
+0x190457 LegendWinTop
+0x190464 VgrCurSpeed
+0x190470 VgrMedSpeed
+0x19047c VgrClassicSpeed
+0x19048c VgrPrivSpeed
+0x190499 VgrCurRythm
+0x1904a5 VgrMedRythm
+0x1904b1 VhsPeriodMed
+0x1904be VhsPeriod
+0x1904c8 SpeedYmin
+0x1904d2 SpeedYmax
+0x1904dc RythmYmin
+0x1904e6 RythmYmax
+0x1904f0 LegendVisible
+0x1904fe AutoRound
+0x190508 FixedY
+0x19050f PrimaryGraph
+0x19051c FingerZonesName
+0x19052c DlitCol1Width
+0x19053a DlitCol2Width
+0x190548 MainStatCol1Width
+0x19055a TextWinLeft
+0x190566 TextWinTop
+0x190571 TextWinWidth
+0x19057e TextWHeight
+0x19058a opWinLeft
+0x190594 opWinTop
+0x19059d opWinWidth
+0x1905a8 opWinHeight
+0x1905b4 opSect2Height
+0x1905c2 opVisible
+0x1905cc opLoSpeed
+0x1905d6 opHiSpeed
+0x190680 Стандарт
+0x190828 Software
+0x190831 UserName
+0x19083b Profile
+0x190844 MainWinLeft
+0x190850 MainWinTop
+0x19085b Language
+0x190865 Software\
+0x1908d3 Software
+0x190927 http://fil.urikor.net
+0x19093d Для смены языка перезапустите Ts
+0x19095e Предупреждение
+0x190a1b basic_string
+0x190ac0 ШяяяT,@
+0x190e04 ьяяяT,@
+0x190e54 мяяяT,@
+0x190ec4 ьяяя0*@
+0x190ef4 ияяяЬO@
+0x190f00 РяяяЬO@
+0x190f1d яяяЬO@
+0x190f38 ЁяяяЬO@
+0x190f55 яяяЬO@
+0x191020 шяяя,X@
+0x1912fc фяяя0*@
+0x191318 мяяя0*@
+0x191334 дяяя0*@
+0x191340 аяяя0*@
+0x19134c Ьяяя0*@
+0x191b88 мяяя<
+0x191c5c ёяяяФ
+0x191cb4 ЁяяяФ
+0x192078 ьяяяh
+0x19296c ьяяяHW@
+0x192984 фяяя,X@
+0x192ba1 яяя0*@
+0x192bac Ёяяя0*@
+0x192bb9 яяя0*@
+0x192be5 яяяд:A
+0x192c11 яяяд:A
+0x192c3c xяяяд:A
+0x193544 шяяяT,@
+0x193731 яяя0*@
+0x193b44 ияяяЬO@
+0x193b50 РяяяЬO@
+0x193b6d яяяЬO@
+0x193b88 ЁяяяЬO@
+0x193ba5 яяяЬO@
+0x193fa0 ьяяяT,@
+0x195764 tыяя0*@
+0x195770 pыяя0*@
+0x196bfc tяяяЬO@
+0x196c08 \яяяЬO@
+0x196c78 (яяяЬO@
+0x196c94  яяяЬO@
+0x196cb1 яяяЬO@
+0x196ccd яяя0*@
+0x196cd9 яяя0*@
+0x196ce5 яяя0*@
+0x196cf1 яяя0*@
+0x196cfd яяя0*@
+0x197060 ияяяд
+0x19707c Ияяяд
+0x197098 Аяяяд
+0x197960 шяяя0*@
+0x197c50 аяяя0*@
+0x197c5c Ьяяя0*@
+0x197c68 Шяяя0*@
+0x197e34 Ёяяя<
+0x198570 ьяяяT,@
+0x198960 Ьяяя(
+0x198998 Ьяяя\
+0x198c59 Timer1ф
+0x198c66 OpenDialog1ш
+0x198c78 SaveDialog1ь
+0x198c8a Panel3
+0x198c97 Panel6
+0x198ca4 Panel1
+0x198cb0 	PaintBox1
+0x198cc1 Panel4
+0x198ccd 
+ScrollBar1
+0x198cde 
+PopupMenu1
+0x198d26 Panel74
+0x198d33 Memo48
+0x198d3f Panel8<
+0x198d4b 	Splitter1@
+0x198d5b 	Splitter2D
+0x198d6b 	PaintBox3H
+0x198d7c Panel2L
+0x198d88 	PaintBox2P
+0x198d99 ApplicationEvents1T
+0x198db1 
+PopupMenu2X
+0x198dd5 Panel9d
+0x198de2 Panel10h
+0x198df0 Panel11l
+0x198dfd 	ComboBox2p
+0x198e0e Panel12t
+0x198e1c Panel13x
+0x198e2a Panel14|
+0x198e37 	ComboBox3
+0x198e47 	ComboBox5
+0x198e57 	ComboBox6
+0x198e68 Panel15
+0x198e75 	CheckBox4
+0x198e85 	CheckBox5
+0x198ebd Panel16Ё
+0x198ecb Panel17
+0x198ed9 Panel18
+0x198ee7 Panel19
+0x198ef5 SpeedButton3ё
+0x198f08 SpeedButton5
+0x198f1b SpeedButton6А
+0x198f2e SpeedButton1Д
+0x198f41 SpeedButton7И
+0x198f54 SpeedButton4М
+0x198f66 SpeedButton12Р
+0x198f7a 	CheckBox1Ф
+0x198f8a 	CheckBox3Ш
+0x198f9a 	CheckBox2Ь
+0x198fab Label1а
+0x198fb8 Label2д
+0x198fc5 UpDown1и
+0x198fd3 Edit1м
+0x198fde 	ComboBox1р
+0x198fef SpeedButton8ф
+0x199002 SpeedButton2ш
+0x199015 Label3ь
+0x199022 Bevel1
+0x19902f Bevel2
+0x19903c Bevel3
+0x199049 Label4
+0x199055 	ComboBox4
+0x199066 SpeedButton9
+0x199078 SpeedButton10
+0x19908c SpeedButton11
+0x1990a0 SpeedButton13 
+0x1990b4 SpeedButton14$
+0x1990c8 SpeedButton15(
+0x1990dc SpeedButton16,
+0x1990f1 Bevel40
+0x1990fd SpeedButton174
+0x199111 SpeedButton188
+0x199125 	ListView1<
+0x199135 	Splitter3@
+0x199145 	ListView2D
+0x199155 SpeedButton19H
+0x199169 SpeedButton20L
+0x19917d SpeedButton21P
+0x199191 
+PopupMenu3T
+0x1991b6 SpeedButton22`
+0x1991ca SpeedButton23d
+0x1991de SpeedButton24h
+0x1991f2 SpeedButton25l
+0x199206 	CheckBox6p
+0x199221 Panel5x
+0x19922d SpeedButton26|
+0x199241 SpeedButton27
+0x199255 	TrayIcon1
+0x199265 
+PopupMenu4
+0x199294 
+ImageList1W
+0x1992a7 
+FormCreate
+0x1992b8 	FormClose
+0x1992c9 CheckBox1Click
+0x1992de Button2Click
+0x1992f1 UpDown1Click
+0x199304 CheckBox2Click
+0x199319 Timer1Timer
+0x19932b PaintBox1Paint
+0x199340 CheckBox4Click
+0x199355 PaintBox1MouseDown
+0x19936e PaintBox1MouseUp
+0x199385 PaintBox1MouseMove
+0x19939e PaintBox1DblClick
+0x1993b6 SpeedButton5Click
+0x1993ce SpeedButton6Click
+0x1993e6 FormKeyPress
+0x1993f9 Memo4SelectionChange
+0x199414 SpeedButton12Click
+0x19942d SpeedButton7Click
+0x199445 PaintBox2Paint
+0x199459 
+FormResize
+0x19946b Memo4KeyDown
+0x19947e ScrollBar1Scroll
+0x199495 SpeedButton4Click
+0x1994ad SpeedButton13Click
+0x1994c6 Memo4MouseMove
+0x1994db N2Click
+0x1994e9 N3Click
+0x1994f7 PaintBox2MouseMove
+0x199510 FormMouseWheel
+0x199525 FormShow
+0x199534 N5Click
+0x199542 N6Click
+0x19954f 	ShowStats
+0x199560 PaintBox3DblClick
+0x199578 PaintBox3MouseDown
+0x199591 PaintBox3MouseMove
+0x1995aa PaintBox3MouseUp
+0x1995c1 PaintBox3Paint
+0x1995d6 Panel8Resize
+0x1995e8 FormCanResize
+0x1995fd Panel1CanResize
+0x199613 Splitter1Moved
+0x199628 Splitter2Moved
+0x19963d ApplicationEvents1Idle
+0x19965a FormKeyDown
+0x19966c SpeedButton8Click
+0x199684 ComboBox1Select
+0x19969a SpeedButton8MouseDown
+0x1996b5 Edit1KeyPress
+0x1996ca N8Click
+0x1996d8 N7Click
+0x1996e6 Panel11Click
+0x1996f9 Panel10MouseDown
+0x199710 Panel10MouseMove
+0x199727 ComboBox5Select
+0x19973d ComboBox5KeyPress
+0x199755 CheckBox5Click
+0x19976a N9Click
+0x199778 Panel17Click
+0x19978b Panel16MouseMove
+0x1997a2 Panel16DblClick
+0x1997b8 SpeedButton2Click
+0x1997d0 SpeedButton14Click
+0x1997e9 SpeedButton9Click
+0x199801 ComboBox4Select
+0x199817 SpeedButton9MouseDown
+0x199833 SpeedButton18Click
+0x19984c FormDestroy
+0x19985e SpeedButton19Click
+0x199877 SpeedButton20Click
+0x199890 SpeedButton21Click
+0x1998a9 N13Click
+0x1998b8 N14Click
+0x1998c7 SpeedButton3Click
+0x1998df SpeedButton22Click
+0x1998f7 ConvCurLayout
+0x19990b 
+ShowOpStat
+0x19991d ShowInpText!
+0x19992f ApplicationEvents1Activate
+0x199950 CheckBox6Click
+0x199965 N15Click
+0x199974 SpeedButton26Click
+0x19998d SpeedButton27Click
+0x1999a6 N16Click 
+0x1999b5 ApplicationEvents1Restore
+0x1999d5 TrayIcon1Restore
+0x1999e6 TForm1
+0x199b60 Ьяяя<
+0x199dc0 ЬяяяD4C
+0x199df4 Ьяяя AC
+0x199e28 Ьяяя`AC
+0x199fb0 ЬяяяДKC
+0x19a1ac Arial
+0x19a1b4 Symbol
+0x19a1bb Arial
+0x19a58c ряяя0*@
+0x19a960 Ьяяя@
+0x19a9c8 НММ=НМL>
+0x19a9ee ИB0*@
+0x19aa9e Symbol
+0x19aaa5 Courier New
+0x19aab1 Courier New
+0x19aac1 Courier New
+0x19aae0 Courier New
+0x19aaf0 Symbol
+0x19aaf7 Courier New
+0x19ab1c ьяяя0*@
+0x19b2a4 шяяяT,@
+0x19b2d0 фяяяT,@
+0x19b3cc дяяя0*@
+0x19b6d9 Label1ф
+0x19b6e6 Edit1ш
+0x19b6f2 Label3ь
+0x19b6ff Edit3
+0x19b70b Label4
+0x19b718 Memo1
+0x19b724 BitBtn1
+0x19b732 BitBtn2
+0x19b73a TForm2
+0x19b7b0 ряяядgD
+0x19bb0a \ExStats.ini
+0x19bd04 ияяя0*@
+0x19bd10 дяяя0*@
+0x19bd2c ШяяяизB
+0x19bdd8 Аяяя0*@
+0x19bdf5 яяя<5D
+0x19be11 яяя$6D
+0x19be88 tяяя0*@
+0x19beb4 `яяя<5D
+0x19bed0 Lяяя$6D
+0x19bf08 ,яяя0*@
+0x19bf14 (яяя0*@
+0x19bf51 яяя0*@
+0x19bf6d яяя<5D
+0x19bf88 шюяя$6D
+0x19c00d юяя$6D
+0x19c070 lюяя$6D
+0x19c62c ряяяЁBD
+0x19c648 иыяяФAD
+0x19c724 ряяяЁBD
+0x19c740 иыяяФAD
+0x19c878 ьяяя0*@
+0x19c90c ьяяя0*@
+0x19c928 фяяя0*@
+0x19ca34 ьяяя0*@
+0x19ca40 шяяя0*@
+0x19ca4c фяяя0*@
+0x19ca98 мяяя0*@
+0x19caa4 ияяя0*@
+0x19cc48 мяяя0*@
+0x19cc54 ияяя0*@
+0x19cc60 дяяя0*@
+0x19cc6c аяяя0*@
+0x19d1e4 Ьяяя4ТY
+0x19d331 RadioGroup1ф
+0x19d343 Panel1ш
+0x19d34f 	CheckBox1ь
+0x19d35f 	CheckBox2
+0x19d36f 	Splitter1
+0x19d380 SpeedButton1
+0x19d393 TntListView1
+0x19d3a5 	ListView2
+0x19d3b5 
+StatusBar1
+0x19d3c6 	GroupBox1
+0x19d3d6 	CheckBox3
+0x19d3e6 	CheckBox4 
+0x19d3f6 	CheckBox5$
+0x19d407 TntEdit1(
+0x19d416 TntEdit2,
+0x19d425 TntEdit30
+0x19d434 SpeedButton74
+0x19d447 SpeedButton48
+0x19d45a Panel2<
+0x19d467 TntComboBox1@
+0x19d47a SpeedButton2D
+0x19d48d SaveDialog1H
+0x19d49f Panel3L
+0x19d4ac SpeedButton8
+0x19d4c1 FormShow
+0x19d4d0 RadioGroup1Click
+0x19d4e7 CheckBox1Click
+0x19d4fc CheckBox2Click
+0x19d511 SpeedButton1Click
+0x19d529 ListView1SelectItem
+0x19d542 ListView2Data
+0x19d557 ListView2SelectItem
+0x19d570 
+FormCreate
+0x19d582 FormDestroy
+0x19d594 TntListView1Data
+0x19d5aa 
+FormResize
+0x19d5bc TntEdit1Change
+0x19d5d1 SpeedButton7Click
+0x19d5e9 TntEdit5Change
+0x19d5fe SpeedButton4Click
+0x19d616 TntListView1ColumnClick
+0x19d634 SpeedButton8Click
+0x19d64c SpeedButton8MouseDown
+0x19d668 SpeedButton2Click
+0x19d67a TForm3
+0x19dcb0 Левый мизинец
+0x19dcbe Левый безымянный
+0x19dccf Левый средний
+0x19dcdd Левый указательный
+0x19dcf0 Правый указательный
+0x19dd04 Правый средний
+0x19dd13 Правый безымянный
+0x19dd25 Правый мизинец
+0x19dd34 Остальные клавиши
+0x19dda0 Times New Roman
+0x19ddb0 Courier New
+0x19e131 Panel2ф
+0x19e13d 	PaintBox1ш
+0x19e14d 	PaintBox2
+0x19e160 FormDestroy
+0x19e172 PaintBox1Paint
+0x19e187 PaintBox2Paint
+0x19e19c PaintBox2MouseDown
+0x19e1b5 FormActivate
+0x19e1c8 PaintBox1MouseDown
+0x19e1e1 FormKeyDown
+0x19e56c шяяяT,@
+0x19f6e0 шяяяизB
+0x19f6f8 ряяяМиB
+0x19f792 [Enter]
+0x19f7b7 [Enter]
+0x19f868 мяяя0*@
+0x19f890 аяяя0*@
+0x19f89c Ьяяя0*@
+0x19f9d0 шяяяXиB
+0x19f9ec шяяяXиB
+0x19f9f8 ряяяАЖD
+0x19fa78 фяяя0*@
+0x19fa84 ряяя0*@
+0x19fa90 мяяя0*@
+0x19fa9c ияяя0*@
+0x19faa8 дяяя0*@
+0x19fab4 аяяя0*@
+0x19fac0 Ьяяя0*@
+0x19fb30 ьяяя0*@
+0x19fb94 шяяяpЪD
+0x19fc4c шяяяXиB
+0x19fc68 шяяяXиB
+0x19fc74 ряяяшдD
+0x19fc90 дяяяXиB
+0x19fcac дяяяXиB
+0x19fcd4 РяяяXиB
+0x19fcf0 РяяяXиB
+0x19fcfc Ияяя<еD
+0x19fd19 яяяXиB
+0x19fd35 яяяXиB
+0x19fd41 яяя`еD
+0x19fe60 фяяя0*@
+0x19feb8 ьяяя0*@
+0x19fec4 шяяя0*@
+0x19ff0c фяяя0*@
+0x19ff64 ьяяя0*@
+0x19ff70 шяяя0*@
+0x19ffb8 фяяя0*@
+0x1a0010 ьяяя0*@
+0x1a001c шяяя0*@
+0x1a0064 фяяя0*@
+0x1a01a0 мяяяФ
+0x1a01cc аяяяр
+0x1a02b0 ьяяя0*@
+0x1a044c фяяяр
+0x1a04e4 фяяяФ!E
+0x1a057c фяяяё$E
+0x1a0805 Panel1ф
+0x1a0811 	PaintBox1ш
+0x1a0821 	TntLabel1ь
+0x1a0832 SpeedButton1
+0x1a0845 SpeedButton2
+0x1a0858 SpeedButton3
+0x1a086a SpeedButton12
+0x1a087f SpeedButton4
+0x1a0893 
+FormCreate
+0x1a08a5 FormShow
+0x1a08b4 PaintBox1Paint
+0x1a08c9 PaintBox1MouseDown
+0x1a08e2 PaintBox1MouseMove
+0x1a08fb PaintBox1MouseUp
+0x1a0911 
+FormResize
+0x1a0923 PaintBox1DblClick
+0x1a093b SpeedButton1Click
+0x1a0953 SpeedButton2Click
+0x1a096b SpeedButton3Click
+0x1a0983 SpeedButton12Click
+0x1a099c SpeedButton4Click
+0x1a09ae TForm4
+0x1a0ae0 Ьяяя0*@
+0x1a0d30 Ьяяя 9E
+0x1a0efc 	PaintBox1
+0x1a0f0f PaintBox1Paint
+0x1a0f1e TForm5
+0x1a0f30 Ьяяя4=E
+0x1a10a0 	CheckBox1ф
+0x1a10b1 LabeledEdit1ш
+0x1a10c4 LabeledEdit2ь
+0x1a10d7 BitBtn1
+0x1a10df TForm6
+0x1a1105 http://fil.urikor.net
+0x1a1120 http://urikor.net/phpBB2/viewforum.php?f=32
+0x1a1151 mailto:Fil95@yandex.ru
+0x1a1416 Надеюсь, Typing statistics Вам в этом поможет
+0x1a1444 Набирайте вслепую
+0x1a1456 Счастье складывается из мелочей...
+0x1a1479 Будьте счастливы!
+0x1a161d Panel2ф
+0x1a162a Label2ш
+0x1a1637 Label6ь
+0x1a1644 Label10
+0x1a1652 Label11
+0x1a1660 Label9
+0x1a166d Label12
+0x1a167a 	TntLabel1
+0x1a168a 	TntLabel2
+0x1a169a 	TntLabel3
+0x1a16aa 	TntLabel4
+0x1a16ba 	TntLabel5 
+0x1a16ca 	TntLabel6$
+0x1a16da 	TntLabel7(
+0x1a16ea 	TntLabel8,
+0x1a16fa 	TntLabel90
+0x1a170a 
+TntLabel104
+0x1a171c TntStaticText1
+0x1a1733 Label5Click
+0x1a1745 Label7Click
+0x1a1757 Label8Click
+0x1a1768 
+FormCreate
+0x1a177a Label13Click
+0x1a178d Label15Click
+0x1a179a TForm7
+0x1a17c0 Default (Russian)
+0x1a17d2 *.lng
+0x1a18d4 Ьяяя$
+0x1a1a20 	GroupBox1ф
+0x1a1a30 	CheckBox1ш
+0x1a1a40 	CheckBox2ь
+0x1a1a50 	GroupBox2
+0x1a1a61 Button1
+0x1a1a6f Button2
+0x1a1a7d Label1
+0x1a1a8a UpDown1
+0x1a1a98 Label2
+0x1a1aa5 UpDown2
+0x1a1ab3 StaticText1
+0x1a1ac5 StaticText2 
+0x1a1ad7 UpDown3$
+0x1a1ae5 StaticText3(
+0x1a1af7 Label3,
+0x1a1b03 	GroupBox30
+0x1a1b14 Label44
+0x1a1b21 Edit18
+0x1a1b2d Label5<
+0x1a1b3a Edit2@
+0x1a1b45 CheckListBox1D
+0x1a1b5a Label6H
+0x1a1b66 	GroupBox4L
+0x1a1b76 	CheckBox3P
+0x1a1b86 	CheckBox4T
+0x1a1b96 	CheckBox5X
+0x1a1ba6 	ComboBox1\
+0x1a1bb7 Label7`
+0x1a1bc3 	CheckBox6d
+0x1a1bd3 	CheckBox7h
+0x1a1be3 	CheckBox8l
+0x1a1bf3 	CheckBox9p
+0x1a1c03 
+CheckBox10
+0x1a1c16 
+FormCreate
+0x1a1c22 TForm8	
+0x1a1c54 ЬяяярDE
+0x1a1dc4 	RichEdit1
+0x1a1dd7 RichEdit1KeyDown
+0x1a1de8 TForm9
+0x1a1e05 200.0%
+0x1a1fd1 Label1ф
+0x1a1fde Label2ш
+0x1a1fea 	Splitter1ь
+0x1a1ffa 
+StatusBar1
+0x1a200d 
+FormResize
+0x1a201f FormActivate
+0x1a2032 FormKeyDown
+0x1a2044 FormShow
+0x1a204d TForm10
+0x1a2068 ЬяяяЙ
+0x1a2110 0ЭUIY
+0x1a212d kМY1ЭUIY
+0x1a215d gёnъ,П
+0x1a216d gёn@аА
+0x1a218d kМYb	вowРР
+0x1a21a2 ДбS-Т
+0x1a21ad gёn3ЭUIY
+0x1a21bd kМY3ЭUIY
+0x1a21cd kМY@аА
+0x1a2685 Dispatch
+0x1a268f ля<UI
+0x1a2695 
+TCCalendar
+0x1a26a4 Ьяяя\
+0x1a26ec ьяяяpqI
+0x1a28c0 шяяяT,@
+0x1a2e73 TCDirectoryOutline
+0x1a2e8c Ьяяя%
+0x1a2ee4 ьяяяd
+0x1a2f4c ьяяяd
+0x1a3229 TCGauge|2Z
+0x1a32ec 
+TBltBitmap
+0x1a3304 ЬяяяSpinUp
+0x1a330f SpinDown
+0x1a3344 ЬяяяD
+0x1a3510 Ьяяя`5Z
+0x1a35f2 ХяУя@
+0x1a35ff TTimerSpeedButton\6Z
+0x1a3755 Dispatch
+0x1a3771 
+TCSpinEditИ7Z
+0x1a389d Dispatch
+0x1a38ae TCSpinButton
+0x1a3c0d TPerformanceGraph
+0x1a3e70 ЬяяяDуI
+0x1a3f94 	TTrayIcon
+0x1a4008 0123456789ABCDEF
+0x1a402c яяяяяяяяяяяяяя
+
+0x1a4046 яяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяя
+
+0x1a40c4 яяяяяя
+0x1a40d3 шяяяяяяяяяяяяяяяя
+0x1a4150 яяяяяяя
+0x1a420c %.*dр
+0x1a4651 ЛМИЙЧПИНОЫШКЩЪЬЭЮЯабг
+0x1a466c Runtime error     at 00000000
+0x1a468c Error
+0x1a4694 0123456789ABCDEF
+0x1a496b MS Sans Serif
+0x1a4f90 юяяяD
+0x1a4f98 эяяяT
+0x1a4fa0 ьяяяd
+0x1a4fa8 ъяяяt
+0x1a4fc8 цяяяД
+0x1a4fd0 хяяяШ
+0x1a4fd8 фяяям
+0x1a4fe0 уяяяь
+0x1a4ff0 сяяя$
+0x1a4ff8 ряяя8
+0x1a5000 пяяяL
+0x1a5008 ояяя`
+0x1a5010 няяяp
+0x1a5028 кяяяЁ
+0x1a54dc ЬяяяIllegal mode in _vector_apply_
+0x1a5534 Illegal mode in _vector_delete_
+0x1a5588 Illegal mode in _vector_new_
+0x1a55a5 Illegal dtorMode in _vector_new_
+0x1a55c8 borlndmm
+0x1a55d1 hrdir_b.c: LoadLibrary != mmdll borlndmm failed
+0x1a5601 borlndmm
+0x1a560a @Borlndmm@SysGetMem$qqri
+0x1a5623 @Borlndmm@SysFreeMem$qqrpv
+0x1a563e @Borlndmm@SysReallocMem$qqrpvi
+0x1a565d borlndmm
+0x1a5666 @Borlndmm@HeapAddRef$qqrv
+0x1a5680 @Borlndmm@HeapRelease$qqrv
+0x1a569b hrdir_b.c: GetMem or FreeMem or ReallocMem from borlndmm failed
+0x1a56db hrdir_b.c: FATAL!!! memory has been allocated prior to heap redirector hook!
+0x1a57d0 xXcDrT
+0x1a57d7 xXcDrT
+0x1a57de xXcDrT
+0x1a57e5 xXcDrT
+0x1a57fe basic_string::operator= (const charT*)
+0x1a5825 basic_string(const charT*,const Allocator&)
+0x1a5851 basic_string::replace(size_t,size_t,char*,size_t,size_t,size_t)
+0x1a5891 basic_string::replace(size_t,size_t,char*,size_t,size_t,size_t)
+0x1a58d6 basic_string::operator= (const charT*)
+0x1a58fd basic_string::replace(size_t,size_t,char*,size_t,size_t,size_t)
+0x1a593d basic_string::replace(size_t,size_t,char*,size_t,size_t,size_t)
+0x1a597d basic_string( const charT*,size_type,const Allocator&)
+0x1a59b4 basic_string( const charT*,size_type,const Allocator&)
+0x1a59eb basic_string( const basic_string&,size_type,size_type)
+0x1a5a22 basic_string( const basic_string&,size_type,size_type)
+0x1a5a59 basic_string(const charT*,const Allocator&)
+0x1a5a85 basic_string( const charT*,size_type,const Allocator&)
+0x1a5abc basic_string( const charT*,size_type,const Allocator&)
+0x1a5afe basic_string::compare(size_t,size_t,const const charT*,size_t) const
+0x1a5b43 basic_string::compare(size_t,size_t,const basic_string&) const
+0x1a5b82 basic_string::compare(size_t,size_t,const basic_string&,size_t,size_t) const
+0x1a5bcf basic_string::compare(size_t,size_t,const basic_string&) const
+0x1a5c0e basic_string::compare(size_t,size_t,const const charT*,size_t) const
+0x1a5c53 basic_string::compare(size_t,size_t,const basic_string&,size_t,size_t) const
+0x1a5ca0 basic_string::erase(size_t,size_t)
+0x1a5cc3 basic_string::erase(size_t,size_t)
+0x1a5cec basic_string::append(const basic_string&)
+0x1a5d16 basic_string::append(basic_string&,size_type,size_type)
+0x1a5d4e basic_string::append(const basic_string&,size_type,size_type)
+0x1a5d8c basic_string::assign(basic_string&,size_type,size_type)
+0x1a5dc4 basic_string::insert(size_t,const basic_string&)
+0x1a5df5 basic_string::insert(size_t,const basic_string&)
+0x1a5e26 basic_string::insert(size_t,const basic_string&,size_t,size_t)
+0x1a5e65 basic_string::insert(size_t,const basic_string&,size_t,size_t)
+0x1a5ea4 basic_string:::replace(size_t,size_t,size_t,char)
+0x1a5ed6 basic_string::replace(size_t,size_t,size_t,char)
+0x1a5f07 basic_string::substr(size_t,size_t) const
+0x1a5f31 basic_string::__initn(size_t,char)
+0x1a5f54 basic_string::append(const basic_string&)
+0x1a5f7e basic_string::append(basic_string&,size_type,size_type)
+0x1a5fb6 basic_string::append(const basic_string&,size_type,size_type)
+0x1a5ff4 basic_string::assign(basic_string&,size_type,size_type)
+0x1a602c basic_string::insert(size_t,const basic_string&)
+0x1a605d basic_string::insert(size_t,const basic_string&)
+0x1a608e basic_string::insert(size_t,const basic_string&,size_t,size_t)
+0x1a60cd basic_string::insert(size_t,const basic_string&,size_t,size_t)
+0x1a610c basic_string:::replace(size_t,size_t,size_t,char)
+0x1a613e basic_string::replace(size_t,size_t,size_t,char)
+0x1a616f basic_string::substr(size_t,size_t) const
+0x1a6199 basic_string::__initn(size_t,char)
+0x1a61bc basic_string( const charT*,size_type,const Allocator&)
+0x1a61f3 basic_string::reserve(size_t)
+0x1a6211 basic_string( const charT*,size_type,const Allocator&)
+0x1a6248 basic_string::reserve(size_t)
+0x1a6266 basic_string::copy(char*,size_t,size_t)
+0x1a628e basic_string::find(char*,size_t,size_t) const
+0x1a62bc basic_string::find_first_not_of(char*,size_t,size_t) const
+0x1a62f7 basic_string::find_first_of(char*,size_t,size_t) const
+0x1a632e basic_string::find_last_not_of(char*,size_t,size_t) const
+0x1a6368 basic_string::find_last_of(char*,size_t,size_t) const
+0x1a639e basic_string::rfind(char*,size_t,size_t) const
+0x1a63cd basic_string::copy(char*,size_t,size_t)
+0x1a63f5 basic_string::find(char*,size_t,size_t) const
+0x1a6423 basic_string::find_first_not_of(char*,size_t,size_t) const
+0x1a645e basic_string::find_first_of(char*,size_t,size_t) const
+0x1a6495 basic_string::find_last_not_of(char*,size_t,size_t) const
+0x1a64cf basic_string::find_last_of(char*,size_t,size_t) const
+0x1a6505 basic_string::rfind(char*,size_t,size_t) const
+0x1a6534 YyjSMIHmBbAapdZUWw
+0x1a654f basic_string::find(const char*,size_t) const
+0x1a657c YyjSMIHmBbAapdZUWw
+0x1a6597 basic_string::replace(iterator,iterator,InputIterato,InputIterato)
+0x1a65da basic_string::replace(iterator,iterator,InputIterator,InputIterator)
+0x1a661f basic_string::__replace_aux(iterator,iterator,InputIterator,InputIterator)
+0x1a666a basic_string::__replace_aux(iterator,iterator,InputIterator,InputIterator)
+0x1a66b5 basic_string::replace(iterator,iterator,InputIterato,InputIterato)
+0x1a66f8 basic_string::replace(iterator,iterator,InputIterator,InputIterator)
+0x1a673d basic_string::__replace_aux(iterator,iterator,InputIterator,InputIterator)
+0x1a6788 basic_string::__replace_aux(iterator,iterator,InputIterator,InputIterator)
+0x1a69c4 LC_COLLATE
+0x1a69d4 LC_CTYPE
+0x1a69e4 LC_MONETARY
+0x1a69f4 LC_NUMERIC
+0x1a6a04 LC_TIME
+0x1a6a14 LC_MESSAGES
+0x1a6a24 LC_ALL
+0x1a6aec Facet not present in locale
+0x1a6b08 locale::__initid() called twice
+0x1a6b28 Tried to construct a locale from a NULL pointer.
+0x1a6b59 System does not recognize this locale name.
+0x1a6b85 Error constructing locale name.
+0x1a6ba5 Code conversion failed.
+0x1a6bc3 POSIX
+0x1a6c84 no named exception thrown
+0x1a6c9e bad exception thrown
+0x1a6cb3 bad alloc exception thrown
+0x1a6cce Error
+0x1a6cd4 rwstderr
+0x1a6d0c Ьяяя<notype>
+0x1a6d19 id->tpName
+0x1a6d24 xxtype.cpp
+0x1a6d33 xxtype.cpp
+0x1a6d42 xxtype.cpp
+0x1a6d4d tp1->tpName
+0x1a6d59 xxtype.cpp
+0x1a6d64 tp2->tpName
+0x1a6d70 xxtype.cpp
+0x1a6d7b IS_STRUC(base->tpMask)
+0x1a6d92 xxtype.cpp
+0x1a6d9d IS_STRUC(derv->tpMask)
+0x1a6db4 xxtype.cpp
+0x1a6dbf derv->tpClass.tpcFlags & CF_HAS_BASES
+0x1a6de5 xxtype.cpp
+0x1a6df0 ((unsigned __far *)vtablePtr)[-1] == 0
+0x1a6e17 xxtype.cpp
+0x1a6e22 <notype>
+0x1a6e2b topTypPtr != 0 && IS_STRUC(topTypPtr->tpMask)
+0x1a6e59 xxtype.cpp
+0x1a6e64 tgtTypPtr != 0 && IS_STRUC(tgtTypPtr->tpMask)
+0x1a6e92 xxtype.cpp
+0x1a6e9d srcTypPtr == 0 || IS_STRUC(srcTypPtr->tpMask)
+0x1a6ecb xxtype.cpp
+0x1a6ed6 __isSameTypeID(srcTypPtr, tgtTypPtr) == 0
+0x1a6f00 xxtype.cpp
+0x1a6f0b tgtTypPtr != 0 && __isSameTypeID(topTypPtr, tgtTypPtr) == 0
+0x1a6f47 xxtype.cpp
+0x1a6f52 srcTypPtr
+0x1a6f5c xxtype.cpp
+0x1a6f67 ((unsigned __far *)vtablePtr)[-1] == 0
+0x1a6f8e xxtype.cpp
+0x1a6f9e xxtype.cpp
+0x1a6fa9 Can't adjust class address (no base class entry found)
+0x1a6fe0 !"Can't adjust class address (no base class entry found)"
+0x1a701a xxtype.cpp
+0x1a712c ___CPPdebugHook
+0x1a7174 Stack Overflow!
+0x1a7714 allocating handle lock table
+0x1a7731 creating handle lock
+0x1a7746 hlocks
+0x1a774d handles.c
+0x1a7757 creating global handle lock
+0x1a7788 ),(((((),(((
+0x1a7968 Error 0
+0x1a7970 Invalid function number
+0x1a7988 No such file or directory
+0x1a79a2 Path not found
+0x1a79b1 Too many open files
+0x1a79c5 Permission denied
+0x1a79d7 Bad file number
+0x1a79e7 Memory arena trashed
+0x1a79fc Not enough memory
+0x1a7a0e Invalid memory block address
+0x1a7a2b Invalid environment
+0x1a7a3f Invalid format
+0x1a7a4e Invalid access code
+0x1a7a62 Invalid data
+0x1a7a6f Bad address
+0x1a7a7b No such device
+0x1a7a8a Attempted to remove current directory
+0x1a7ab0 Not same device
+0x1a7ac0 No more files
+0x1a7ace Invalid argument
+0x1a7adf Arg list too big
+0x1a7af0 Exec format error
+0x1a7b02 Cross-device link
+0x1a7b14 Too many open files
+0x1a7b28 No child processes
+0x1a7b3b Inappropriate I/O control operation
+0x1a7b5f Executable file in use
+0x1a7b76 File too large
+0x1a7b85 No space left on device
+0x1a7b9d Illegal seek
+0x1a7baa Read-only file system
+0x1a7bc0 Too many links
+0x1a7bcf Broken pipe
+0x1a7bdb Math argument
+0x1a7be9 Result too large
+0x1a7bfa File already exists
+0x1a7c0e Possible deadlock
+0x1a7c20 Operation not permitted
+0x1a7c38 No such process
+0x1a7c48 Interrupted function call
+0x1a7c62 Input/output error
+0x1a7c75 No such device or address
+0x1a7c8f Resource temporarily unavailable
+0x1a7cb0 Block device required
+0x1a7cc6 Resource busy
+0x1a7cd4 Not a directory
+0x1a7ce4 Is a directory
+0x1a7cf4 Directory not empty
+0x1a7d08 Unknown error
+0x1a7da4 creating global stream lock
+0x1a7dc0 allocating stream lock table
+0x1a7ddd creating stream lock
+0x1a7df2 strm_locks
+0x1a7dfd streams.c
+0x1a7e08 (null)
+0x1a8130  !"#$%&'()*+,-./0123456789:;<=>?@abcdefghijklmnopqrstuvwxyz[\]^_`abcdefghijklmnopqrstuvwxyz{|}~
+0x1a81d0 АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдежзийклмнопрстуфхцчшщъыьэюя
+0x1a8230  !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`ABCDEFGHIJKLMNOPQRSTUVWXYZ{|}~
+0x1a82d0 АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдежзийклмнопрстуфхцчшщъыьэюя
+0x1a835c LC_MONETARY
+0x1a8368 LC_NUMERIC
+0x1a8373 LC_TIME
+0x1a837b LC_COLLATE
+0x1a8386 LC_CTYPE
+0x1a838f en_US
+0x1a8399 en_GB
+0x1a83a3 fr_FR
+0x1a83ad de_DE
+0x1a83b9 LC_MONETARY
+0x1a83c5 LC_TIME
+0x1a83cd LC_NUMERIC
+0x1a83d8 LC_COLLATE
+0x1a83e3 LC_CTYPE
+0x1a83ec LC_CTYPE
+0x1a83f5 LC_TIME
+0x1a83fd LC_NUMERIC
+0x1a8408 LC_MONETARY
+0x1a8414 LC_COLLATE
+0x1a8581 %H:%M:%S
+0x1a858a %m/%d/%y
+0x1a8593 %A, %B %d, %Y
+0x1a85a7 Monday
+0x1a85ae Tuesday
+0x1a85b6 Wednesday
+0x1a85c0 Thursday
+0x1a85c9 Friday
+0x1a85d0 Saturday
+0x1a85d9 Sunday
+0x1a85fc January
+0x1a8604 February
+0x1a860d March
+0x1a8613 April
+0x1a8627 August
+0x1a862e September
+0x1a8638 October
+0x1a8640 November
+0x1a8649 December
+0x1a86f0 %s: %s error
+0x1a8776 xВУ@а
+0x1a879d uvЙHMе]=Е];
+0x1a87b1 R`Д%u
+0x1a87dc printf : floating point formats not linked
+0x1a8807 scanf : floating point formats not linked
+0x1a8844 printf : floating point formats not linked
+0x1a886f scanf : floating point formats not linked
+0x1a88a5 dЮщ3у
+0x1a88bd dЮщ3у
+0x1a88e6 яяяяяяп
+0x1a88ee яяяяяяяяю
+0x1a8970 DOMAIN
+0x1a897c OVERFLOW
+0x1a8985 UNDERFLOW
+0x1a898f TLOSS
+0x1a8995 PLOSS
+0x1a89b2 р?pow
+0x1a8a54 Error: system code page access failure; MBCS table not initialized
+0x1a8a98 Assertion failed: 
+0x1a8aab , file 
+0x1a8ab3 , line 
+0x1a8abc %02d/%02d/%04d %02d:%02d:%02d.%03d 
+0x1a8af0 kernel32.dll
+0x1a8afd GetProcAddress
+0x1a8b0c Borland32
+0x1a8b18 Pure virtual function called
+0x1a8b38 Abnormal program termination
+0x1a8b7c No space for command line argument vector
+0x1a8ba6 No space for command line argument
+0x1a8bd0 No space for copy of command line
+0x1a8bf4 No space for copy of command line
+0x1a8c24 Out of memory in _setargv0
+0x1a8c44 GetEnvironmentStrings failed
+0x1a8c61 Could not allocate memory for environment block
+0x1a8c91 creating environment lock
+0x1a8d14 creating atexit lock
+0x1a8d2c creating thread data lock
+0x1a8d48 Semaphore error 
+0x1a8e58 Sunday
+0x1a8e5f Monday
+0x1a8e66 Tuesday
+0x1a8e6e Wednesday
+0x1a8e78 Thursday
+0x1a8e81 Friday
+0x1a8e88 Saturday
+0x1a8ec1 January
+0x1a8ec9 February
+0x1a8ed2 March
+0x1a8ed8 April
+0x1a8eec August
+0x1a8ef3 September
+0x1a8efd October
+0x1a8f05 November
+0x1a8f0e December
+0x1a99b4 ___CPPdebugHook
+0x1a99c4 EDivByZero
+0x1a99cf ERangeError
+0x1a99db EIntOverflow
+0x1a99e8 EInvalidOp
+0x1a99f3 EZeroDivide
+0x1a99ff EOverflow
+0x1a9a09 EUnderflow
+0x1a9a14 EAccessViolation
+0x1a9a25 EPrivilege
+0x1a9a30 EControlC
+0x1a9a3a EStackOverflow
+0x1a9a49 Bad exception number
+0x1a9a5e !"Bad exception number"
+0x1a9a76 xx.cpp
+0x1a9a7d mask & TM_IS_REF
+0x1a9a8e xx.cpp
+0x1a9a95 srcmask & TM_IS_REF
+0x1a9aa9 xx.cpp
+0x1a9ab0 (ctorMask & 0x0100) != 0 || (ctorMask & 0x0020) == 0
+0x1a9ae5 xx.cpp
+0x1a9aec (ctorMask & 0x0080) == 0
+0x1a9b05 xx.cpp
+0x1a9b0c what?
+0x1a9b12 !"what?"
+0x1a9b1b xx.cpp
+0x1a9b22 what?
+0x1a9b28 !"what?"
+0x1a9b31 xx.cpp
+0x1a9b38 (dtorMask & 0x0080) == 0
+0x1a9b51 xx.cpp
+0x1a9b58 what?
+0x1a9b5e !"what?"
+0x1a9b67 xx.cpp
+0x1a9b6e (mfnMask & 0x0080) == 0
+0x1a9b86 xx.cpp
+0x1a9b8d what?
+0x1a9b93 !"what?"
+0x1a9b9c xx.cpp
+0x1a9ba3 typeID || (reThrow && (flags & XDF_ISDELPHIEXCEPTION))
+0x1a9bda xx.cpp
+0x1a9be1 cctrAddr
+0x1a9bea xx.cpp
+0x1a9bf1 xdp->xdArgBuff
+0x1a9c00 xx.cpp
+0x1a9c07 dtorAddr
+0x1a9c10 xx.cpp
+0x1a9c17 argType
+0x1a9c1f xx.cpp
+0x1a9c26 __CPPexceptionList
+0x1a9c39 xx.cpp
+0x1a9c43 xx.cpp
+0x1a9c4a xdrPtr->xdERRaddr == xl
+0x1a9c62 xx.cpp
+0x1a9c69 !tpid || tpid->tpMask & (TM_IS_PTR | TM_IS_REF)
+0x1a9c99 xx.cpp
+0x1a9ca0 dscPtr->xdERRaddr == errPtr
+0x1a9cbc xx.cpp
+0x1a9cc3 dscPtr->xdHtabAdr == hdtPtr
+0x1a9cdf xx.cpp
+0x1a9ce6 dscPtr->xdArgCopy == 0
+0x1a9cfd xx.cpp
+0x1a9d04 (dscPtr->xdMask & TM_IS_PTR) == 0
+0x1a9d26 xx.cpp
+0x1a9d2d mask & TM_IS_PTR
+0x1a9d3e xx.cpp
+0x1a9d45 dscPtr->xdMask & TM_IS_PTR
+0x1a9d60 xx.cpp
+0x1a9d67 dscPtr->xdTypeID == dscPtr->xdBase
+0x1a9d8a xx.cpp
+0x1a9d91 hdtPtr->HDcctrAddr
+0x1a9da4 xx.cpp
+0x1a9dab dscPtr->xdSize == size
+0x1a9dc2 xx.cpp
+0x1a9dc9 xdrPtr && xdrPtr == *xdrLPP
+0x1a9de5 xx.cpp
+0x1a9dec bogus context in Local_unwind()
+0x1a9e0c !"bogus context in Local_unwind()"
+0x1a9e2f xx.cpp
+0x1a9e36 const 
+0x1a9e3d volatile 
+0x1a9e47 bogus context in _ExceptionHandler()
+0x1a9e6c !"bogus context in _ExceptionHandler()"
+0x1a9e94 xx.cpp
+0x1a9e9b varType->tpClass.tpcFlags & CF_HAS_DTOR
+0x1a9ec3 xx.cpp
+0x1a9eca varType->tpClass.tpcDtorAddr
+0x1a9ee7 xx.cpp
+0x1a9eee (errPtr->ERRcInitDtc >= varType->tpClass.tpcDtorCount) || flags
+0x1a9f2e xx.cpp
+0x1a9f35 varType->tpClass.tpcFlags & CF_HAS_DTOR
+0x1a9f5d xx.cpp
+0x1a9f67 xx.cpp
+0x1a9f6e bl->blOffs == 0
+0x1a9f7e xx.cpp
+0x1a9f85 dtorCnt < varCount
+0x1a9f98 xx.cpp
+0x1a9f9f IS_STRUC(blType->tpMask)
+0x1a9fb8 xx.cpp
+0x1a9fbf IS_STRUC(blType->tpMask)
+0x1a9fd8 xx.cpp
+0x1a9fdf memType
+0x1a9fe7 xx.cpp
+0x1a9fee memType->tpClass.tpcFlags & CF_HAS_DTOR
+0x1aa016 xx.cpp
+0x1aa01d varType->tpMask & TM_IS_ARRAY
+0x1aa03b xx.cpp
+0x1aa042 varType->tpArr.tpaElemType->tpClass.tpcFlags & CF_HAS_DTOR
+0x1aa07d xx.cpp
+0x1aa084 vdtCount
+0x1aa08d xx.cpp
+0x1aa094 etdCount <= elemCount || elemCount == 0
+0x1aa0bc xx.cpp
+0x1aa0c3 dtrCount <= vdtCount
+0x1aa0d8 xx.cpp
+0x1aa0df IS_CLASS(varType->tpMask)
+0x1aa0f9 xx.cpp
+0x1aa100 ((unsigned __far *)vftAddr)[-1] == 0
+0x1aa125 xx.cpp
+0x1aa12c dttPtr->dttFlags & (DTCVF_PTRVAL|DTCVF_RETVAL)
+0x1aa15b xx.cpp
+0x1aa162 dttPtr->dttType->tpMask & TM_IS_PTR
+0x1aa186 xx.cpp
+0x1aa18d dttPtr->dttType->tpPtr.tppBaseType->tpClass.tpcFlags & CF_HAS_DTOR
+0x1aa1d0 xx.cpp
+0x1aa1d7 IS_CLASS(dttPtr->dttType->tpMask) && (dttPtr->dttType->tpClass.tpcFlags & CF_HAS_DTOR)
+0x1aa22e xx.cpp
+0x1aa235 dtvtPtr->dttType->tpMask & TM_IS_ARRAY
+0x1aa25c xx.cpp
+0x1aa263 varType->tpClass.tpcFlags & CF_HAS_DTOR
+0x1aa28b xx.cpp
+0x1aa292 elemType->tpClass.tpcFlags & CF_HAS_DTOR
+0x1aa2bb xx.cpp
+0x1aa2c2 varType->tpMask & TM_IS_ARRAY
+0x1aa2e0 xx.cpp
+0x1aa2e7 varType->tpMask & TM_IS_PTR
+0x1aa303 xx.cpp
+0x1aa30d xx.cpp
+0x1aa314 **BCCxh1
+0x1aa520 шяяяT,@
+0x1aa56c ьяяяT,@
+0x1aa598 шяяяT,@
+0x1aa75c false
+0x1aa81f Data == 0
+0x1aa829 WString.cpp
+0x1aa835 %s @ %s/%d
+0x1aa840 _ASSERTE: 
+0x1aa84b %s failed - %s/%d
+0x1aa860 %s
+Press [Y]es to terminate, [N]o to continue and [C]ancel to Debug
+0x1aaa38 ьяяяT,@
+0x1aaa64 фяяяT,@
+0x1aaa90 ряяяT,@
+0x1aab04 (__p == 0) == (__n == 0)
+0x1aab1d ..\stlport\stl/_alloc.h
+0x1aab35 basic_string
+0x1aab42 
+%s(%d): STL error: %s
+
+0x1aab5a %s(%d): STL assertion failure : %s
+
+0x1aab7e 
+%s(%d): STL error : %s
+%s(%d): STL assertion failure:     %s 
+
+0x1aabbe Invalid argument to operation (see operation documentation)
+0x1aabfa Taking an iterator out of destroyed (or otherwise corrupted) container
+0x1aac41 Trying to extract an object out from empty container
+0x1aac76 Past-the-end iterator could not be erased
+0x1aaca0 Index out of bounds
+0x1aacb4 Container doesn't own the iterator
+0x1aacd7 Uninitialized or invalidated (by mutating operation) iterator used
+0x1aad1a Uninitialized or invalidated (by mutating operation) lefthand iterator in expression
+0x1aad6f Uninitialized or invalidated (by mutating operation) righthand iterator in expression
+0x1aadc5 Iterators used in expression are from different owners
+0x1aadfc Iterator could not be dereferenced (past-the-end ?)
+0x1aae30 Range [first,last) is invalid
+0x1aae4e Iterator is not in range [first,last)
+0x1aae74 Range [first,last) is not in range [start,finish)
+0x1aaea6 The advance would produce invalid iterator
+0x1aaed1 Iterator is singular (advanced beyond the bounds ?)
+0x1aaf05 Memory block deallocated twice
+0x1aaf24 Deallocating a block that was never allocated
+0x1aaf52 Deallocating a memory block allocated for another type
+0x1aaf89 Size of block passed to deallocate() doesn't match block size
+0x1aafc7 Pointer underrun - safety margin at front of memory block overwritten
+0x1ab00d Pointer overrrun - safety margin at back of memory block overwritten
+0x1ab052 Unknown problem
+0x1ab062 (__p == 0) == (__n == 0)
+0x1ab07b ..\stlport\stl/_alloc.h
+0x1ab093 (__p == 0) == (__n == 0)
+0x1ab0ac ..\stlport\stl/_alloc.h
+0x1ab0c4 (__p == 0) == (__n == 0)
+0x1ab0dd ..\stlport\stl/_alloc.h
+0x1ab0f5 (__p == 0) == (__n == 0)
+0x1ab10e ..\stlport\stl/_alloc.h
+0x1ab126 (__p == 0) == (__n == 0)
+0x1ab13f ..\stlport\stl/_alloc.h
+0x1ab157 (__p == 0) == (__n == 0)
+0x1ab170 ..\stlport\stl/_alloc.h
+0x1ab188 (__p == 0) == (__n == 0)
+0x1ab1a1 ..\stlport\stl/_alloc.h
+0x1ab1b9 (__p == 0) == (__n == 0)
+0x1ab1d2 ..\stlport\stl/_alloc.h
+0x1ab1ea (__p == 0) == (__n == 0)
+0x1ab203 ..\stlport\stl/_alloc.h
+0x1ab21b (__p == 0) == (__n == 0)
+0x1ab234 ..\stlport\stl/_alloc.h
+0x1ab24c basic_string
+0x1ab259 (__p == 0) == (__n == 0)
+0x1ab272 ..\stlport\stl/_alloc.h
+0x1ab28a (__p == 0) == (__n == 0)
+0x1ab2a3 ..\stlport\stl/_alloc.h
+0x1ab2bb (__p == 0) == (__n == 0)
+0x1ab2d4 ..\stlport\stl/_alloc.h
+0x1ab2ec (__p == 0) == (__n == 0)
+0x1ab305 ..\stlport\stl/_alloc.h
+0x1ab31d (__p == 0) == (__n == 0)
+0x1ab336 ..\stlport\stl/_alloc.h
+0x1ab34e (__p == 0) == (__n == 0)
+0x1ab367 ..\stlport\stl/_alloc.h
+0x1ab37f (__p == 0) == (__n == 0)
+0x1ab398 ..\stlport\stl/_alloc.h
+0x1ab3b0 (__p == 0) == (__n == 0)
+0x1ab3c9 ..\stlport\stl/_alloc.h
+0x1ab3e1 (__p == 0) == (__n == 0)
+0x1ab3fa ..\stlport\stl/_alloc.h
+0x1ab412 (__p == 0) == (__n == 0)
+0x1ab42b ..\stlport\stl/_alloc.h
+0x1ab5e8 фюяяь
+0x1ab787 Аыяяя
+0x1ab8c0 ЬяяярaV
+0x1ab968 ios failure
+0x1ab974 basic_string
+0x1aba60 фюяяь
+0x1aba6c Ьюяя0hV
+0x1abc90 ьяяяh
+0x1abcbc ЬяяяшmV
+0x1ac098 Ьяяяbasic_string
+0x1ac874 Ьяяяbasic_string
+0x1ac885 basic_string
+0x1aca30 ЬяяяШ
+0x1acb00 шяяя\
+0x1acb7c шяяяX
+0x1ad028  !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`ABCDEFGHIJKLMNOPQRSTUVWXYZ{|}~
+0x1ad0c8 АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдежзийклмнопрстуфхцчшщъыьэюя
+0x1ad128  !"#$%&'()*+,-./0123456789:;<=>?@abcdefghijklmnopqrstuvwxyz[\]^_`abcdefghijklmnopqrstuvwxyz{|}~
+0x1ad1c8 АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдежзийклмнопрстуфхцчшщъыьэюя
+0x1ad308 шяяя@
+0x1ad375 basic_string
+0x1ad384 basic_string
+0x1ad7fc ьяяяь
+0x1ad808 дяяяь
+0x1ad814 Мяяяь
+0x1ad868 lяяяь
+0x1ad874 Tяяяь
+0x1ad8b0 $яяяь
+0x1ad8e8 Ьюяяь
+0x1ad8f4 Дюяяь
+0x1adc3c ьяяяь
+0x1adc48 дяяяь
+0x1adc54 Мяяяь
+0x1adc98 lяяяь
+0x1adcb4 Tяяяь
+0x1adcc0 <яяяь
+0x1adcdc $яяяь
+0x1adcf4 фюяяь
+0x1add00 Ьюяяь
+0x1add1c Фюяяь
+0x1adfdc ьяяя@
+0x1adfe8 дяяя@
+0x1adff4 Мяяя@
+0x1ae048 lяяя@
+0x1ae054 Tяяя@
+0x1ae090 $яяя@
+0x1ae0c8 Ьюяяь
+0x1ae0d4 Дюяяь
+0x1ae450 ьяяяь
+0x1ae45c дяяя@
+0x1ae468 Мяяя@
+0x1ae4ac lяяяь
+0x1ae4c8 Tяяя@
+0x1ae4d4 <яяя@
+0x1ae4f0 $яяя@
+0x1ae508 фюяя@
+0x1ae514 Ьюяя@
+0x1ae530 Фюяя@
+0x1ae808 0123456789
+0x1ae813 aAbBcCdDeEfF
+0x1ae820 яяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяяя
+0x1ae859 	яяяяяяя
+
+0x1ae867 яяяяяяяяяяяяяяяяяяяяяяяяяя
+
+0x1ae887 яяяяяяяяяяяяяяяяяяяяяяяяя+-0xXbasic_string
+0x1ae8cc ьяяя@
+0x1ae8d8 дяяя@
+0x1aea94 ьяяяь
+0x1aeaa0 дяяяь
+0x1aec54 0123456789
+0x1aed3a вПPKПР,Ц
+0x1aed49 кСБНвеФ
+0x1aed5f ЩjiРй
+0x1aed6d сPЭч,4
+0x1aed75 дxЯQdТ
+0x1aed83 cещШг
+0x1aed9f ш}Уeр
+0x1aeda5 5Cц&сГЮ
+0x1aedc1 N1Jм<емЛ
+0x1aede3 MDzвгnMСы:
+0x1aef2b яFяйю
+0x1aef31 ю/юТэuэ
+0x1aef80 0123456789abcdefx
+0x1aef92 0123456789ABCDEFX
+0x1aefa4 basic_string
+0x1aefb1 basic_string
+0x1aefd8 ьяяяь
+0x1af004 Мяяяь
+0x1af0f8 ьяяя@
+0x1af124 Мяяя@
+0x1af284 шяяяь
+0x1af29c ряяяь
+0x1af2b4 ияяя@
+0x1af2cc аяяя@
+0x1af2e4 Шяяяь
+0x1af3b0 basic_string
+0x1af3c2 false
+0x1af3c9 basic_string
+0x1af5ba Sunday
+0x1af5c8 Monday
+0x1af5d6 Tuesday
+0x1af5e4 Wednesday
+0x1af5f2 Thursday
+0x1af600 Friday
+0x1af60e Saturday
+0x1af73c January
+0x1af754 February
+0x1af76c March
+0x1af784 April
+0x1af7e4 August
+0x1af7fc September
+0x1af814 October
+0x1af82c November
+0x1af844 December
+0x1af862 %H:%M:%S
+0x1af86b %m/%d/%y
+0x1af874 %a %b %e %H:%M:%S %Y
+0x1af889 basic_string
+0x1af896 %.2ld
+0x1af8a5 %.2ld
+0x1af8af %.2ld
+0x1af8b9 %.2ld
+0x1af8c3 %.2ld
+0x1af8cd %.2ld
+0x1afa20 Ьяяяbasic_string
+0x1afb96 basic_string
+0x1afbb5 basic_string
+0x1afe1c фяяя@
+0x1afee4 фяяяь
+0x1b0460 basic_string
+0x1b046f bad locale name: 
+0x1b0481 locale error
+0x1b0490 basic_string

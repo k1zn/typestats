@@ -1,0 +1,4 @@
+* text=auto
+*.exe binary
+*.tsf binary
+*.tsj binary

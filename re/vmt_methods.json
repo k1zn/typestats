@@ -1,0 +1,206 @@
+{
+ "TForm1": {
+  "vmt": "0x598b5c",
+  "instance_size": 1192,
+  "methods": {
+   "FormCreate": "0x407c34",
+   "FormClose": "0x40c234",
+   "CheckBox1Click": "0x40c2a8",
+   "Button2Click": "0x413ed8",
+   "UpDown1Click": "0x4145b0",
+   "CheckBox2Click": "0x4145d0",
+   "Timer1Timer": "0x4145f0",
+   "PaintBox1Paint": "0x41464c",
+   "CheckBox4Click": "0x414658",
+   "PaintBox1MouseDown": "0x414678",
+   "PaintBox1MouseUp": "0x414718",
+   "PaintBox1MouseMove": "0x414730",
+   "PaintBox1DblClick": "0x414aa0",
+   "SpeedButton5Click": "0x415f64",
+   "SpeedButton6Click": "0x418ce8",
+   "FormKeyPress": "0x418e28",
+   "Memo4SelectionChange": "0x418e2c",
+   "SpeedButton12Click": "0x418ec8",
+   "SpeedButton7Click": "0x418ed0",
+   "PaintBox2Paint": "0x41966c",
+   "FormResize": "0x4196f0",
+   "Memo4KeyDown": "0x419718",
+   "ScrollBar1Scroll": "0x4198b0",
+   "SpeedButton4Click": "0x419a08",
+   "SpeedButton13Click": "0x419ed4",
+   "Memo4MouseMove": "0x41a21c",
+   "N2Click": "0x41a6a8",
+   "N3Click": "0x41a70c",
+   "PaintBox2MouseMove": "0x41a8c8",
+   "FormMouseWheel": "0x41a960",
+   "FormShow": "0x423a08",
+   "N5Click": "0x424754",
+   "N6Click": "0x424868",
+   "ShowStats": "0x424a1c",
+   "PaintBox3DblClick": "0x424a2c",
+   "PaintBox3MouseDown": "0x424a4c",
+   "PaintBox3MouseMove": "0x424ac8",
+   "PaintBox3MouseUp": "0x424d40",
+   "PaintBox3Paint": "0x424d70",
+   "Panel8Resize": "0x424dc8",
+   "FormCanResize": "0x424fac",
+   "Panel1CanResize": "0x425000",
+   "Splitter1Moved": "0x425218",
+   "Splitter2Moved": "0x425234",
+   "ApplicationEvents1Idle": "0x425250",
+   "FormKeyDown": "0x4282ac",
+   "SpeedButton8Click": "0x4282f4",
+   "ComboBox1Select": "0x4283fc",
+   "SpeedButton8MouseDown": "0x428488",
+   "Edit1KeyPress": "0x4286b4",
+   "N8Click": "0x42872c",
+   "N7Click": "0x428758",
+   "Panel11Click": "0x428784",
+   "Panel10MouseDown": "0x4287b0",
+   "Panel10MouseMove": "0x4287c8",
+   "ComboBox5Select": "0x4287fc",
+   "ComboBox5KeyPress": "0x428804",
+   "CheckBox5Click": "0x42881c",
+   "N9Click": "0x428838",
+   "Panel17Click": "0x42889c",
+   "Panel16MouseMove": "0x428948",
+   "Panel16DblClick": "0x42897c",
+   "SpeedButton2Click": "0x4289c0",
+   "SpeedButton14Click": "0x428a94",
+   "SpeedButton9Click": "0x428aec",
+   "ComboBox4Select": "0x428bd0",
+   "SpeedButton9MouseDown": "0x428c34",
+   "SpeedButton18Click": "0x428dd4",
+   "FormDestroy": "0x429734",
+   "SpeedButton19Click": "0x4297d4",
+   "SpeedButton20Click": "0x4297e4",
+   "SpeedButton21Click": "0x4297fc",
+   "N13Click": "0x4299dc",
+   "N14Click": "0x4299ec",
+   "SpeedButton3Click": "0x429a04",
+   "SpeedButton22Click": "0x429a30",
+   "ConvCurLayout": "0x429e80",
+   "ShowOpStat": "0x42a15c",
+   "ShowInpText": "0x42a16c",
+   "ApplicationEvents1Activate": "0x42a704",
+   "CheckBox6Click": "0x42a710",
+   "N15Click": "0x42a718",
+   "SpeedButton26Click": "0x42b934",
+   "SpeedButton27Click": "0x42b998",
+   "N16Click": "0x42b9a4",
+   "ApplicationEvents1Restore": "0x42b9bc",
+   "TrayIcon1Restore": "0x42b9ec"
+  }
+ },
+ "TForm2": {
+  "vmt": "0x59b5dc",
+  "instance_size": 784,
+  "methods": {}
+ },
+ "TForm3": {
+  "vmt": "0x59d234",
+  "instance_size": 872,
+  "methods": {
+   "FormShow": "0x444a50",
+   "RadioGroup1Click": "0x444a58",
+   "CheckBox1Click": "0x444ad4",
+   "CheckBox2Click": "0x444afc",
+   "SpeedButton1Click": "0x444c50",
+   "ListView1SelectItem": "0x4451a0",
+   "ListView2Data": "0x4451c8",
+   "ListView2SelectItem": "0x445328",
+   "FormCreate": "0x445350",
+   "FormDestroy": "0x445510",
+   "TntListView1Data": "0x44559c",
+   "FormResize": "0x445710",
+   "TntEdit1Change": "0x4457bc",
+   "SpeedButton7Click": "0x4457c4",
+   "TntEdit5Change": "0x445a8c",
+   "SpeedButton4Click": "0x445aa4",
+   "TntListView1ColumnClick": "0x445d38",
+   "SpeedButton8Click": "0x445dcc",
+   "SpeedButton8MouseDown": "0x445ec8",
+   "SpeedButton2Click": "0x445fa0"
+  }
+ },
+ "TForm4": {
+  "vmt": "0x5a0708",
+  "instance_size": 784,
+  "methods": {
+   "FormCreate": "0x450b24",
+   "FormShow": "0x451308",
+   "PaintBox1Paint": "0x451404",
+   "PaintBox1MouseDown": "0x451410",
+   "PaintBox1MouseMove": "0x451444",
+   "PaintBox1MouseUp": "0x4517c4",
+   "FormResize": "0x4517dc",
+   "PaintBox1DblClick": "0x451870",
+   "SpeedButton1Click": "0x451abc",
+   "SpeedButton2Click": "0x451c50",
+   "SpeedButton3Click": "0x451f0c",
+   "SpeedButton12Click": "0x4521f0",
+   "SpeedButton4Click": "0x4524d4"
+  }
+ },
+ "TForm5": {
+  "vmt": "0x5a0e00",
+  "instance_size": 768,
+  "methods": {
+   "PaintBox1Paint": "0x453b98"
+  }
+ },
+ "TForm6": {
+  "vmt": "0x5a0fa4",
+  "instance_size": 768,
+  "methods": {}
+ },
+ "TForm7": {
+  "vmt": "0x5a1520",
+  "instance_size": 824,
+  "methods": {
+   "Label5Click": "0x453e98",
+   "Label7Click": "0x453eb0",
+   "Label8Click": "0x453ec8",
+   "FormCreate": "0x453ee0",
+   "Label13Click": "0x453f38",
+   "Label15Click": "0x453f54"
+  }
+ },
+ "TForm8": {
+  "vmt": "0x5a1924",
+  "instance_size": 888,
+  "methods": {
+   "FormCreate": "0x4540b8"
+  }
+ },
+ "TForm9": {
+  "vmt": "0x5a1cc8",
+  "instance_size": 760,
+  "methods": {
+   "RichEdit1KeyDown": "0x454508"
+  }
+ },
+ "TForm10": {
+  "vmt": "0x5a1ed4",
+  "instance_size": 768,
+  "methods": {
+   "FormResize": "0x454680",
+   "FormActivate": "0x4547b8",
+   "FormKeyDown": "0x4547f4",
+   "FormShow": "0x454810"
+  }
+ },
+ "Tkbd": {
+  "vmt": "0x59e034",
+  "instance_size": 768,
+  "methods": {
+   "FormDestroy": "0x449bb8",
+   "PaintBox1Paint": "0x449c5c",
+   "PaintBox2Paint": "0x449c7c",
+   "PaintBox2MouseDown": "0x449c9c",
+   "FormActivate": "0x449cd4",
+   "PaintBox1MouseDown": "0x449cf0",
+   "FormKeyDown": "0x449d6c"
+  }
+ }
+}

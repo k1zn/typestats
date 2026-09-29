@@ -1,0 +1,43 @@
+<RCC>
+  <qresource prefix="/">
+    <file>icons/Form1_SpeedButton1.png</file>
+    <file>icons/Form1_SpeedButton10.png</file>
+    <file>icons/Form1_SpeedButton11.png</file>
+    <file>icons/Form1_SpeedButton12.png</file>
+    <file>icons/Form1_SpeedButton13.png</file>
+    <file>icons/Form1_SpeedButton14.png</file>
+    <file>icons/Form1_SpeedButton15.png</file>
+    <file>icons/Form1_SpeedButton16.png</file>
+    <file>icons/Form1_SpeedButton17.png</file>
+    <file>icons/Form1_SpeedButton18.png</file>
+    <file>icons/Form1_SpeedButton19.png</file>
+    <file>icons/Form1_SpeedButton2.png</file>
+    <file>icons/Form1_SpeedButton20.png</file>
+    <file>icons/Form1_SpeedButton21.png</file>
+    <file>icons/Form1_SpeedButton22.png</file>
+    <file>icons/Form1_SpeedButton23.png</file>
+    <file>icons/Form1_SpeedButton24.png</file>
+    <file>icons/Form1_SpeedButton25.png</file>
+    <file>icons/Form1_SpeedButton26.png</file>
+    <file>icons/Form1_SpeedButton27.png</file>
+    <file>icons/Form1_SpeedButton3.png</file>
+    <file>icons/Form1_SpeedButton4.png</file>
+    <file>icons/Form1_SpeedButton5.png</file>
+    <file>icons/Form1_SpeedButton6.png</file>
+    <file>icons/Form1_SpeedButton7.png</file>
+    <file>icons/Form1_SpeedButton8.png</file>
+    <file>icons/Form1_SpeedButton9.png</file>
+    <file>icons/Form3_SpeedButton1.png</file>
+    <file>icons/Form3_SpeedButton2.png</file>
+    <file>icons/Form3_SpeedButton4.png</file>
+    <file>icons/Form3_SpeedButton7.png</file>
+    <file>icons/Form3_SpeedButton8.png</file>
+    <file>icons/Form4_SpeedButton1.png</file>
+    <file>icons/Form4_SpeedButton12.png</file>
+    <file>icons/Form4_SpeedButton2.png</file>
+    <file>icons/Form4_SpeedButton3.png</file>
+    <file>icons/Form4_SpeedButton4.png</file>
+    <file>icons/app.png</file>
+    <file>icons/app.ico</file>
+  </qresource>
+</RCC>
