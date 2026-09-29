@@ -3,3 +3,4 @@ build/
 *.user
 re/ghidra_proj/
 *.log
+re/decomp/

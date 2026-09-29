@@ -39,6 +39,119 @@ public class TsImportAndDecompile extends GhidraScript {
         "  <killedbycall><register name=\"EAX\"/><register name=\"ECX\"/><register name=\"EDX\"/><register name=\"ST0\"/></killedbycall>\n" +
         "</prototype>\n";
 
+    // Decompile every function whose signature is still unknown and commit the
+    // recovered parameters/return, so callers show real arguments. Two passes
+    // (callees mostly sit at higher addresses, so walk backwards).
+    void paramId() throws Exception {
+        DecompInterface di = new DecompInterface();
+        di.setOptions(new DecompileOptions());
+        di.openProgram(currentProgram);
+        for (int pass = 0; pass < 2; pass++) {
+            int n = 0;
+            FunctionIterator it = currentProgram.getListing().getFunctions(false);
+            while (it.hasNext() && !monitor.isCancelled()) {
+                Function f = it.next();
+                if (f.isThunk() || f.isExternal()) continue;
+                if (f.getSignatureSource() == SourceType.USER_DEFINED || f.getSignatureSource() == SourceType.IMPORTED) {
+                    if (f.getParameterCount() > 0) continue;
+                }
+                DecompileResults r = di.decompileFunction(f, 30, monitor);
+                if (r == null || !r.decompileCompleted()) continue;
+                try {
+                    ghidra.program.model.pcode.HighFunctionDBUtil.commitParamsToDatabase(r.getHighFunction(), true,
+                        ghidra.program.model.pcode.HighFunctionDBUtil.ReturnCommitOption.COMMIT, SourceType.ANALYSIS);
+                    n++;
+                } catch (Exception e) { }
+            }
+            println("paramid pass " + pass + ": " + n);
+        }
+    }
+
+    // BCB compiles free functions as __cdecl (args at [EBP+8], plain RET) while VCL/AnsiString
+    // code uses the Borland register convention. Classify every non-VCL function and reset
+    // its signature so paramId() can recover real parameters.
+    void classifyConventions() throws Exception {
+        int cd = 0, fc = 0;
+        FunctionIterator it = currentProgram.getListing().getFunctions(true);
+        while (it.hasNext() && !monitor.isCancelled()) {
+            Function f = it.next();
+            if (f.isThunk() || f.isExternal()) continue;
+            if (!f.getParentNamespace().isGlobal()) continue; // VCL methods named from RTTI stay register
+            boolean stackArgs = false, plainRet = false, retN = false, regUse = false;
+            java.util.Set<String> written = new java.util.HashSet<>();
+            int count = 0;
+            for (Instruction ins : currentProgram.getListing().getInstructions(f.getBody(), true)) {
+                String t = ins.toString().toUpperCase();
+                if (t.matches(".*\[EBP \+ 0X(8|C|10|14|18|1C|20)\].*")) stackArgs = true;
+                if (ins.getMnemonicString().equalsIgnoreCase("RET")) {
+                    if (ins.getNumOperands() == 0) plainRet = true; else retN = true;
+                }
+                if (count++ < 12) {
+                    // register args read before being written?
+                    for (String r : new String[]{"EAX", "EDX", "ECX"}) {
+                        Object[] res = ins.getInputObjects();
+                        for (Object o : res) if (o.toString().equals(r) && !written.contains(r)
+                                && !ins.getMnemonicString().equalsIgnoreCase("XOR") && !ins.getMnemonicString().equalsIgnoreCase("PUSH")) regUse = true;
+                    }
+                    for (Object o : ins.getResultObjects()) written.add(o.toString());
+                }
+            }
+            String cc = (stackArgs && plainRet && !regUse) || (!regUse && !retN) ? "__cdecl" : "__fastcall";
+            if (cc.equals("__cdecl")) cd++; else fc++;
+            try {
+                f.updateFunction(cc, null, java.util.List.of(), Function.FunctionUpdateType.DYNAMIC_STORAGE_ALL_PARAMS,
+                    true, SourceType.DEFAULT);
+            } catch (Exception e) { }
+        }
+        println("cconv: cdecl=" + cd + " fastcall=" + fc);
+    }
+
+    // re/rtl_names.json: {"0xADDR": "Name"}; re/globals.json: {"0xADDR": ["name", "type"]}
+    void applyTypes(String root) throws Exception {
+        DataTypeManager dtm = currentProgram.getDataTypeManager();
+        CategoryPath cat = new CategoryPath("/TS");
+        StructureDataType rec = new StructureDataType(cat, "KeyRec", 0, dtm);
+        rec.add(UnsignedIntegerDataType.dataType, "dt", "microseconds since previous event");
+        rec.add(UnsignedIntegerDataType.dataType, "aux", null);
+        rec.add(UnsignedIntegerDataType.dataType, "flags", null);
+        rec.add(UnsignedIntegerDataType.dataType, "ch", null);
+        rec.add(new PointerDataType(CharDataType.dataType), "comment", "AnsiString");
+        rec.add(UnsignedIntegerDataType.dataType, "aux2", null);
+        DataType recDt = dtm.addDataType(rec, DataTypeConflictHandler.REPLACE_HANDLER);
+        Map<String, DataType> types = new HashMap<>();
+        types.put("KeyRec*", new PointerDataType(recDt));
+        types.put("uint", UnsignedIntegerDataType.dataType);
+        types.put("int", IntegerDataType.dataType);
+        types.put("bool", BooleanDataType.dataType);
+        types.put("char", CharDataType.dataType);
+        types.put("double", DoubleDataType.dataType);
+        types.put("float", FloatDataType.dataType);
+        types.put("AnsiString", new PointerDataType(CharDataType.dataType));
+        Path rn = Path.of(root, "re", "rtl_names.json");
+        if (Files.exists(rn)) {
+            JsonObject j = JsonParser.parseString(Files.readString(rn, StandardCharsets.UTF_8)).getAsJsonObject();
+            for (Map.Entry<String, JsonElement> e : j.entrySet()) {
+                Function f = getFunctionAt(toAddr(Long.decode(e.getKey())));
+                if (f != null) f.setName(e.getValue().getAsString(), SourceType.USER_DEFINED);
+            }
+        }
+        Path gl = Path.of(root, "re", "globals.json");
+        if (Files.exists(gl)) {
+            JsonObject j = JsonParser.parseString(Files.readString(gl, StandardCharsets.UTF_8)).getAsJsonObject();
+            for (Map.Entry<String, JsonElement> e : j.entrySet()) {
+                Address a = toAddr(Long.decode(e.getKey()));
+                JsonArray v = e.getValue().getAsJsonArray();
+                createLabel(a, v.get(0).getAsString(), true, SourceType.USER_DEFINED);
+                DataType dt = types.get(v.get(1).getAsString());
+                if (dt != null) {
+                    clearListing(a, a.add(dt.getLength() - 1));
+                    createData(a, dt);
+                }
+            }
+        }
+        println("types applied");
+    }
+
     @Override
     public void run() throws Exception {
         String root = getScriptArgs()[0];
@@ -46,7 +159,7 @@ public class TsImportAndDecompile extends GhidraScript {
         Listing listing = currentProgram.getListing();
         SymbolTable st = currentProgram.getSymbolTable();
 
-        if (!mode.equals("decompile")) {
+        if (mode.equals("names")) {
             try {
                 SpecExtension ext = new SpecExtension(currentProgram);
                 ext.addReplaceCompilerSpecExtension(BORLAND, monitor);
@@ -110,6 +223,9 @@ public class TsImportAndDecompile extends GhidraScript {
         }
 
         if (mode.equals("names")) return;
+        if (mode.equals("paramid")) { paramId(); return; }
+        if (mode.equals("cconv")) { classifyConventions(); paramId(); return; }
+        if (mode.equals("types")) { applyTypes(root); return; }
         // decompile app range
         long lo = Long.decode(System.getProperty("ts.lo", "0x401000"));
         long hi = Long.decode(System.getProperty("ts.hi", "0x456000"));
