@@ -131,6 +131,8 @@ def port_styles(text, runs_out):
 
 class Original:
     def __init__(self, tsf):
+        # The original creates its journal <year>_<month>.tsj next to the exe at startup.
+        self.journals = set(ORIGINAL.parent.glob("*.tsj"))
         self.proc = subprocess.Popen([str(ORIGINAL), str(tsf)])
         self.main = None
         deadline = time.time() + 20
@@ -286,6 +288,9 @@ class Original:
     def close(self):
         self.proc.kill()
         self.proc.wait()
+        for j in set(ORIGINAL.parent.glob("*.tsj")) - self.journals:
+            if j.stat().st_size == 0:  # an empty journal this run created
+                j.unlink()
 
 
 # ---------------------------------------------------------------- comparison

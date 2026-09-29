@@ -5,3 +5,5 @@ re/ghidra_proj/
 *.log
 re/decomp/
 re/decomp_clean/
+__pycache__/
+/*.tsj
