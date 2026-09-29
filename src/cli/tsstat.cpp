@@ -17,6 +17,7 @@ int main(int argc, char *argv[])
     QCoreApplication app(argc, argv);
     const QStringList args = app.arguments();
     RecalcOptions opt;
+    opt.onlyText = false; // options come from the flags only
     int selStart = 0, selLen = 0;
     bool printText = false, printRuns = false;
     QString file;

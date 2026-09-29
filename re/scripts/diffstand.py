@@ -206,7 +206,7 @@ class Original:
         return out
 
     def select(self, text, start, length):
-        """Selects in the RichEdit and waits for ListView2.
+        """Selects in the RichEdit and waits for ListView2 and ListView1.
 
         The original refreshes the statistics in ApplicationEvents1Idle (flag DAT_0058e1d6 set by
         Memo4SelectionChange), and skips it if the range did not change. Sometimes the refresh does
@@ -214,16 +214,17 @@ class Original:
         """
         a, b = self.re_pos(text, start), self.re_pos(text, start + length)
         for attempt in range(3):
-            before = wr.listview_rows(self.lv2)
+            lists = lambda: (wr.listview_rows(self.lv2), wr.listview_rows(self.lv1))
+            before = lists()
             wr.richedit_select(self.richedit, a, b)
             deadline = time.time() + 0.6
-            cur = wr.listview_rows(self.lv2)
+            cur = lists()
             while cur == before and time.time() < deadline:
                 time.sleep(0.03)
-                cur = wr.listview_rows(self.lv2)
+                cur = lists()
             while True:  # stable for 0.1 s
                 time.sleep(0.1)
-                nxt = wr.listview_rows(self.lv2)
+                nxt = lists()
                 if nxt == cur:
                     break
                 cur = nxt
@@ -284,6 +285,22 @@ class Original:
         klav = rd(0x5B1348, "<I")
         bitmap = rd(rd(klav + 0x28, "<I") + 0x28, "<I")
         return {"klav_width": rd(bitmap + 0x1C, "<i"), "klav_zoom": rd(klav + 0x6C, "<f")}
+
+    # Graph series objects (FUN_00403868): global pointer -> object, vector<float> at +0x24/+0x28.
+    SERIES = {"pause": 0x5B1408, "curSpeed": 0x5B13EC, "medSpeed": 0x5B13F0, "classicSpeed": 0x5B13FC,
+              "privSpeed": 0x5B1400, "curRhythm": 0x5B13F4, "medRhythm": 0x5B13F8, "arrhythmia": 0x5B140C,
+              "finger": 0x5B1404}
+
+    def series(self):
+        """Raw float bits (hex) of every graph series, read from the original's memory."""
+        rd = lambda a, n: wr.read_process(self.proc.pid, a, n)
+        out = {}
+        for name, glob in self.SERIES.items():
+            obj, = struct.unpack("<I", rd(glob, 4))
+            begin, end = struct.unpack("<II", rd(obj + 0x24, 8))
+            raw = rd(begin, end - begin) if end > begin else b""
+            out[name] = [f"{v:08x}" for v in struct.unpack(f"<{len(raw) // 4}I", raw)]
+        return out
 
     def close(self):
         self.proc.kill()
@@ -357,7 +374,7 @@ def collect_variant(orig, opts, args):
     orig.select(text, 0, 0)
     rec = {"options": opts, "text": text, "stats": wr.listview_rows(orig.lv2),
            "lv1": wr.listview_rows(orig.lv1), "lv1_rows": wr.send(orig.lv1, 0x1028),  # LVM_GETCOUNTPERPAGE
-           **orig.klav_view(), "selections": []}
+           **orig.klav_view(), "series": orig.series(), "selections": []}
     if not args.no_styles:
         rec["styles"] = orig.styles(text)
     for s, n in selections(text, args):

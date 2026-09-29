@@ -2,6 +2,7 @@
 // tests/golden/orig/<name>.json is written by re/scripts/diffstand.py (one entry per option set:
 // ListView2, text, character styles, and ListView2 for a number of selections).
 
+#include "core/Graphs.h"
 #include "core/KeyList.h"
 #include "core/MainStats.h"
 #include "core/TsfFile.h"
@@ -11,6 +12,8 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QTest>
+
+#include <cstring>
 
 namespace {
 
@@ -92,6 +95,26 @@ QStringList portLv1(const TextModel &m, int selStart, int widthPx, float zoom, i
     return r;
 }
 
+// Float bits as the bench records them (exact comparison).
+QStringList bits(const QVector<float> &v)
+{
+    QStringList r;
+    for (float f : v) {
+        quint32 u;
+        std::memcpy(&u, &f, 4);
+        r << QStringLiteral("%1").arg(u, 8, 16, QLatin1Char('0'));
+    }
+    return r;
+}
+
+QStringList bits(const QJsonArray &a)
+{
+    QStringList r;
+    for (const QJsonValue &v : a)
+        r << v.toString();
+    return r;
+}
+
 } // namespace
 
 class TstOrig : public QObject
@@ -148,6 +171,20 @@ private slots:
         const int widthPx = variant[QLatin1String("klav_width")].toInt(652);
         const float zoom = float(variant[QLatin1String("klav_zoom")].toDouble(0.25));
         QCOMPARE(portLv1(m, 0, widthPx, zoom, maxRows), lv1Rows(variant[QLatin1String("lv1")].toArray()));
+        if (variant.contains(QLatin1String("series"))) {
+            const QJsonObject series = variant[QLatin1String("series")].toObject();
+            const GraphSeries g = Graphs::compute(m.pauses);
+            const QList<QPair<const char *, const QVector<float> *>> all = {
+                {"pause", &g.pause}, {"curSpeed", &g.curSpeed}, {"medSpeed", &g.medSpeed},
+                {"classicSpeed", &g.classicSpeed}, {"privSpeed", &g.privSpeed}, {"curRhythm", &g.curRhythm},
+                {"medRhythm", &g.medRhythm}, {"arrhythmia", &g.arrhythmia}};
+            for (const auto &[name, v] : all) {
+                const QStringList want = bits(series[QLatin1String(name)].toArray());
+                if (bits(*v) != want)
+                    qWarning() << "series" << name;
+                QCOMPARE(bits(*v), want);
+            }
+        }
         if (variant.contains(QLatin1String("styles")))
             QCOMPARE(portStyles(m), origStyles(variant[QLatin1String("styles")].toArray()));
         for (const QJsonValue &s : variant[QLatin1String("selections")].toArray()) {
@@ -157,7 +194,10 @@ private slots:
             if (got != want)
                 qWarning() << "selection" << start << len;
             QCOMPARE(got, want);
-            QCOMPARE(portLv1(m, start, widthPx, zoom, maxRows), lv1Rows(s[QLatin1String("lv1")].toArray()));
+            const QStringList lv1 = portLv1(m, start, widthPx, zoom, maxRows);
+            if (lv1 != lv1Rows(s[QLatin1String("lv1")].toArray()))
+                qWarning() << "ListView1, selection" << start << len;
+            QCOMPARE(lv1, lv1Rows(s[QLatin1String("lv1")].toArray()));
         }
     }
 };
