@@ -1,5 +1,7 @@
 #include "core/TsfFile.h"
 
+#include <QDir>
+#include <QFile>
 #include <QTest>
 
 class TstTsf : public QObject
@@ -73,6 +75,32 @@ private slots:
         QCOMPARE(d.records[0].ch, u'а');
         QCOMPARE(d.records[0].scan(), 0x1E);
         QCOMPARE(d.records[0].vk(), 0x41);
+    }
+
+    void goldenFiles_data()
+    {
+        QTest::addColumn<QString>("file");
+        for (const QString &f : QDir(QStringLiteral(TS_GOLDEN_DIR)).entryList({QStringLiteral("*.tsf")}))
+            QTest::newRow(qPrintable(f)) << QStringLiteral(TS_GOLDEN_DIR "/") + f;
+    }
+
+    void goldenFiles()
+    {
+        QFETCH(QString, file);
+        TsfDocument d;
+        QCOMPARE(Tsf::read(file, d), Tsf::ReadError::None);
+        QVERIFY(d.records.size() > 10);
+        QVERIFY(d.signed_);
+        QVERIFY2(d.signatureValid, "MD5 signature mismatch");
+        // Re-serialising must reproduce the original file byte for byte.
+        QFile f(file);
+        QVERIFY(f.open(QIODevice::ReadOnly));
+        const QByteArray original = f.readAll();
+        const QString tmp = QDir::temp().filePath(QStringLiteral("ts_roundtrip.tsf"));
+        QVERIFY(Tsf::write(tmp, d, true));
+        QFile g(tmp);
+        QVERIFY(g.open(QIODevice::ReadOnly));
+        QCOMPARE(g.readAll(), original);
     }
 
     void newerVersionWarns()

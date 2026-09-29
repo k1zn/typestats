@@ -82,7 +82,7 @@ public class TsImportAndDecompile extends GhidraScript {
             int count = 0;
             for (Instruction ins : currentProgram.getListing().getInstructions(f.getBody(), true)) {
                 String t = ins.toString().toUpperCase();
-                if (t.matches(".*\[EBP \+ 0X(8|C|10|14|18|1C|20)\].*")) stackArgs = true;
+                if (t.matches(".*\\[EBP \\+ 0X(8|C|10|14|18|1C|20)\\].*")) stackArgs = true;
                 if (ins.getMnemonicString().equalsIgnoreCase("RET")) {
                     if (ins.getNumOperands() == 0) plainRet = true; else retN = true;
                 }
@@ -226,6 +226,24 @@ public class TsImportAndDecompile extends GhidraScript {
         if (mode.equals("paramid")) { paramId(); return; }
         if (mode.equals("cconv")) { classifyConventions(); paramId(); return; }
         if (mode.equals("types")) { applyTypes(root); return; }
+        if (mode.startsWith("one:")) {
+            // one:<hexaddr>[,<hexaddr>...] -> re/decomp/one_<addr>.c with a long timeout
+            DecompInterface d1 = new DecompInterface();
+            DecompileOptions o1 = new DecompileOptions();
+            o1.setMaxPayloadMBytes(512);
+            o1.setMaxInstructions(200000);
+            d1.setOptions(o1);
+            d1.openProgram(currentProgram);
+            for (String a : mode.substring(4).split(",")) {
+                Function f = getFunctionAt(toAddr(Long.decode(a)));
+                DecompileResults r = d1.decompileFunction(f, 1800, monitor);
+                String c = (r != null && r.decompileCompleted()) ? r.getDecompiledFunction().getC() : "// failed: " + (r == null ? "" : r.getErrorMessage());
+                Files.writeString(Path.of(root, "re", "decomp", "one_" + a + ".c"),
+                    "\n// ===== " + f.getEntryPoint() + " _global::" + f.getName() + "\n" + c, StandardCharsets.UTF_8);
+                println("one " + a + " " + (r != null && r.decompileCompleted()));
+            }
+            return;
+        }
         // decompile app range
         long lo = Long.decode(System.getProperty("ts.lo", "0x401000"));
         long hi = Long.decode(System.getProperty("ts.hi", "0x456000"));
