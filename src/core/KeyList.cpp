@@ -1,0 +1,64 @@
+#include "KeyList.h"
+
+#include "KeyName.h"
+
+namespace KeyList {
+
+float scrollForPosition(const TextModel &m, int selStart)
+{
+    if (m.klav.isEmpty())
+        return 0.0f;
+    const int k = Recalc::at(m.mapKlav, Recalc::lowerBound(m.mapPos, selStart));
+    // The original checks size < k only, and reads one record past the end for k == size.
+    const qint64 t = k < m.klav.size() ? m.klav[k].tDraw : m.klav.last().tDraw;
+    return float(0.001L * (t - 100));
+}
+
+QVector<KeyListRow> rows(const QVector<KlavRecord> &klav, float scrollMs, int widthPx, float zoom, int maxRows,
+                         const QLocale &locale)
+{
+    QLocale loc = locale;
+    loc.setNumberOptions(QLocale::OmitGroupSeparator);
+    const float start = scrollMs * 1000.0f - 10.0f;
+    const float end = float(double(float(widthPx * 1000)) / double(zoom) + double(start));
+
+    QVector<KeyListRow> out;
+    int pressRow[256];
+    qint64 pressT[256] = {};
+    std::fill(std::begin(pressRow), std::end(pressRow), -1);
+    qint64 prev = 0;
+    const bool windowed = maxRows < 0x7fffffff; // the original ignores the window for "all rows"
+    for (const KlavRecord &r : klav) {
+        const double t = double(r.tDraw);
+        if (windowed && t < double(start))
+            continue;
+        if (windowed && widthPx >= 0 && t > double(end))
+            break;
+        const quint8 scan = r.flags & KeyRecord::ScanMask; // indexed by scan code, not VK
+        if (!r.down) {
+            if (pressRow[scan] >= 0) {
+                out[pressRow[scan]].duration = loc.toString(double(0.001L * (r.t - pressT[scan])), 'f', 3);
+                pressRow[scan] = -1;
+            }
+            continue;
+        }
+        pressRow[scan] = out.size();
+        pressT[scan] = r.t;
+        KeyListRow row;
+        const float pause = float(0.001L * (r.t - prev));
+        if (pause <= 59000.0f)
+            row.pause = loc.toString(double(pause), 'f', 3);
+        row.key = keyDisplayName(r.flags, r.ch);
+        if (row.key == QLatin1String("\r"))
+            row.key = QStringLiteral("[Enter]");
+        out.append(row);
+        if (out.size() >= maxRows)
+            break;
+        prev = r.t;
+    }
+    if (!out.isEmpty())
+        out[0].pause.clear(); // FUN_00404c44
+    return out;
+}
+
+} // namespace KeyList

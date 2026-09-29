@@ -127,6 +127,7 @@ private slots:
         t.text(QStringLiteral("cd"), 2000000); // 2 s > 500 ms: 'c' starts a fragment, 'd' does too
         t.text(QStringLiteral("e"), 100000);
         RecalcOptions opt;
+        opt.splitMs = 500;
         const TextModel m = Recalc::run(t.recs, opt);
         QCOMPARE(m.text, QStringLiteral("ab‡c‡de"));
         QCOMPARE(m.size(), 5);

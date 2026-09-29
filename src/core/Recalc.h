@@ -8,9 +8,9 @@
 
 struct RecalcOptions
 {
-    int splitMs = 500;         // UpDown1 "Пауза разбиения", 200..10000
-    bool onlyText = false;     // CheckBox2 "Только текст"
-    bool byPauses = false;     // CheckBox3 "Разбивать по паузам"
+    int splitMs = 2000;        // UpDown1 "Пауза разбиения", 200..10000; registry "Pause", default 2000
+    bool onlyText = true;      // CheckBox2 "Только текст"; registry "TextOnly", default 1
+    bool byPauses = false;     // CheckBox3 "Разбивать по паузам"; registry "SplitOnEnter", default 0
     bool onlyInjected = false; // CheckBox6 "Только PCmo" (hidden in the original)
 };
 

@@ -41,10 +41,11 @@ if len(s) > 1:    s = "[" + s + "]"
 Пример: Ctrl+BackSpace → `[Ctrl+BackSpace]`, Shift → `[LShift]`, Enter → `\r`.
 
 ## 4. Проход по записям: элементы и текст
-Опции:
-- `split = UpDown1 · 1000` мкс. UpDown1: 200..10000 мс, по умолчанию 500;
-- `onlyText` = CheckBox2 «Только текст»;
-- `byPauses` = CheckBox3 «Разбивать по паузам»;
+Опции (читает `FUN_0041ab08` через `TRegIniFile("Software")`, секция `TypingStatistics` или
+`TypingStatistics\<Profile>`; значения в DFM перекрываются, эффективные умолчания — из кода):
+- `split = UpDown1 · 1000` мкс. UpDown1: 200..10000 мс, ключ `Pause`, по умолчанию **2000** (в DFM 500);
+- `onlyText` = CheckBox2 «Только текст», ключ `TextOnly`, по умолчанию **1**;
+- `byPauses` = CheckBox3 «Разбивать по паузам», ключ `SplitOnEnter`, по умолчанию 0;
 - `onlyInjected` = CheckBox6 «Только PCmo» (скрыт, false).
 
 Состояние:
@@ -117,8 +118,16 @@ computeGraphs(segStart); flushPara()
 - `DAT_005b1064` — номер сырой записи.
 
 По ним выделение в тексте переводится в элементы и записи (lower_bound).
-Позиции `pos` — это смещения RichEdit: разрыв абзаца там считается за 2 символа.
-В порту можно считать позиции по-своему, лишь бы маппинг был согласован.
+Позиции `pos` — это смещения RichEdit. TRichEdit у BCB6 — RichEdit 1.0 (класс `RICHEDIT`): разрыв абзаца
+хранится как настоящие CR LF, это 2 позиции и в тексте, и в выделении (`EM_GETTEXTLENGTHEX` с
+`GTL_NUMCHARS` = длине `WM_GETTEXT`). Поэтому маппинг и стили у оригинала согласованы.
+Порт считает разрыв за 1 символ (LF); при сверке позиция порта `q` соответствует
+`q + (число разрывов до q)` у оригинала (так делает `re/scripts/diffstand.py`).
+
+**Отображение.** Модель текста — WideString, но RichEdit ANSI (cp1251): символы вне cp1251
+заменяются при выводе по best-fit `WideCharToMultiByte`. Стёртый пробел `█` (U+2588, литерал @0x58ea80,
+глобальная `DAT_0058e190`) на экране у оригинала выглядит как `-`. Порт показывает `█`, как задумано.
+Разделитель `‡` (U+2021, @0x58ea7c, `DAT_0058e18c`) и `—` в cp1251 есть.
 
 **Абзацы (`flushPara`, 0x40c5d0).** Накопленные сегменты склеиваются в строку и дописываются
 в конец RichEdit. Если там уже есть текст, перед строкой ставится `\r\n`. Функция возвращает новую
@@ -144,9 +153,57 @@ computeGraphs(segStart); flushPara()
 
 Абсолютное время `t` = `trunc(Σdt)` по всем записям, в мкс (`__ftol` от double-суммы).
 
-## 6. После прохода
+## 6. Обновление статистики при выделении
+`Memo4SelectionChange` (0x418e2c) → `FUN_00414500`: ставит позицию клавограммы и флаг `DAT_0058e1d6`.
+Сам пересчёт — в `ApplicationEvents1Idle` (0x42a2xx): `FUN_00424e64`, `PaintBox3Paint`, ListView1
+(`FUN_00404c44`) и, если `FUN_00405188` (синхронизация клавограмма → текст) вернула 0, основная
+статистика `FUN_004255a8`. Изменение опций (`UpDown1Click`, `CheckBox2Click`, Enter в Edit1 —
+`Edit1KeyPress` 0x4286b4) сразу сохраняет пресет в реестр (`FUN_00406a90`) и зовёт `Recalculate`.
+
+## 7. После прохода
 - `FUN_0043ad1c(textModel)` — финализация модели (слова для Form3 и т.п., не разобрано);
-- `FUN_00405b34`, `FUN_0040687c` — ListView1 (Пауза/Длительность/Клавиша) и прочее;
+- `FUN_00405b34`, `FUN_0040687c` — не разобраны (графики/прочее);
 - восстановить курсор RichEdit;
 - `PaintBox3Paint` (клавограмма), `FUN_00404c44` (ListView1), `PaintBox1Paint` (график);
 - пересчитать Form3/Form4, если они открыты.
+
+## 8. ListView1 «Пауза / Длительность / Клавиша» (0x404c44 + 0x437d98)
+Это список нажатий, **видимых на клавограмме**, а не элементов текста. Порт: `src/core/KeyList`.
+
+Состояние клавограммы (`DAT_005b1348`):
+- `+0x68` — scroll, float, мс времени рисования (`tDraw`);
+- `+0x6c` — масштаб, float, px/мс: по умолчанию 0.25, ограничен 0.04..300;
+- `+0x28` — объект холста, у него `+0x28` → TBitmap, ширина `+0x1c` (652 px у пользователя).
+
+При смене выделения `FUN_00414500`: `k = mapKlav[lower_bound(mapPos, SelStart)]`,
+`scroll = float(0.001 · (klav[k].tDraw − 100))`. Если `k > size`, берётся последняя запись; при
+`k == size` оригинал читает запись за концом вектора.
+
+`FUN_00404c44`: `n = LVM_GETCOUNTPERPAGE` (12 при высоте по умолчанию), затем `FUN_00437d98(klav, …, n)`:
+```
+start = float(scroll·1000f − 10f); end = float(float(width·1000) / zoom + start)   // мкс tDraw
+row[scan] = −1 (256 шт., индекс — СКАН-код, flags & 0xFF); prev = 0; count = 0
+for r in klav:
+    if n < 0x7fffffff:                    // для «все строки» окно не проверяется
+        if tDraw < start: continue
+        if tDraw > end: stop
+    if release: if row[scan] ≥ 0: duration[row[scan]] = Fixed3((r.t − pressT[scan]) · 0.001L); row[scan] = −1
+    else:
+        row[scan] = rows; pressT[scan] = r.t
+        p = float((r.t − prev) · 0.001L);  pause = p ≤ 59000 ? Fixed3(p) : ""
+        key = KeyDisplayName(flags, ch), "\r" → "[Enter]"; duration = ""
+        if ++count ≥ n: stop              // у последней строки длительность остаётся пустой
+        prev = r.t
+pause[0] = ""                             // FUN_00404c44
+```
+Время (`r.t`) — абсолютное (`+0x00`), окно — по `tDraw` (`+0x10`). Длительность считается в
+extended, пауза округляется до float.
+
+## Сверка с оригиналом
+`re/scripts/diffstand.py` (pywinauto + свои 32-битные структуры, `re/scripts/win32remote.py`)
+запускает оригинал с файлом, читает ListView2, ListView1, текст и стили RichEdit, выделяет
+случайные диапазоны и ставит курсор. С `--variants` переключает опции в окне (оригинал сразу
+пишет пресет в реестр, стенд снимает снимок `HKCU\Software\TypingStatistics` и восстанавливает его).
+Результат пишется в `tests/golden/orig/<имя>.json`; `--offline` сравнивает с ним без запуска
+оригинала. `tests/tst_orig.cpp` проверяет по этим JSON ядро: основная статистика, текст, стили,
+выделения и ListView1 на 4 golden-файлах × 5 наборов опций совпадают полностью.
