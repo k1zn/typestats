@@ -2,6 +2,7 @@
 // tests/golden/orig/<name>.json is written by re/scripts/diffstand.py (one entry per option set:
 // ListView2, text, character styles, and ListView2 for a number of selections).
 
+#include "core/FingerZones.h"
 #include "core/Graphs.h"
 #include "core/KeyList.h"
 #include "core/MainStats.h"
@@ -184,6 +185,11 @@ private slots:
                     qWarning() << "series" << name;
                 QCOMPARE(bits(*v), want);
             }
+            // Finger of every element with the built-in scheme (the golden files store none).
+            QVector<float> finger;
+            for (quint8 f : fingerSeries(m, FingerZones::standard()))
+                finger << f;
+            QCOMPARE(bits(finger), bits(series[QLatin1String("finger")].toArray()));
         }
         if (variant.contains(QLatin1String("styles")))
             QCOMPARE(portStyles(m), origStyles(variant[QLatin1String("styles")].toArray()));
