@@ -1,6 +1,8 @@
 #include "Texts.h"
 
 #include <QCoreApplication>
+#include <QLocale>
+#include <QSettings>
 
 namespace Texts {
 
@@ -27,6 +29,19 @@ QStringList statsRowNames()
             tr("Скорость брутто"),   tr("Скорость брутто+"),  tr("Скорость брутто*"),
             tr("Потери от исправлений"), tr("Аритмия"),       tr("Исправлений"),
             tr("Серий исправлений"), tr("max без исправлений")};
+}
+
+QStringList languages()
+{
+    return {QStringLiteral("Russian"), QStringLiteral("English")};
+}
+
+QString currentLanguage()
+{
+    const QString stored = QSettings().value(QStringLiteral("Language")).toString();
+    if (languages().contains(stored))
+        return stored;
+    return QLocale::system().language() == QLocale::Russian ? QStringLiteral("Russian") : QStringLiteral("English");
 }
 
 } // namespace Texts

@@ -13,6 +13,8 @@ public:
     explicit TextView(QWidget *parent = nullptr);
 
     void setModel(const TextModel &m);
+    // Font size in points, as in the settings (8..24).
+    void setFontSize(int points);
 
     // Selection in text positions of the model (a paragraph break is one position).
     int selectionStart() const;

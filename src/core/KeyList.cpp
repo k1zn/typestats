@@ -15,7 +15,8 @@ float scrollForPosition(const TextModel &m, int selStart)
     return float(0.001L * (t - 100));
 }
 
-QVector<KeyListRow> rows(const QVector<KlavRecord> &klav, const QLocale &loc, double fromUs, double toUs, int limit)
+QVector<KeyListRow> rows(const QVector<KlavRecord> &klav, const QLocale &loc, double fromUs, double toUs, int limit,
+                         int digits)
 {
     QVector<KeyListRow> out;
     int pressRow[256];
@@ -31,7 +32,7 @@ QVector<KeyListRow> rows(const QVector<KlavRecord> &klav, const QLocale &loc, do
         const quint8 scan = r.flags & KeyRecord::ScanMask; // indexed by scan code, not VK
         if (!r.down) {
             if (pressRow[scan] >= 0) {
-                out[pressRow[scan]].duration = formatFixed(double(0.001L * (r.t - pressT[scan])), 3, loc);
+                out[pressRow[scan]].duration = formatFixed(double(0.001L * (r.t - pressT[scan])), digits, loc);
                 pressRow[scan] = -1;
             }
             continue;
@@ -41,7 +42,7 @@ QVector<KeyListRow> rows(const QVector<KlavRecord> &klav, const QLocale &loc, do
         KeyListRow row;
         const float pause = float(0.001L * (r.t - prev));
         if (pause <= 59000.0f)
-            row.pause = formatFixed(double(pause), 3, loc);
+            row.pause = formatFixed(double(pause), digits, loc);
         row.key = keyDisplayName(r.flags, r.ch);
         if (row.key == QLatin1String("\r"))
             row.key = QStringLiteral("[Enter]");

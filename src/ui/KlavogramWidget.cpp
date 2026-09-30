@@ -67,6 +67,12 @@ KlavogramWidget::KlavogramWidget(QWidget *parent) : QWidget(parent), m_font(QStr
     setContextMenuPolicy(Qt::PreventContextMenu);
 }
 
+void KlavogramWidget::setFontSize(int points)
+{
+    m_font.setPointSize(points);
+    update();
+}
+
 void KlavogramWidget::setModel(const TextModel *m)
 {
     m_model = m;

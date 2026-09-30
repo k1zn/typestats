@@ -36,6 +36,8 @@ public:
     bool openFile(const QString &path);
     // Installs the keyboard hook: from now on what is typed elsewhere is recorded.
     void startCapture();
+    // Opens a form by name (`--show NAME`, for screenshots): settings.
+    void showForm(const QString &name);
 
 protected:
     void closeEvent(QCloseEvent *e) override;
@@ -50,6 +52,8 @@ private:
     QToolButton *toolButton(QWidget *panel, int n, int x, int y, int h, const QString &hint);
     void loadSettings();
     void saveSettings() const;
+    void showSettings();
+    void applySettings();
 
     RecalcOptions options() const;
     void recalculate();
@@ -96,6 +100,7 @@ private:
     KeyRecords m_undo;     // the records before the last deletion
     int m_labelRecord = -1; // the record whose label is under the mouse
     QString m_path; // empty: not saved yet
+    int m_keyDigits = 3;    // decimals of the times in the key list (DlitDigits)
     TextModel m_model;
     FingerZoneSchemes m_schemes;
 

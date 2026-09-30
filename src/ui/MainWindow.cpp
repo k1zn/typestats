@@ -4,6 +4,7 @@
 #include "GraphWidget.h"
 #include "KlavogramWidget.h"
 #include "LiveStatsWindow.h"
+#include "SettingsDialog.h"
 #include "TextView.h"
 #include "Texts.h"
 #include "FilePropertiesDialog.h"
@@ -200,7 +201,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     resize(876, 579);
     loadSettings();
-    recalculate();
+    applySettings();
 }
 
 QToolButton *MainWindow::toolButton(QWidget *panel, int n, int x, int y, int h, const QString &hint)
@@ -242,7 +243,7 @@ QWidget *MainWindow::createToolBar()
     action(12, 150, 4, 23, tr("Дополнительная статистика"), nullptr);
     action(19, 174, 4, 23, tr("Статистические гистограммы"), nullptr);
     action(20, 198, 4, 23, tr("Видео"), nullptr);
-    action(22, 222, 4, 23, tr("Настройки..."), nullptr);
+    action(22, 222, 4, 23, tr("Настройки..."), &MainWindow::showSettings);
     action(4, 246, 4, 23, tr("Оперативная статистика"), &MainWindow::showLiveStats);
     action(3, 270, 4, 23, tr("Справка"), nullptr);
     bevel(bar, 3, 29, 294, 2, QFrame::HLine);
@@ -391,6 +392,34 @@ void MainWindow::saveSettings() const
     s.setValue(QStringLiteral("LegendVisible"), m_legend->isVisibleTo(this));
     s.setValue(QStringLiteral("LegendWinLeft"), m_legend->x());
     s.setValue(QStringLiteral("LegendWinTop"), m_legend->y());
+}
+
+void MainWindow::showSettings()
+{
+    SettingsDialog dialog(this);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+    dialog.save();
+    if (dialog.languageChanged())
+        QMessageBox::warning(this, tr("Предупреждение"), tr("Для смены языка перезапустите Ts"));
+    applySettings();
+}
+
+void MainWindow::applySettings()
+{
+    // FUN_00429bbc; the rows of the statistics list follow MainOption* in updateStats().
+    const QSettings s;
+    m_text->setFontSize(std::clamp(s.value(QStringLiteral("TextFontSize"), 12).toInt(), 8, 24));
+    m_klav->setFontSize(std::clamp(s.value(QStringLiteral("KlavogrFontSize"), 9).toInt(), 8, 24));
+    m_keyDigits = std::clamp(s.value(QStringLiteral("DlitDigits"), 3).toInt(), 0, 3);
+    m_live->setSpeedRange(s.value(QStringLiteral("opLoSpeed"), 200).toInt(), s.value(QStringLiteral("opHiSpeed"), 500).toInt());
+    recalculate();
+}
+
+void MainWindow::showForm(const QString &name)
+{
+    if (name == QLatin1String("settings"))
+        showSettings();
 }
 
 void MainWindow::closeEvent(QCloseEvent *e)
@@ -809,7 +838,7 @@ void MainWindow::updateKeyList()
     // As many rows as fit in the list.
     const int limit = std::max(1, m_keys->viewport()->height() / m_keys->verticalHeader()->defaultSectionSize());
     QVector<QStringList> rows;
-    for (const KeyListRow &row : KeyList::rows(m_model.klav, QLocale(), from, to, limit))
+    for (const KeyListRow &row : KeyList::rows(m_model.klav, QLocale(), from, to, limit, m_keyDigits))
         rows.append({row.pause, row.duration, row.key});
     setRows(m_keys, rows);
 }

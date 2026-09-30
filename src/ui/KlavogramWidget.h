@@ -15,6 +15,7 @@ public:
 
     void setModel(const TextModel *m);
     void setZones(const FingerZones &zones);
+    void setFontSize(int points);
     // Puts the element at a text position to the left edge (FUN_00414500).
     void scrollToPosition(int textPos);
     // Set by the graph; viewChanged() is not emitted.

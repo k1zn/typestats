@@ -377,6 +377,109 @@
         <source>Копировать с тегами</source>
         <translation>Copy with tags</translation>
     </message>
+    <message>
+        <source>Предупреждение</source>
+        <translation>Warning</translation>
+    </message>
+    <message>
+        <source>Для смены языка перезапустите Ts</source>
+        <translation>Restart Ts to change the language</translation>
+    </message>
+</context>
+<context>
+    <name>SettingsDialog</name>
+    <message>
+        <source>Настройки</source>
+        <translation>Settings</translation>
+    </message>
+    <message>
+        <source>Размер шрифта</source>
+        <translation>Font size</translation>
+    </message>
+    <message>
+        <source>Текст</source>
+        <translation>Text</translation>
+    </message>
+    <message>
+        <source>Клавограмма</source>
+        <translation>Klavogram</translation>
+    </message>
+    <message>
+        <source>Оперативная статистика</source>
+        <translation>Live statistics</translation>
+    </message>
+    <message>
+        <source>Нижняя скорость </source>
+        <translation>Lower speed </translation>
+    </message>
+    <message>
+        <source>Верхняя скорость </source>
+        <translation>Upper speed </translation>
+    </message>
+    <message>
+        <source>Глобальные горячие клавиши</source>
+        <translation>Global hot keys</translation>
+    </message>
+    <message>
+        <source>LCtrl+LWin (Очистить)</source>
+        <translation>LCtrl+LWin (Clear)</translation>
+    </message>
+    <message>
+        <source>F8+F9 (Управление перехватом)</source>
+        <translation>F8+F9 (Capture on/off)</translation>
+    </message>
+    <message>
+        <source>Копирование текста с тегами (для вставки в блог)</source>
+        <translation>Copying text with tags (to paste into a blog)</translation>
+    </message>
+    <message>
+        <source>Выделять исправления цветом</source>
+        <translation>Show corrections in colour</translation>
+    </message>
+    <message>
+        <source>Выделять исправления зачёркиванием</source>
+        <translation>Strike corrections through</translation>
+    </message>
+    <message>
+        <source>Выделять цветом следующий символ</source>
+        <translation>Colour the next character</translation>
+    </message>
+    <message>
+        <source>Сворачивать в трей</source>
+        <translation>Minimize to tray</translation>
+    </message>
+    <message>
+        <source>Вести журнал</source>
+        <translation>Keep a journal</translation>
+    </message>
+    <message>
+        <source>Автокомментарии</source>
+        <translation>Auto comments</translation>
+    </message>
+    <message>
+        <source>Сворачивать при старте</source>
+        <translation>Start minimized</translation>
+    </message>
+    <message>
+        <source>Основная статистика</source>
+        <translation>Main statistics</translation>
+    </message>
+    <message>
+        <source>Точность времени в списке длительностей</source>
+        <translation>Time precision in the duration list</translation>
+    </message>
+    <message>
+        <source>Язык</source>
+        <translation>Language</translation>
+    </message>
+    <message>
+        <source>Ok</source>
+        <translation>Ok</translation>
+    </message>
+    <message>
+        <source>Отмена</source>
+        <translation>Cancel</translation>
+    </message>
 </context>
 <context>
     <name>Texts</name>

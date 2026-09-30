@@ -6,16 +6,22 @@
 #include "ui/GraphWidget.h"
 #include "ui/KlavogramWidget.h"
 #include "ui/MainWindow.h"
+#include "ui/SettingsDialog.h"
 #include "ui/TextView.h"
 
 #include <QApplication>
 #include <QClipboard>
+#include <QListWidget>
+#include <QSpinBox>
+#include <QCheckBox>
+#include <QLineEdit>
 #include <QScrollBar>
 #include <QSettings>
 #include <QTableWidget>
 #include <QTemporaryDir>
 #include <QTest>
 #include <QTextCursor>
+#include <QComboBox>
 #include <QToolButton>
 
 class TstUi : public QObject
@@ -158,6 +164,49 @@ private slots:
         QVERIFY(w.m_needRecalc);
         w.recalculate();
         QCOMPARE(w.m_model.text, QStringLiteral("ab"));
+    }
+
+    void settings()
+    {
+        MainWindow w;
+        w.resize(876, 579);
+        w.show();
+        QVERIFY(w.openFile(golden("обыка.tsf")));
+        const QString duration = w.m_keys->item(0, 1)->text();
+        QVERIFY(duration.contains(QLocale().decimalPoint()));
+        {
+            SettingsDialog d(&w);
+            QCOMPARE(d.m_textFont->value(), 12);
+            QCOMPARE(d.m_mainStats->count(), 17);
+            QVERIFY(!d.m_journal->isChecked());
+            QVERIFY(!d.grab().isNull());
+            d.m_textFont->setValue(20);
+            d.m_klavFont->setValue(14);
+            d.m_digits->setValue(0);
+            d.m_mainStats->item(0)->setCheckState(Qt::Unchecked);
+            d.m_mainStats->item(16)->setCheckState(Qt::Unchecked);
+            d.m_hiSpeed->setText(QStringLiteral("700"));
+            d.m_journal->setChecked(true);
+            QVERIFY(!d.languageChanged());
+            d.save();
+        }
+        const int listHeight = w.m_stats->height();
+        w.applySettings();
+        QCOMPARE(w.m_text->font().pixelSize(), 27);
+        QCOMPARE(w.m_stats->rowCount(), 15);
+        QCOMPARE(w.m_stats->item(0, 0)->text(), QStringLiteral("Общее время"));
+        QVERIFY(w.m_stats->height() < listHeight);
+        QVERIFY(!w.m_keys->item(0, 1)->text().contains(QLocale().decimalPoint()));
+        QVERIFY(QSettings().value(QStringLiteral("JournalOn")).toBool());
+        QCOMPARE(QSettings().value(QStringLiteral("opHiSpeed")).toInt(), 700);
+        {
+            SettingsDialog d(&w); // shows what was stored
+            QCOMPARE(d.m_digits->value(), 0);
+            QCOMPARE(d.m_mainStats->item(16)->checkState(), Qt::Unchecked);
+            d.m_language->setCurrentIndex(1 - d.m_language->currentIndex());
+            QVERIFY(d.languageChanged());
+        }
+        QSettings().clear(); // the other tests run with the defaults
     }
 
 private:

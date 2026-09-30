@@ -1,9 +1,10 @@
 #include "ui/MainWindow.h"
+#include "ui/Texts.h"
 
 #include <QApplication>
 #include <QIcon>
-#include <QSettings>
 #include <QStyleHints>
+#include <QTimer>
 #include <QTranslator>
 
 int main(int argc, char *argv[])
@@ -17,9 +18,7 @@ int main(int argc, char *argv[])
     // The source texts are Russian, as in the original; "Language" (its preset key) picks a translation.
     // Without the key the system language decides. `--lang ru|en` overrides both.
     QStringList args = app.arguments();
-    QString language = QSettings().value(QStringLiteral("Language")).toString();
-    if (language.isEmpty())
-        language = QLocale::system().language() == QLocale::Russian ? QStringLiteral("Russian") : QStringLiteral("English");
+    QString language = Texts::currentLanguage();
     if (const qsizetype i = args.indexOf(QStringLiteral("--lang")); i > 0 && i + 1 < args.size()) {
         language = args[i + 1] == QLatin1String("ru") ? QStringLiteral("Russian") : QStringLiteral("English");
         args.remove(i, 2);
@@ -39,7 +38,14 @@ int main(int argc, char *argv[])
     MainWindow w;
     w.show();
     w.startCapture();
+    QString form;
+    if (const qsizetype i = args.indexOf(QStringLiteral("--show")); i > 0 && i + 1 < args.size()) {
+        form = args[i + 1];
+        args.remove(i, 2);
+    }
     if (args.size() > 1)
         w.openFile(args[1]);
+    if (!form.isEmpty())
+        QTimer::singleShot(0, &w, [&w, form] { w.showForm(form); });
     return app.exec();
 }

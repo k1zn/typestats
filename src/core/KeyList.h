@@ -23,8 +23,9 @@ float scrollForPosition(const TextModel &m, int selStart);
 
 // Presses with drawing time (KlavRecord::tDraw, µs) in [fromUs, toUs], at most `limit` of them
 // (negative: all). The main window passes the time span visible on the klavogram and the number of
-// rows that fit in the list.
+// rows that fit in the list; `digits` is the precision of the times (DlitDigits, 0..3).
 QVector<KeyListRow> rows(const QVector<KlavRecord> &klav, const QLocale &loc,
                          double fromUs = -std::numeric_limits<double>::infinity(),
-                         double toUs = std::numeric_limits<double>::infinity(), int limit = -1);
+                         double toUs = std::numeric_limits<double>::infinity(), int limit = -1,
+                         int digits = 3);
 }

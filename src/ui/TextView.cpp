@@ -29,10 +29,17 @@ TextView::TextView(QWidget *parent) : QTextEdit(parent)
     setAcceptRichText(false);
     setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
     setTextInteractionFlags(Qt::TextSelectableByMouse | Qt::TextSelectableByKeyboard);
-    QFont f(QStringLiteral("Arial"));
-    f.setPixelSize(16);
-    setFont(f);
+    setFont(QFont(QStringLiteral("Arial")));
+    setFontSize(12);
     viewport()->setMouseTracking(true);
+}
+
+void TextView::setFontSize(int points)
+{
+    // The size the original gets at 96 dpi: 12 pt is 16 px.
+    QFont f = font();
+    f.setPixelSize(qRound(points * 96.0 / 72.0));
+    setFont(f);
 }
 
 void TextView::keyPressEvent(QKeyEvent *e)
