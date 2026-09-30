@@ -176,7 +176,12 @@ private slots:
         QCOMPARE(portLv1(m, 0, widthPx, zoom, maxRows), lv1Rows(variant[QLatin1String("lv1")].toArray()));
         if (variant.contains(QLatin1String("series"))) {
             const QJsonObject series = variant[QLatin1String("series")].toObject();
-            const GraphSeries g = Graphs::compute(m.pauses);
+            // The original marks the first element of a fragment with -2^31 in every series.
+            GraphSeries g = Graphs::compute(m);
+            for (QVector<float> *s : {&g.pause, &g.curSpeed, &g.medSpeed, &g.classicSpeed, &g.privSpeed,
+                                      &g.curRhythm, &g.medRhythm, &g.arrhythmia})
+                for (int start : m.fragmentStarts)
+                    (*s)[start] = -2147483648.0f;
             const QList<QPair<const char *, const QVector<float> *>> all = {
                 {"pause", &g.pause}, {"curSpeed", &g.curSpeed}, {"medSpeed", &g.medSpeed},
                 {"classicSpeed", &g.classicSpeed}, {"privSpeed", &g.privSpeed}, {"curRhythm", &g.curRhythm},

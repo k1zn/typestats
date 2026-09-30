@@ -1,10 +1,11 @@
 #pragma once
 
-#include <QVector>
+#include "Recalc.h"
 
 // Graph series of the main window (PaintBox1), port of FUN_00403868 + FUN_0043d4cc.
-// One value per text element, aligned with TextModel::pauses; the first element of every fragment
-// holds kFragmentStart in every series. See re/graphs.md.
+// One value per text element. The first element of a fragment (TextModel::fragmentStarts) is not
+// part of any graph: there the computed series hold 0 and `pause` the gap between the fragments
+// (the original keeps a marker value, -2^31, in all of them). See re/graphs.md.
 
 struct GraphSeries
 {
@@ -19,7 +20,7 @@ struct GraphSeries
 };
 
 namespace Graphs {
-GraphSeries compute(const QVector<float> &pauses);
+GraphSeries compute(const TextModel &m);
 
 // FUN_0043d4cc on src[from, to): exponential smoothing with alpha 0.03, started from the mean of
 // the first min(to − from, 15) values.

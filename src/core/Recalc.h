@@ -38,9 +38,6 @@ struct KlavRecord
     bool fragmentStart = false; // the first press after a split pause
 };
 
-// Pause value that marks the first element of a fragment.
-constexpr float kFragmentStart = -2147483648.0f;
-
 struct TextModel
 {
     // The records the model is built from: the document's without leading releases and auto-repeated
@@ -52,10 +49,17 @@ struct TextModel
     QVector<QString> names;   // KeyDisplayName; a "character" is a name of length 1
     QVector<quint32> flags;   // flags of the source record
     QVector<int> recIndex;    // index of the source record
-    QVector<float> pauses;    // ms since the previous element, or kFragmentStart
+    QVector<float> pauses;    // ms since the previous element
     bool erased(int i) const { return i >= 0 && i < recIndex.size() && recErased[recIndex[i]]; }
     bool isChar(int i) const { return names[i].size() == 1; }
     int size() const { return names.size(); }
+
+    // Fragments: runs of elements typed without a pause longer than the split pause. Sorted first
+    // elements; the pause of such an element is the gap between fragments and belongs to neither.
+    QVector<int> fragmentStarts;
+    bool startsFragment(int i) const;
+    // [begin, end) of the fragment with element i; i == size() gives the last one.
+    std::pair<int, int> fragmentAt(int i) const;
 
     // The text: paragraphs separated by '\n', runs carry TextStyle flags (unstyled text has no run).
     QString text;

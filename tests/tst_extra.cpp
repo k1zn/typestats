@@ -26,7 +26,9 @@ TextModel model(const QString &s, float pause = 100.0f)
             m.flags << 0u;
             m.recIndex << m.names.size() - 1;
             m.recErased << erased;
-            m.pauses << (fragment ? kFragmentStart : pause);
+            if (fragment)
+                m.fragmentStarts << m.pauses.size();
+            m.pauses << pause;
             fragment = erased = false;
         }
     }

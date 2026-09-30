@@ -6,11 +6,6 @@
 
 namespace {
 
-float pauseAt(const TextModel &m, int i)
-{
-    return i >= 0 && i < m.pauses.size() ? m.pauses[i] : 0.0f;
-}
-
 double meanAbsDeviationPct(const QVector<float> &v, double avg, double minAvg)
 {
     double sum = 0;
@@ -28,21 +23,11 @@ namespace Stats {
 std::pair<int, int> range(const TextModel &m, int selStart, int selLen, bool byPauses)
 {
     auto elemAt = [&](int pos) { return Recalc::at(m.mapElem, Recalc::lowerBound(m.mapPos, pos)); };
-    const int n = m.pauses.size();
     if (selLen != 0)
         return {elemAt(selStart), elemAt(selStart + selLen)};
     if (!byPauses)
-        return {0, n};
-    const int cur = elemAt(selStart);
-    int b = cur;
-    while (b != 0 && !(pauseAt(m, b) < 0.0f))
-        --b;
-    int e = cur;
-    if (e < n)
-        ++e;
-    while (e < n && !(pauseAt(m, e) < 0.0f))
-        ++e;
-    return {b, e};
+        return {0, m.size()};
+    return m.fragmentAt(elemAt(selStart));
 }
 
 void speedAndHold(const QVector<KlavRecord> &klav, int rb, int re, quint32 splitUs,
@@ -117,31 +102,30 @@ MainStats compute(const TextModel &m, int b, int e, int splitMs, bool byPauses)
     for (int i = b; i < e; ++i) {
         const bool single = m.isChar(i);
         const bool er = m.erased(i);
-        if (s.chars != 0) {
-            const float p = pauseAt(m, i);
-            if (p > -0.1f) {
-                if (p < minP)
-                    minP = p;
-                if (maxP < p)
-                    maxP = p;
-                s.sumAll += p;
-                accAll += p;
-                if (single) {
-                    ++nAll;
-                    intervalsAll.append(float(accAll));
-                    accAll = 0;
-                }
-                if (!er) {
-                    if (single)
-                        ++nOk;
-                    if (!m.erased(i - 1) && !prevErased) {
-                        sumClean += p;
-                        accClean += p;
-                        if (single) {
-                            ++nClean;
-                            intervalsClean.append(float(accClean));
-                            accClean = 0;
-                        }
+        // The pause before the first character and the gaps between fragments do not count.
+        if (s.chars != 0 && !m.startsFragment(i)) {
+            const float p = m.pauses[i];
+            if (p < minP)
+                minP = p;
+            if (maxP < p)
+                maxP = p;
+            s.sumAll += p;
+            accAll += p;
+            if (single) {
+                ++nAll;
+                intervalsAll.append(float(accAll));
+                accAll = 0;
+            }
+            if (!er) {
+                if (single)
+                    ++nOk;
+                if (!m.erased(i - 1) && !prevErased) {
+                    sumClean += p;
+                    accClean += p;
+                    if (single) {
+                        ++nClean;
+                        intervalsClean.append(float(accClean));
+                        accClean = 0;
                     }
                 }
             }

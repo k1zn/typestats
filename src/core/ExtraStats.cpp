@@ -57,7 +57,7 @@ void collectNGrams(const TextModel &m, int b, int e, int n, const CharFilter &fi
         bool ok = true;
         for (int k = 0; k < n && ok; ++k) {
             const int i = p + k;
-            if (m.erased(i) || (k != 0 && m.pauses[i] < 0)) {
+            if (m.erased(i) || (k != 0 && m.startsFragment(i))) {
                 ok = false;
                 break;
             }
@@ -84,7 +84,7 @@ void collectWords(const TextModel &m, int b, int e, Kind kind, const CharFilter 
             sep = (name == QLatin1String(" ") || name == kEnter) && !m.erased(p);
             brk = (sep && (kind != Sentences || sentEnd)) || name == kEnter;
             if (!brk) {
-                if (m.pauses[p] < 0) // a new fragment
+                if (m.startsFragment(p))
                     brk = true;
                 else if (!cur.isEmpty())
                     sum += m.pauses[p];
@@ -130,7 +130,7 @@ void collectTemplate(const TextModel &m, const QVector<quint8> &fingers, int b, 
             const int i = p + k;
             const QString &name = m.names[i];
             const bool erased = m.erased(i);
-            if (name == kEnter || (k != 0 && m.pauses[i] < 0) || (erased && tpl[k].code != TemplateItem::Erased)
+            if (name == kEnter || (k != 0 && m.startsFragment(i)) || (erased && tpl[k].code != TemplateItem::Erased)
                 || !matches(tpl[k], name.size() == 1 ? name[0] : QChar(), erased,
                             i < fingers.size() ? fingers[i] : FingerZones::kNone)) {
                 ok = false;

@@ -83,6 +83,17 @@ bool isParenthesized(const QString &c)
 
 } // namespace
 
+bool TextModel::startsFragment(int i) const
+{
+    return std::binary_search(fragmentStarts.begin(), fragmentStarts.end(), i);
+}
+
+std::pair<int, int> TextModel::fragmentAt(int i) const
+{
+    const auto next = std::upper_bound(fragmentStarts.begin(), fragmentStarts.end(), i);
+    return {next == fragmentStarts.begin() ? 0 : *(next - 1), next == fragmentStarts.end() ? size() : *next};
+}
+
 namespace Recalc {
 
 KeyRecords normalized(const KeyRecords &recs)
@@ -294,7 +305,9 @@ TextModel run(const KeyRecords &document, const RecalcOptions &opt)
                 pos = flushParagraph(m, segs);
             }
             lastElemMapIdx = m.mapPos.size();
-            m.pauses.append(startsFragment ? kFragmentStart : float(0.001L * acc));
+            if (startsFragment)
+                m.fragmentStarts.append(elem);
+            m.pauses.append(float(0.001L * acc));
             m.names.append(name);
             m.flags.append(r.flags);
             m.recIndex.append(ri);

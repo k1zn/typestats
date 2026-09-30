@@ -129,10 +129,12 @@ private slots:
         const TextModel m = Recalc::run(t.recs, opt);
         QCOMPARE(m.text, QStringLiteral("ab‡c‡de"));
         QCOMPARE(m.size(), 5);
-        QCOMPARE(m.pauses[0], kFragmentStart);
+        QCOMPARE(m.fragmentStarts, (QVector<int>{0, 2, 3}));
         QCOMPARE(m.pauses[1], 150.0f); // 50 ms hold + 100 ms gap
-        QCOMPARE(m.pauses[2], kFragmentStart);
+        QCOMPARE(m.pauses[2], 2050.0f);
         QCOMPARE(m.pauses[4], 150.0f);
+        QCOMPARE(m.fragmentAt(1), std::make_pair(0, 2));
+        QCOMPARE(m.fragmentAt(5), std::make_pair(3, 5));
 
         opt.byPauses = true;
         const TextModel p = Recalc::run(t.recs, opt);

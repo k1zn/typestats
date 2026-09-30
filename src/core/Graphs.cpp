@@ -1,7 +1,5 @@
 #include "Graphs.h"
 
-#include "Recalc.h"
-
 #include <cmath>
 
 // long double is the 80-bit x87 format with MinGW; the original computes in it and rounds to float
@@ -59,27 +57,21 @@ void smooth(const QVector<float> &src, int from, int to, QVector<float> &dst)
     }
 }
 
-GraphSeries compute(const QVector<float> &pauses)
+GraphSeries compute(const TextModel &m)
 {
     GraphSeries g;
-    g.pause = pauses;
-    const int n = pauses.size();
+    g.pause = m.pauses;
+    const int n = m.size();
     for (QVector<float> *s : {&g.curSpeed, &g.medSpeed, &g.classicSpeed, &g.privSpeed, &g.curRhythm,
                               &g.medRhythm, &g.arrhythmia})
         s->fill(0.0f, n);
-    // Recalculate calls FUN_00403868 for every fragment when the next one starts (and at the end);
-    // the marker element itself only gets kFragmentStart in every series.
+    // Every fragment is computed on its own, without its first element.
     int from = 0;
-    for (int i = 0; i <= n; ++i) {
-        if (i == n || pauses[i] == kFragmentStart) {
-            computeFragment(g, from, i);
-            if (i < n)
-                for (QVector<float> *s : {&g.curSpeed, &g.medSpeed, &g.classicSpeed, &g.privSpeed, &g.curRhythm,
-                                          &g.medRhythm, &g.arrhythmia})
-                    (*s)[i] = kFragmentStart;
-            from = i + 1;
-        }
+    for (int start : m.fragmentStarts) {
+        computeFragment(g, from, start);
+        from = start + 1;
     }
+    computeFragment(g, from, n);
     return g;
 }
 
