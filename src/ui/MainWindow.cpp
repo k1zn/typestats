@@ -298,7 +298,7 @@ QWidget *MainWindow::createToolBar()
     action(16, 174, 32, 22, tr("Настройка оси Y графиков"), &MainWindow::toggleAxisPanel);
     action(17, 198, 32, 22, tr("Легенда"), &MainWindow::toggleLegend);
     action(23, 222, 32, 22, tr("Ввод текста (F4)"), &MainWindow::showTextInput);
-    action(25, 246, 32, 22, tr("Преобразовать в текущую раскладку"), nullptr);
+    action(25, 246, 32, 22, tr("Преобразовать в текущую раскладку"), &MainWindow::convertLayout);
     QToolButton *quit = toolButton(bar, 24, 270, 32, 22, tr("Выход"));
     quit->setEnabled(true);
     connect(quit, &QToolButton::clicked, this, &QWidget::close);
@@ -640,6 +640,19 @@ void MainWindow::removeNonText()
     normalizeRecords();
     m_undo = m_doc.records;
     Editing::removeNonText(m_doc.records, m_model.recordOfElement(b), m_model.recordOfElement(e));
+    recalculate();
+}
+
+void MainWindow::convertLayout()
+{
+    // ConvCurLayout 0x429e80: the selection as if it was typed in the layout active now.
+    const auto [from, to] = Editing::recordRange(m_model, m_text->selectionStart(), m_text->selectionLength());
+    if (to == 0)
+        return;
+    normalizeRecords();
+    m_undo = m_doc.records; // the original's record range keeps the copy for "Отменить"
+    Editing::convertLayout(m_doc.records, from, to, m_toUnicode, KeyboardHook::capsLock());
+    KeyboardHook::clearDeadKey();
     recalculate();
 }
 

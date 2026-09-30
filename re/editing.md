@@ -81,25 +81,28 @@
 `FUN_004254b4` (нет выделения — все); заголовок окна и имя файла не меняются, видео не прикладывается.
 Подпись — если `g_fileClean` (после «Очистить» и открытия журнала — да, после открытия .tsf — по проверке подписи).
 
-## «Преобразовать в текущую раскладку» (SpeedButton25, `ConvCurLayout` 0x429e80) — разобрано, в порту НЕ сделано
+## «Преобразовать в текущую раскладку» (SpeedButton25, `ConvCurLayout` 0x429e80)
 
 Пересчитывает символы записей выделения так, будто они набраны в раскладке, активной сейчас (исправить текст,
 набранный «не в той» раскладке):
-1. Диапазон записей — `FUN_004254b4` (`Editing::recordRange`); пусто — ничего.
-2. `hkl = GetKeyboardLayout(поток окна)`; состояние клавиатуры — `GetKeyboardState`, но Shift/Ctrl/Alt (0x10–0x12),
-   LWin/RWin (0x5b/0x5c), LShift/RShift/LAlt/RAlt (0xa0/0xa1/0xa4/0xa5) обнулены; CapsLock (0x14) — `GetKeyState(0x14) & 1`.
-   `deadIndex = −1`.
-3. Для каждой записи, по порядку:
+1. Диапазон записей — `FUN_004254b4` (`Editing::recordRange`); пусто — ничего. Этот же вызов сохраняет копию записей,
+   так что «Отменить» возвращает текст до преобразования.
+2. `hkl = GetKeyboardLayout(поток главного окна)`; состояние клавиатуры — `GetKeyboardState`, но Shift/Ctrl/Alt
+   (0x10–0x12), LWin/RWin (0x5b/0x5c), LShift/RShift/LAlt/RAlt (0xa0/0xa1/0xa4/0xa5) обнулены;
+   CapsLock (0x14) — `GetKeyState(0x14) & 1`. `deadIndex = −1` (это глобальная `g_deadKeyIndex` хука).
+3. Для каждой записи, по порядку (VK — из флагов записи):
    - отпускание LShift/RShift (VK 0xa0/0xa1) → снять 0x80 в `state[vk]`; прочие отпускания не трогаются;
    - нажатие: CapsLock → переключить `state[0x14]`; LShift/RShift → `state[vk] = 0x80`; `state[0x10] = state[0xa0] | state[0xa1]`;
      `flags &= ~0x20000000` (DeadKey), `ch = 0`;
      `vk = MapVirtualKeyA(scan, 1)`, `n = ToUnicodeEx(vk & 0xff, scan, state, buf, 2, 0, hkl)`;
      `n ≠ 0` → `ch = buf[n > 0 ? n − 1 : 0]`; `n > 1` и есть `deadIndex` → у той записи снять DeadKey и `ch = buf[0]`;
      `deadIndex = −1`; `n < 0` → `flags |= DeadKey`, `deadIndex = i`.
-   Биты HasChar/NoChar **не меняются** — только `ch` и DeadKey.
-4. Recalculate. Отмены нет (`m_undo` не заполняется).
+   Биты HasChar/NoChar **не меняются** — только `ch` и DeadKey. Мёртвая клавиша в конце диапазона остаётся в состоянии
+   клавиатуры потока (ToUnicodeEx хранит её между вызовами).
+4. `Recalculate(0)`.
 
-План порта: ядро `Editing::convertLayout(records, from, to, toUnicode, capsOn)` с внедряемой функцией
-`toUnicode(scan, shift, caps, char16_t out[2]) → n` (тест на синтетике); платформа — `KeyboardHook::toUnicode` (Windows —
-ToUnicodeEx с состоянием как выше; прочие ОС — US-таблица); в MainWindow — `normalizeRecords()`, преобразование,
-`recalculate()`, включить кнопку 25.
+Порт: `Editing::convertLayout(records, from, to, toUnicode, caps)` (тест `tst_editing::convertLayout` на выдуманной
+раскладке), `KeyboardHook::toUnicode` (Windows — ToUnicodeEx с состоянием как выше; прочие ОС — US-раскладка),
+`KeyboardHook::capsLock`, `MainWindow::convertLayout` (тест `tst_ui::convertLayout`). Отличия: нажатия VK_PACKET
+(символ, посланный программой, скан-кода нет) не трогаются — оригинал обнулял их символ; после преобразования
+висящая мёртвая клавиша снимается (`KeyboardHook::clearDeadKey`), чтобы не повлиять на следующий символ хука.

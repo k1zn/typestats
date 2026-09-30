@@ -32,6 +32,12 @@ public:
     // Name of the key with this scan code in the current keyboard layout, as the text shows it
     // (the original's 0x448fe8); `dead` tells a dead key. Without layout access: the US layout.
     static QString layoutKeyName(quint8 scan, bool *dead = nullptr);
+    // Editing::ToUnicode for the current keyboard layout with only Shift and CapsLock as given
+    // (ConvCurLayout 0x429e80); a dead key stays pending for the next call, as in typing, until
+    // clearDeadKey(). Without layout access: the US layout.
+    static int toUnicode(quint8 scan, bool shift, bool caps, char16_t out[2]);
+    static void clearDeadKey();
+    static bool capsLock();
 
     // Used by the platform callbacks.
     void deliver(const HookEvent &e) { emit key(e); }

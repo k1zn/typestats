@@ -2,6 +2,7 @@
 
 #include "core/FingerZones.h"
 #include "core/Journal.h"
+#include "core/Editing.h"
 #include "core/Recalc.h"
 #include "core/TsfFile.h"
 #include "export/TableExport.h"
@@ -107,6 +108,7 @@ private:
     void selectionChanged();
     void deleteSelection();
     void removeNonText();
+    void convertLayout();
     void undo();
     void mark();
     void editLabel(int record);
@@ -126,6 +128,7 @@ private:
     bool m_clean = true; // the recording is genuine: it is signed when saved (g_fileClean)
     bool m_loaded = false; // the recording came from a .tsf: its author and date are kept (g_fileLoaded)
     KeyRecords m_undo;     // the records before the last deletion
+    Editing::ToUnicode m_toUnicode = &KeyboardHook::toUnicode; // the current layout (tests put their own)
     int m_labelRecord = -1; // the record whose label is under the mouse
     QString m_path; // empty: not saved yet
     int m_keyDigits = 3;    // decimals of the times in the key list (DlitDigits)

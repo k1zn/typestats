@@ -2,6 +2,8 @@
 
 #include "Recalc.h"
 
+#include <functional>
+
 // Editing of a recording and copying of its text, see re/editing.md. Record indexes are those of
 // TextModel::records: the normalized records the text was built from.
 namespace Editing {
@@ -33,6 +35,15 @@ void removeLabel(KeyRecords &recs, int i);
 
 // "Копировать" / "Копировать без ошибок": names of elements [b, e); an erased space is a space again.
 QString copyText(const TextModel &m, int b, int e, bool skipErased);
+
+// Characters of the key with this scan code in some layout, like ToUnicodeEx: n > 0 characters in
+// `out` (the last one is typed), n < 0 a dead key (its accent in out[0]), 0 nothing.
+using ToUnicode = std::function<int(quint8 scan, bool shift, bool caps, char16_t out[2])>;
+
+// "Преобразовать в текущую раскладку" (0x429e80): the presses of [from, to) get the characters
+// their keys give in another layout. Shift and CapsLock are followed by the records, CapsLock
+// starting as `caps`; only ch and DeadKey change. VK_PACKET presses keep their characters.
+void convertLayout(KeyRecords &recs, int from, int to, const ToUnicode &toUnicode, bool caps);
 
 struct TagOptions
 {

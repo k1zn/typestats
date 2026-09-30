@@ -135,6 +135,74 @@ private slots:
         QVERIFY(from <= m.recordOfElement(2) && to == m.recordOfElement(3));
         QCOMPARE(Editing::recordRange(m, 2, 0), (std::pair<int, int>(0, 0)));
     }
+    void convertLayout()
+    {
+        // "ghbdtn" typed with the US layout, converted to a Russian one: "привет".
+        // A fake layout: scan codes of qwerty letters give Cyrillic, ` is a dead key.
+        const QString us = QStringLiteral("qwertyuiopasdfghjkl;zxcvbnm,");
+        const QString ru = QStringLiteral("йцукенгшщзфывапролджячсмитьб");
+        const quint8 scans[] = {0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19,
+                                0x1E, 0x1F, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27,
+                                0x2C, 0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32, 0x33};
+        bool deadPending = false;
+        auto layout = [&](quint8 scan, bool shift, bool caps, char16_t out[2]) {
+            if (scan == 0x29) { // dead accent
+                out[0] = u'`';
+                deadPending = true;
+                return -1;
+            }
+            for (int k = 0; k < ru.size(); ++k)
+                if (scans[k] == scan) {
+                    const QChar c = shift != caps ? ru[k].toUpper() : ru[k];
+                    if (deadPending) {
+                        deadPending = false;
+                        out[0] = u'`';
+                        out[1] = c.unicode();
+                        return 2;
+                    }
+                    out[0] = c.unicode();
+                    return 1;
+                }
+            return 0;
+        };
+        auto key = [&](char c) {
+            const int k = us.indexOf(QLatin1Char(c));
+            KeyRecord r = press(quint8(QChar(c).toUpper().unicode()), char16_t(c));
+            r.flags = (r.flags & ~quint32(KeyRecord::ScanMask)) | scans[k];
+            return r;
+        };
+        auto noChar = [](quint8 vk, quint8 scan) {
+            KeyRecord r = press(vk, 0);
+            r.flags = (r.flags & ~quint32(KeyRecord::ScanMask)) | scan;
+            return r;
+        };
+        KeyRecord accent = press(0xC0, u'`');
+        accent.flags = (accent.flags & ~quint32(KeyRecord::ScanMask)) | 0x29;
+
+        // Shift+g h b, CapsLock, d, CapsLock, t, accent, n
+        KeyRecords recs = {noChar(Vk::LShift, 0x2A), key('g'), release(Vk::LShift), key('h'), key('b'),
+                           noChar(Vk::Capital, 0x3A), key('d'), noChar(Vk::Capital, 0x3A), key('t'), accent, key('n')};
+        Editing::convertLayout(recs, 0, recs.size(), layout, false);
+        QString text;
+        for (const KeyRecord &r : recs)
+            if (r.isDown() && r.ch)
+                text += QChar(r.ch);
+        QCOMPARE(text, QStringLiteral("ПриВе`т"));
+        QVERIFY(!(recs[9].flags & KeyRecord::DeadKey)); // the accent was typed on its own
+
+        // Starting with CapsLock on; the range leaves the first record alone.
+        KeyRecords two = {key('g'), key('h')};
+        Editing::convertLayout(two, 1, 2, layout, true);
+        QCOMPARE(QString(QChar(two[0].ch)), QStringLiteral("g"));
+        QCOMPARE(QString(QChar(two[1].ch)), QStringLiteral("Р"));
+
+        // A dead key left at the end keeps its flag.
+        KeyRecords last = {accent};
+        Editing::convertLayout(last, 0, 1, layout, false);
+        QVERIFY(last[0].flags & KeyRecord::DeadKey);
+        QCOMPARE(last[0].ch, u'`');
+        deadPending = false;
+    }
 };
 
 QTEST_APPLESS_MAIN(TstEditing)

@@ -99,6 +99,26 @@ private slots:
         QCOMPARE(w.m_model.size(), 264);
     }
 
+    void convertLayout()
+    {
+        MainWindow w;
+        w.show();
+        QVERIFY(w.openFile(golden("обыка.tsf")));
+        const QString text = w.m_model.text;
+        // A layout that types every key as "x": the selected word becomes "xxxxx", the rest stays.
+        w.m_toUnicode = [](quint8 scan, bool, bool, char16_t out[2]) {
+            out[0] = u'x';
+            return scan == 0x39 ? 0 : 1;
+        };
+        w.convertLayout(); // nothing selected: nothing to do
+        QCOMPARE(w.m_model.text, text);
+        select(w, 9, 5); // "этому"
+        w.convertLayout();
+        QCOMPARE(w.m_model.text, text.left(9) + QStringLiteral("xxxxx") + text.mid(14));
+        w.undo();
+        QCOMPARE(w.m_model.text, text);
+    }
+
     void labels()
     {
         MainWindow w;

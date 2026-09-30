@@ -255,4 +255,45 @@ QString copyTagged(const TextModel &m, int b, int e, const TagOptions &opt)
     return out;
 }
 
+void convertLayout(KeyRecords &recs, int from, int to, const ToUnicode &toUnicode, bool caps)
+{
+    bool leftShift = false, rightShift = false;
+    int dead = -1; // the dead key waiting for the next character
+    for (int i = from; i < to; ++i) {
+        KeyRecord &r = recs[i];
+        const quint8 vk = r.vk();
+        if (r.isUp()) {
+            if (vk == Vk::LShift)
+                leftShift = false;
+            else if (vk == Vk::RShift)
+                rightShift = false;
+            continue;
+        }
+        if (vk == Vk::Capital)
+            caps = !caps;
+        else if (vk == Vk::LShift)
+            leftShift = true;
+        else if (vk == Vk::RShift)
+            rightShift = true;
+        else if (vk == Vk::Packet)
+            continue; // a character sent by a program has no key to convert (the original loses it)
+
+        r.flags &= ~quint32(KeyRecord::DeadKey);
+        r.ch = 0;
+        char16_t out[2] = {};
+        const int n = toUnicode(r.scan(), leftShift || rightShift, caps, out);
+        if (n != 0)
+            r.ch = out[n > 0 ? n - 1 : 0];
+        if (n > 1 && dead >= 0) { // the accent did not combine: it is typed on its own
+            recs[dead].flags &= ~quint32(KeyRecord::DeadKey);
+            recs[dead].ch = out[0];
+        }
+        dead = -1;
+        if (n < 0) {
+            r.flags |= KeyRecord::DeadKey;
+            dead = i;
+        }
+    }
+}
+
 }
