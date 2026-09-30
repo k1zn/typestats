@@ -7,9 +7,12 @@
 // --text  the text as the RichEdit shows it (paragraphs separated by '\n');
 // --runs  styled runs of that text: "start<TAB>length<TAB>style" (TextStyle bits);
 // --extra the list of the extra statistics window (Form3) for kind 0..6: "speed<TAB>text[<TAB>count]".
+//
+//   tsstat --to-journal out.tsj file.tsf    the records of the file as a journal (re/journal.md)
 
 #include "core/ExtraStats.h"
 #include "core/FingerZones.h"
+#include "core/Journal.h"
 #include "core/MainStats.h"
 #include "core/TsfFile.h"
 
@@ -28,7 +31,7 @@ int main(int argc, char *argv[])
     bool averages = false, descending = false;
     QString pattern;
     ExtraStats::CharFilter filter;
-    QString file;
+    QString file, journalOut;
     for (int i = 1; i < args.size(); ++i) {
         const QString &a = args[i];
         if (a == QLatin1String("--split") && i + 1 < args.size())
@@ -46,6 +49,8 @@ int main(int argc, char *argv[])
             printRuns = true;
         else if (a == QLatin1String("--extra") && i + 1 < args.size())
             extraKind = args[++i].toInt();
+        else if (a == QLatin1String("--to-journal") && i + 1 < args.size())
+            journalOut = args[++i];
         else if (a == QLatin1String("--avg"))
             averages = true;
         else if (a == QLatin1String("--sort") && i + 1 < args.size())
@@ -73,6 +78,14 @@ int main(int argc, char *argv[])
     if (file.isEmpty() || Tsf::read(file, doc) == Tsf::ReadError::CannotOpen) {
         QTextStream(stderr) << "usage: tsstat [--split MS] [--only-text] [--by-pauses] [--sel START LEN] [--text] file.tsf\n";
         return 1;
+    }
+    if (!journalOut.isEmpty()) {
+        QFile f(journalOut);
+        if (!f.open(QIODevice::WriteOnly))
+            return 1;
+        for (const KeyRecord &r : doc.records)
+            f.write(Journal::encode(r));
+        return 0;
     }
     const TextModel m = Recalc::run(doc.records, opt);
     if (printText) {

@@ -753,6 +753,40 @@ def run_file(tsf, opts, args, rep):
         compare_variant(tsf, rec, rep)
 
 
+def run_journal(tsf, opts, rep):
+    """The port writes the records of tsf as this month's journal and the original opens it (re/journal.md).
+
+    The same records must show what the .tsf itself does (text, styles, statistics).
+    """
+    import datetime
+    print(f"== {tsf.name} as a journal")
+    today = datetime.date.today()
+    journal = ORIGINAL.parent / f"{today.year}_{today.month}.tsj"
+    assert not journal.exists() or journal.stat().st_size == 0, f"{journal} is a real journal: not touching it"
+    snap = reg_snapshot()
+    tsstat(["--to-journal", str(journal), str(tsf)])
+    orig = None
+    try:
+        orig = Original(tsf)
+        text = orig.text()
+        stats, styles = wr.listview_rows(orig.lv2), orig.styles(text)
+        orig.click_speedbutton(0x5B09FC, 1144)  # Form1.SpeedButton26 "Открыть журнал"
+        deadline = time.time() + 5
+        while journal.name not in orig.main.window_text():
+            assert time.time() < deadline, "the journal did not open"
+            time.sleep(0.1)
+        orig._wait_stable(None)
+        print("  window:", orig.main.window_text())
+        rep.text("journal: text", text, orig.text())
+        rep.rows("journal: ListView2", stats, wr.listview_rows(orig.lv2))
+        rep.styles("journal: styles", text, styles, orig.styles(text))
+    finally:
+        if orig:
+            orig.close()
+        reg_restore(snap)
+        journal.unlink(missing_ok=True)
+
+
 # ---------------------------------------------------------------- registry guard
 
 REG_ROOT = r"Software\TypingStatistics"
@@ -802,6 +836,8 @@ def main():
                     help="run the original only for Form3 (extra statistics) and add it to the recorded JSON")
     ap.add_argument("--hist", action="store_true",
                     help="run the original only for Form4 (histograms) and add it to the recorded JSON")
+    ap.add_argument("--journal", action="store_true",
+                    help="write the file as a journal with the port and let the original open it (~10 s)")
     ap.add_argument("--variant", type=int, default=0, choices=range(len(VARIANTS) + 1),
                     help="with --extra / --hist: record them for VARIANTS[N-1] instead of the registry options")
     args = ap.parse_args()
@@ -811,7 +847,10 @@ def main():
     print("options:", opts, "->", " ".join(tsstat_args(opts)))
     rep = Report()
     for f in files:
-        run_file(f, opts, args, rep)
+        if args.journal:
+            run_journal(f, opts, rep)
+        else:
+            run_file(f, opts, args, rep)
     print(f"\n{rep.failures} section(s) differ")
     sys.exit(1 if rep.failures else 0)
 

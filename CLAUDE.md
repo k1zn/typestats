@@ -50,9 +50,14 @@ src/core/      только QtCore, тестируемо
   TsfSignature.*      MD5-подпись — ГОТОВО
   Keyboard.*          vkToScan (US-таблица, для tsfVersion=0)
   KeyName.*           keyDisplayName(flags, ch) — порт 0x405fe0 — ГОТОВО
-  Recalc.*            порт Recalculate: normalize / markErased / build → TextModel
-                      (элементы, паузы, текст+стили, маппинги позиция→элемент/клавограмма/запись,
-                      клавограмма KlavRecord)
+  Recalc.*            порт Recalculate: `Recalc::run(const KeyRecords &, opt)` → TextModel; документ не меняется.
+                      TextModel: `records` (нормализованная копия; все индексы записей — в ней), `recErased`,
+                      элементы (names/flags/recIndex/pauses), `fragmentStarts` + `startsFragment()/fragmentAt()`,
+                      текст+стили, клавограмма KlavRecord (`erased`, `fragmentStart`), якоря `anchors`
+                      {pos, elem, klav, rec} + `elementAt(pos)`, `klavAt(pos)`, `klavOfElement`, `recordOfElement`,
+                      `elementOfRecord`
+  Journal.*           журнал .tsj (`re/journal.md`): fileName, encode/decode, read, JournalWriter — ГОТОВО,
+                      оригинал открывает журнал порта (стенд `--journal`)
   MainStats.*         17 параметров ListView2 (compute/format/range/speedAndHold/formatTime) — ГОТОВО,
                       СВЕРЕНО с оригиналом (tst_orig)
   Graphs.*            серии графиков (FUN_00403868 + сглаживание 0x43d4cc), `re/graphs.md` — ГОТОВО, сверено побитно
@@ -60,19 +65,22 @@ src/core/      только QtCore, тестируемо
   FingerZones.*       зоны пальцев: FingerZones (встроенная «Стандарт», разбор/запись Finger0..7, редактор Tkbd,
                       равенство), FingerZoneSchemes (FingerZones.ini + adopt() для LoadTsf), fingerSeries() — ГОТОВО,
                       серия сверена с оригиналом побитно (tst_orig, series.finger)
-  KeyList.*           ListView1 «Пауза/Длительность/Клавиша» (0x437d98 + 0x404c44, scrollForPosition 0x414500) —
-                      ГОТОВО, сверено
+  KeyList.*           ListView1 «Пауза/Длительность/Клавиша» (0x437d98 + 0x404c44, scrollForPosition 0x414500):
+                      `rows(klav, loc, fromUs, toUs, limit)` — ГОТОВО, сверено. Окно времени считает UI; формула
+                      оригинала (float!) — в `tst_orig.cpp::portLv1`: `start = scrollMs·1000 − 10`,
+                      `end = start + widthPx·1000/zoom`, zoom px/мс (0.25 по умолч., 0.04..300)
   ExtraStats.*        Form3 «Дополнительная статистика» (0x43ff3c): parseTemplate, CharFilter, collect → вхождения,
                       rows (средние, сортировки 0–3), occurrences, Sort (клики по столбцам, заголовки ▲▼),
                       formatSpeed, toText, TemplateList (ExStats.ini) — ГОТОВО, сверено побитно
   Histograms.*        Form4 «Статистические гистограммы»: Node (страница) → build() → Page{title, bars}, drill(),
-                      fromExtra(), hint(), labelsFromRecords() (подписи клавиш из записи, а не из раскладки окна) —
-                      ГОТОВО, сверено побитно (`re/histograms.md`)
+                      fromExtra(), hint(), labelsFromRecords() (подписи клавиш из записи, а не из раскладки окна:
+                      самый частый символ без Shift) — ГОТОВО, сверено побитно (`re/histograms.md`)
   NumberFormat.*      formatFixed(v, decimals, loc): округление половинок от нуля, как FloatToStrF оригинала
                       (QLocale округляет к чётному) — используется всеми списками
 src/cli/tsstat.cpp  консольная утилита: `tsstat [--split MS] [--only-text] [--by-pauses] [--sel S L] [--text|--runs] f.tsf`
                     печатает «Параметр\tЗначение» как ListView2 (для дифф-стенда);
-                    `--extra KIND [--avg] [--sort N] [--desc] [--pattern P] [--only S] [--any S] [--exclude S]` — список Form3
+                    `--extra KIND [--avg] [--sort N] [--desc] [--pattern P] [--only S] [--any S] [--exclude S]` — список Form3;
+                    `--to-journal out.tsj f.tsf` — записи файла журналом
 src/platform/KeyboardHook.*   обёртка libuiohook → сигнал HookKey{vk, scan, kind Press/Release/Typed, timeUs, ch}
 src/main.cpp        пока заглушка (QLabel)
 src/ui/, src/export/, i18n/   пусто
@@ -82,9 +90,11 @@ tests/tst_recalc.cpp  KeyName, разметка BS/Ctrl+BS, нормализац
 tests/tst_zones.cpp FingerZones, FingerZoneSchemes, IniFile
 tests/tst_extra.cpp ExtraStats на синтетике
 tests/tst_hist.cpp  Histograms и formatFixed на синтетике
+tests/tst_journal.cpp  Journal: формат записи, битый хвост, JournalWriter, golden-записи через журнал
 tests/tst_orig.cpp  ядро против записанного вывода оригинала (tests/golden/orig/*.json): ListView2, текст, стили,
-                    выделения, ListView1 — 4 файла × 5 наборов опций; серии графиков, Form3 (ключ `extra`) и
-                    Form4 (ключ `hist`) — 824
+                    выделения, ListView1 — 4 файла × 5 наборов опций; серии графиков — 824; Form3 (ключ `extra`) и
+                    Form4 (ключ `hist`) — 824 и обыка (обыка — при «Только текст» = 1 и = 0).
+                    Побитная сверка float — только при 80-битном long double, иначе допуск 1e-4 (`sameFloats`)
 tests/golden/       реальные .tsf пользователя с рабочего стола (801, 824, обыка, цифры13зн)
 tests/golden/orig/  что показывал оригинал (пишет re/scripts/diffstand.py)
 ```
@@ -100,6 +110,8 @@ python re/scripts/diffstand.py [файлы] [--variants] [--sel N] [--no-styles]
 python re/scripts/diffstand.py [файлы] --offline                              # по записанным JSON, секунды
 python re/scripts/diffstand.py файл --extra                                   # только Form3, ~10 с, дописывает ключ extra
 python re/scripts/diffstand.py файл --hist                                    # только Form4, ~10 с, дописывает ключ hist
+python re/scripts/diffstand.py файл --extra --hist --variant N               # то же для VARIANTS[N-1] (1 = «Только текст» выкл)
+python re/scripts/diffstand.py файл --journal                                 # порт пишет журнал, оригинал открывает, ~10 с
 ```
 - Запускает `TypeStats.exe <файл>`, читает ListView2/ListView1/текст/стили RichEdit, выделения и курсор.
   64-битный Python против 32-битного процесса: структуры LVITEM/CHARFORMAT собираются вручную
@@ -141,6 +153,7 @@ python re/scripts/diffstand.py файл --hist                                  
   - `tsf_format.md` — **спецификация формата и хука**;
   - `finger_zones.md` — **зоны пальцев**: объект 0x5b1078, встроенная схема, FingerZones.ini, .tsf, Tkbd (геометрия, цвета);
   - `extra_stats.md` — **Form3**: n-граммы, слова, предложения, шаблоны, фильтр, сортировки, формат, ExStats.ini, стенд;
+  - `journal.md` — **журнал `.tsj`**: формат записи, имя файла, чтение/запись, отличия порта, стенд;
   - `metrics.md` — **формулы основной статистики** (0x4255a8, 0x438304), форматы строк, разметка стёртых;
   - `text_reconstruction.md` — **Recalculate**: нормализация, KeyDisplayName, построение текста/абзацев/стилей,
     фрагменты, комментарии, маппинги, клавограмма.
@@ -235,16 +248,16 @@ python re/scripts/diffstand.py файл --hist                                  
    - ~~зоны пальцев~~ — готово (`re/finger_zones.md`, `src/core/FingerZones`, серия сверена);
    - ~~Form3 «Дополнительная статистика»~~ — готово (`re/extra_stats.md`, `src/core/ExtraStats`, `tsstat --extra`,
      стенд `--extra`; там же грабли стенда: CN_NOTIFY вместо WM_NOTIFY, `id & 0xFFFF` в WM_COMMAND). Сверено на
-     824.tsf (цифры): слов с ошибками и предложений там мало — при случае прогнать `--extra` на текстовом файле
-     (обыка.tsf) и при «Только текст» = 0;
-   - ~~Form4 «Статистические гистограммы»~~ — готово (`re/histograms.md`, `src/core/Histograms`, стенд `--hist`);
-     отрисовка столбиков и подсказка — на UI-этапе;
-   - **СЛЕДУЮЩЕЕ:** журнал `.tsj` (запись с `dt ^ 0x554973`, `FUN_0040b288`); оригинал создаёт пустой `<год>_<месяц>.tsj`
-     рядом с exe при каждом старте (стенд его удаляет).
+     824.tsf (цифры) и обыка.tsf (текст, «Только текст» = 1 и 0; русские шаблоны и фильтры). В обыке нет стёртых
+     символов — «Слова с ошибками» на тексте проверены только пустым списком;
+   - ~~Form4 «Статистические гистограммы»~~ — готово (`re/histograms.md`, `src/core/Histograms`, стенд `--hist`),
+     сверено на 824 и обыке; отрисовка столбиков и подсказка — на UI-этапе;
+   - ~~журнал `.tsj`~~ — готово (`re/journal.md`, `src/core/Journal`, стенд `--journal`). Оригинал создаёт пустой
+     `<год>_<месяц>.tsj` рядом с exe при каждом старте (стенд его удаляет); порт создаёт файл при первой записи.
    Для сверки новых модулей стенд дополняется: открыть форму оригинала (кнопка/меню через WM_COMMAND или
    BM_CLICK, TSpeedButton — кликом по родителю) и считать её ListView, либо читать структуры из памяти
    (`win32remote.read_process`).
-5. UI по `re/forms_dfm.txt`. Раскладка главного окна:
+5. **СЛЕДУЮЩЕЕ:** UI по `re/forms_dfm.txt`. Раскладка главного окна:
    - тулбар 57 px в две строки кнопок 23 px;
    - слева сверху вниз: RichEdit (текст, 120), PaintBox1 (график + скроллбар), PaintBox3 (клавограмма, 200);
    - справа панель 218 px: ListView2 (Параметр/Значение, высота 318) и ListView1 (Пауза/Длительность/Клавиша);
@@ -252,30 +265,30 @@ python re/scripts/diffstand.py файл --hist                                  
 
 ## Технический долг: артефакты оригинала в ядре
 
-Найдено при ревизии `src/core` (результаты верные, но внутри — перенос устройства оригинала). Убирать отдельным
-шагом, до UI; после каждого пункта — `ctest` (golden-сверка не должна измениться):
+Осталось (результаты верные, но внутри — перенос устройства оригинала):
 
-1. **Recalc портит записи документа.** `normalize` удаляет записи, `markErased`/`build` пишут биты `Erased` (0x100) и
-   `SegmentStart` прямо в `KeyRecord::flags`; `Histograms` и клавограмма потом читают эти биты. Лучше: Recalc берёт
-   `const KeyRecords &`, нормализованную копию и признаки «стёрто»/«начало фрагмента» хранит в `TextModel`.
-2. **Маркер фрагмента `kFragmentStart` (−2³¹ в `pauses` и во всех сериях графиков)**, проверки `pause < 0` в
-   MainStats/ExtraStats/Graphs. Лучше: список фрагментов (диапазоны элементов) в `TextModel`; серии — без
-   элементов-маркеров (в `tst_orig` маркер подставлять при сравнении с памятью оригинала).
-3. **Четыре параллельных вектора `mapPos/mapElem/mapKlav/mapRec` + `Recalc::at` («последний + 1»).** Лучше: один
-   вектор якорей `{pos, elem, klav, rec}` и методы модели `elementAt(pos)`, `recordOf(elem)`, `elementOfRecord(rec)`.
-4. **`KeyList::rows(widthPx, zoom, maxRows)`** — ядро знает о пикселях клавограммы и о магическом
-   `maxRows >= 0x7fffffff`. Лучше: `rows(klav, fromUs, toUs, limit)`; окно времени считает UI.
-5. **`long double` как 80-битный x87** (Graphs, ExtraStats, Histograms, Recalc): побитное совпадение с оригиналом
+1. **`long double` как 80-битный x87** (Graphs, ExtraStats, Histograms, Recalc): побитное совпадение с оригиналом
    есть только там, где `long double` 80-битный (MinGW/GCC x86). На MSVC и macOS arm64 он 64-битный — возможны
-   расхождения в последнем бите float (на экране, в 2–3 знаках, практически не видны). Решить на этапе портирования:
-   побитные проверки `tst_orig` включать только при `LDBL_MANT_DIG == 64`, иначе сравнивать отформатированные строки.
-6. `markErased` переводит имя клавиши в cp1251, чтобы сравнить с набором пунктуации (у оригинала ANSI). Символ вне
-   cp1251 превращается в `?` и считается пунктуацией — поведение оригинала; при переписывании на QChar сохранить.
-7. Мелочи: режим сортировки Form3 — `int` 0..3 (сделать enum); тексты `Histograms::Names`, заголовки `ExtraStats::Sort`,
+   расхождения в последнем бите float (на экране практически не видны). `tst_orig` это уже учитывает (`sameFloats`);
+   сам код не менялся.
+2. `Recalc::erasedRecords` переводит имя клавиши в cp1251, чтобы сравнить с набором пунктуации (у оригинала ANSI).
+   Символ вне cp1251 превращается в `?` и считается пунктуацией — поведение оригинала; при переписывании на QChar
+   сохранить.
+3. Мелочи: режим сортировки Form3 — `int` 0..3 (сделать enum); тексты `Histograms::Names`, заголовки `ExtraStats::Sort`,
    `Stats::rowNames` — русские литералы, на этапе i18n перевести на `tr()`/таблицу `.lng`.
 
-Уже убрано: дословный порт `FloatToStrF` → `formatFixed` (обычное округление половинок от нуля, один форматтер на
-все списки); выбор максимума в цикле в гистограммах → сортировка; `std::list` нажатых клавиш → вектор.
+Уже убрано:
+- Recalc не трогает документ: нормализованная копия записей, «стёрто» и «начало фрагмента» — в `TextModel`
+  (`KeyRecord::Erased` больше нет; бит 0x100 в файле — `Transient`). Оригинал нормализует записи на месте, т.е.
+  сохраняет файл уже без автоповтора модификаторов; порт сохраняет документ как есть;
+- маркер фрагмента −2³¹ в паузах и сериях → `TextModel::fragmentStarts`. Пауза первого элемента фрагмента теперь
+  настоящая (разрыв между фрагментами) и ни в какие суммы не входит; в сериях графиков на этих элементах 0 —
+  UI рисует по списку фрагментов. `tst_orig` подставляет маркер перед сравнением с памятью оригинала;
+- четыре вектора `map*` и `Recalc::at` → `TextModel::anchors` и методы поиска («последний + 1» за концом сохранён,
+  для элементов ограничен `size()`);
+- `KeyList::rows` без пикселей и магического `maxRows`;
+- дословный порт `FloatToStrF` → `formatFixed`; выбор максимума в цикле в гистограммах → сортировка; `std::list`
+  нажатых клавиш → вектор.
 
 ## Правила работы
 
