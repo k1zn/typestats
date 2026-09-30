@@ -340,6 +340,15 @@ python re/scripts/diffstand.py файл --journal                               
    мёртвые клавиши, хоткеи), мышь на графике, перетаскивание панелей. Попросить пользователя попробовать.
    Правка, копирование, «Сохранить блок», «Свойства файла» — сделаны (`re/editing.md`).
    **СЛЕДУЮЩЕЕ**, по порядку:
+   - Form8 «Настройки» (начато: только разведка, кода нет). Геометрия — `re/forms_geometry.txt` (TFORM8, 589×317,
+     модальная, Ok/Отмена). Контролы → ключи пресета (порядок и умолчания — `FUN_0041ab08`): CheckBox1 `GlobalClear` (1),
+     CheckBox2 `GlobalOnOff` (1), UpDown1 `TextFontSize` (8..24, 12), UpDown2 `KlavogrFontSize` (8..24, 9), UpDown3
+     `DlitDigits` (0..3, 3 — знаков в ListView1), Edit1/Edit2 `opLoSpeed`/`opHiSpeed`, CheckListBox1 `MainOption0..16`,
+     CheckBox3..5 `CopyBlock1..3`, CheckBox7 `JournalOn` (0), CheckBox8 `AutoComments` (0), CheckBox9 `MinimizeToTray`,
+     CheckBox10 `AutoMinimize`, ComboBox1 — язык (`Language`; у оригинала список `*.lng`, в порту Russian/English).
+     CheckBox6 «Запускать Ts на одном ядре» выкинут. Применение — `FUN_00429bbc`: шрифты текста и клавограммы,
+     строки и высота ListView2, Recalculate, точность ListView1. Порт уже ЧИТАЕТ эти ключи из QSettings (кроме
+     шрифтов, DlitDigits и трея) — нужна сама форма, применение и смена языка на лету (или после перезапуска);
    - остальные формы: Form3, Form4 (движок панелей 0x43c6bc тот же, что у графика: группа `DAT_005b1688`, ось
      `DAT_005b16b0`, подписи `DAT_005b16b4`), Tkbd, Form8 (настройки: GlobalOnOff, GlobalClear, AutoComments,
      JournalOn, MainOption*, Language, шрифты — сейчас читаются из QSettings без UI), Form2, Form9, Form7;
