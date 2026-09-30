@@ -16,6 +16,7 @@ class QLabel;
 class QMenu;
 class QScrollBar;
 class QSpinBox;
+class QSplitter;
 class QTableWidget;
 class QToolButton;
 class TextView;
@@ -76,6 +77,8 @@ private:
     QTableWidget *m_stats = nullptr;
     QTableWidget *m_keys = nullptr;
     QLabel *m_damaged = nullptr;
+    QSplitter *m_leftSplit = nullptr;
+    QSplitter *m_mainSplit = nullptr;
 
     QCheckBox *m_capture = nullptr;
     QCheckBox *m_onlyText = nullptr;

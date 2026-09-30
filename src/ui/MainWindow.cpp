@@ -45,7 +45,6 @@ QTableWidget *reportList(const QStringList &headers, const QFont &font)
     list->setHorizontalHeaderLabels(headers);
     list->horizontalHeader()->setDefaultAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     list->horizontalHeader()->setHighlightSections(false);
-    list->horizontalHeader()->setFont(QApplication::font());
     list->verticalHeader()->hide();
     list->verticalHeader()->setMinimumSectionSize(1);
     list->verticalHeader()->setDefaultSectionSize(QFontMetrics(font).height() + 1);
@@ -59,7 +58,8 @@ QTableWidget *reportList(const QStringList &headers, const QFont &font)
 
 void setRows(QTableWidget *list, const QVector<QStringList> &rows)
 {
-    list->setRowCount(rows.size());
+    if (list->rowCount() != rows.size())
+        list->setRowCount(rows.size());
     for (int r = 0; r < rows.size(); ++r)
         for (int c = 0; c < rows[r].size(); ++c) {
             auto *item = new QTableWidgetItem(rows[r][c]);
@@ -119,7 +119,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     // Right: main statistics and the keys of the visible part of the klavogram.
     m_stats = reportList({tr("Параметр"), tr("Значение")}, font());
-    m_stats->setFixedHeight(318);
+    m_stats->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_stats->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
     m_stats->horizontalHeader()->resizeSection(1, 92);
     QFont mono(QStringLiteral("Courier New"));
@@ -144,6 +144,8 @@ MainWindow::MainWindow(QWidget *parent)
     split->setStretchFactor(1, 0);
     split->setSizes({652, 218});
     right->setMinimumWidth(100);
+    m_leftSplit = left;
+    m_mainSplit = split;
     root->addWidget(split, 1);
 
     m_damaged = new QLabel(tr("Внимание! Файл повреждён!"), this);
@@ -291,6 +293,16 @@ void MainWindow::loadSettings()
     const QByteArray geometry = s.value(QStringLiteral("WindowGeometry")).toByteArray();
     if (!geometry.isEmpty())
         restoreGeometry(geometry);
+    // Heights of the text and the klavogram, width of the right panel; the graph takes the rest.
+    const int total = m_leftSplit->sizes().value(0) + m_leftSplit->sizes().value(1) + m_leftSplit->sizes().value(2);
+    const int textHeight = s.value(QStringLiteral("TextWinHeight"), 120).toInt();
+    const int klavHeight = s.value(QStringLiteral("KlavWinHeight"), 200).toInt();
+    m_leftSplit->setSizes({textHeight, std::max(20, total - textHeight - klavHeight), klavHeight});
+    const int rightWidth = s.value(QStringLiteral("RightPanelWidth"), 218).toInt();
+    m_mainSplit->setSizes({std::max(100, width() - rightWidth - m_mainSplit->handleWidth()), rightWidth});
+    m_keys->horizontalHeader()->resizeSection(0, s.value(QStringLiteral("DlitCol1Width"), 80).toInt());
+    m_keys->horizontalHeader()->resizeSection(1, s.value(QStringLiteral("DlitCol2Width"), 80).toInt());
+    m_fingers->setCurrentIndex(std::max(0, m_fingers->findText(s.value(QStringLiteral("FingerZonesName")).toString())));
 
     static const bool shownByDefault[GraphWidget::SeriesCount] = {false, true, false, false, false, true, true, false};
     for (int i = 0; i < GraphWidget::SeriesCount; ++i)
@@ -324,6 +336,12 @@ void MainWindow::saveSettings() const
     s.setValue(QStringLiteral("TextOnly"), m_onlyText->isChecked());
     s.setValue(QStringLiteral("SplitOnEnter"), m_byPauses->isChecked());
     s.setValue(QStringLiteral("WindowGeometry"), saveGeometry());
+    s.setValue(QStringLiteral("TextWinHeight"), m_leftSplit->sizes().value(0));
+    s.setValue(QStringLiteral("KlavWinHeight"), m_leftSplit->sizes().value(2));
+    s.setValue(QStringLiteral("RightPanelWidth"), m_mainSplit->sizes().value(1));
+    s.setValue(QStringLiteral("DlitCol1Width"), m_keys->horizontalHeader()->sectionSize(0));
+    s.setValue(QStringLiteral("DlitCol2Width"), m_keys->horizontalHeader()->sectionSize(1));
+    s.setValue(QStringLiteral("FingerZonesName"), m_fingers->currentText());
 
     for (int i = 0; i < GraphWidget::SeriesCount; ++i)
         s.setValue(QLatin1String(kSeriesKeys[i]), m_graph->seriesVisible(i));
@@ -511,6 +529,13 @@ void MainWindow::updateStats()
         if (s.value(QStringLiteral("MainOption%1").arg(i), true).toBool())
             rows.append({names[i], values.value(i)});
     setRows(m_stats, rows);
+    // The list is as tall as its rows plus one (FUN_00429bbc); the key list gets the rest.
+    const int height = m_stats->horizontalHeader()->height() + 2 * m_stats->frameWidth()
+                       + int(rows.size() + 1) * m_stats->verticalHeader()->defaultSectionSize();
+    if (m_stats->height() != height) {
+        m_stats->setFixedHeight(height);
+        updateKeyList();
+    }
 }
 
 void MainWindow::updateKeyList()
@@ -557,6 +582,13 @@ bool MainWindow::openFile(const QString &path)
     if (err == Tsf::ReadError::NewerVersion)
         QMessageBox::warning(this, appTitle(), tr("Этот файл создан в более поздней версии программы."));
     m_path = path;
+    if (!doc.fingerZonesName.isEmpty()) {
+        // The finger layout of the file: an equal one that is already known, or a new one (LoadTsf).
+        const QString scheme = m_schemes.adopt(doc.fingerZonesName, FingerZones::fromStrings(doc.fingers));
+        if (m_fingers->findText(scheme) < 0)
+            m_fingers->addItem(scheme);
+        m_fingers->setCurrentText(scheme);
+    }
     setDocument(doc, name, doc.signed_ && !doc.signatureValid);
     return true;
 }
@@ -587,6 +619,13 @@ void MainWindow::save()
         return;
     if (QFileInfo(path).suffix().isEmpty())
         path += QStringLiteral(".tsf");
+    // The finger layout goes into the file unless it is the built-in one (SaveTsf).
+    m_doc.fingerZonesName.clear();
+    m_doc.fingers.clear();
+    if (m_fingers->currentIndex() > 0) {
+        m_doc.fingerZonesName = m_fingers->currentText();
+        m_doc.fingers = m_schemes.zones(m_fingers->currentText()).toStrings();
+    }
     // Only a recording that came with a valid signature keeps one; nothing here edits the records yet.
     if (!Tsf::write(path, m_doc, m_doc.signed_ && m_doc.signatureValid)) {
         QMessageBox::warning(this, appTitle(), tr("Не удалось сохранить файл %1").arg(path));
