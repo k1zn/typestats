@@ -39,6 +39,18 @@ cd build && ctest
   и удаление `build/TypingStatistics_autogen` (устаревший кэш AUTOMOC).
 - Каждый вызов Bash — новый шелл, поэтому `source env.sh` нужен каждый раз.
 
+**Дистрибутив** (`dist/`, `build-release/` — в `.gitignore`):
+```bash
+source env.sh
+cmake -S . -B build-release -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=$QTDIR
+cmake --build build-release --target TypingStatistics
+mkdir -p dist/TypingStatistics && cp build-release/TypingStatistics.exe dist/TypingStatistics/
+windeployqt --release --no-translations --no-opengl-sw --no-system-d3d-compiler --no-quick-import --compiler-runtime dist/TypingStatistics/TypingStatistics.exe
+```
+Затем удалить лишнее: `multimedia/windowsmediaplugin.dll` (работает FFmpeg), `generic/`, `tls/`, `networkinformation/`,
+`iconengines/`, `imageformats/{qgif,qjpeg,qsvg}.dll`, `Qt6Svg.dll` (Qt6Network нужна QtMultimedia). ~54 МБ, zip ~24 МБ.
+Проверено запуском с `PATH` без Qt/MinGW (главное окно и окно видео на AVI).
+
 **Сторонние библиотеки (vendored):**
 - `third_party/libuiohook` (LGPL-3) — глобальный хук;
 - `third_party/QXlsx` (MIT). В его `CMakeLists.txt` закомментирован `include(CPackConfig)`.
