@@ -4,6 +4,7 @@
 #include "core/KeyName.h"
 #include "core/MainStats.h"
 #include "core/NumberFormat.h"
+#include "Texts.h"
 
 #include <QMouseEvent>
 #include <QPainter>
@@ -241,13 +242,14 @@ void KlavogramWidget::drawRuler(QPainter &p, int top, int rowHeight)
 {
     const QFontMetrics fm(m_font);
     const QLocale loc;
+    const StatsUnits units = Texts::units();
     const int w = width();
     // The first step whose labels do not run into each other.
     int step = kRulerSteps[0], digits = kRulerDigits[0], labelWidth = 0;
     for (int i = 0; i < int(std::size(kRulerSteps)); ++i) {
         step = kRulerSteps[i];
         digits = kRulerDigits[i];
-        const QString widest = Stats::formatTime(int(float(w) / m_zoom + m_scrollMs), digits, loc) + QLatin1Char('W');
+        const QString widest = Stats::formatTime(int(float(w) / m_zoom + m_scrollMs), digits, loc, units) + QLatin1Char('W');
         labelWidth = fm.horizontalAdvance(widest);
         if (step > int(float(labelWidth) / m_zoom))
             break;
@@ -264,7 +266,7 @@ void KlavogramWidget::drawRuler(QPainter &p, int top, int rowHeight)
         const int ms = int(v < 0.0f ? v - 0.5f : v + 0.5f);
         if (ms < 0)
             continue;
-        const QString label = Stats::formatTime(ms, digits, loc);
+        const QString label = Stats::formatTime(ms, digits, loc, units);
         const int lw = fm.horizontalAdvance(label);
         p.setPen(Qt::black);
         p.drawText(QRect(int(x) - lw / 2, top - fm.height() - 1, lw, fm.height()), Qt::AlignCenter | Qt::TextDontClip, label);
@@ -420,7 +422,7 @@ void KlavogramWidget::paintEvent(QPaintEvent *)
         if (m_selecting) {
             p.drawLine(m_selectionX, top - 1, m_selectionX, top + rowHeight * kTracks - 1);
             const QLocale loc;
-            const StatsUnits units;
+            const StatsUnits units = Texts::units();
             const QString time = formatFixed(std::fabs(double(0.001L * (m_cursorT - m_selectionT))), 3, loc)
                                  + QLatin1Char(' ') + units.ms;
             const QString speed = formatFixed(measuredSpeed(m_selectionT, m_cursorT), 2, loc) + QLatin1Char(' ') + tr("зн/мин");

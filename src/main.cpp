@@ -2,7 +2,9 @@
 
 #include <QApplication>
 #include <QIcon>
+#include <QSettings>
 #include <QStyleHints>
+#include <QTranslator>
 
 int main(int argc, char *argv[])
 {
@@ -11,7 +13,20 @@ int main(int argc, char *argv[])
     QApplication::setApplicationName(QStringLiteral("TypingStatistics"));
     QApplication::setApplicationVersion(QStringLiteral(TS_VERSION));
     QApplication::setWindowIcon(QIcon(QStringLiteral(":/icons/app.png")));
-    QLocale::setDefault(QLocale(QLocale::Russian)); // numbers as the original shows them, until i18n
+
+    // The source texts are Russian, as in the original; "Language" (its preset key) picks a translation.
+    // Without the key the system language decides. `--lang ru|en` overrides both.
+    QStringList args = app.arguments();
+    QString language = QSettings().value(QStringLiteral("Language")).toString();
+    if (language.isEmpty())
+        language = QLocale::system().language() == QLocale::Russian ? QStringLiteral("Russian") : QStringLiteral("English");
+    if (const qsizetype i = args.indexOf(QStringLiteral("--lang")); i > 0 && i + 1 < args.size()) {
+        language = args[i + 1] == QLatin1String("ru") ? QStringLiteral("Russian") : QStringLiteral("English");
+        args.remove(i, 2);
+    }
+    QTranslator translator;
+    if (language != QLatin1String("Russian") && translator.load(QStringLiteral(":/i18n/typestats_en.qm")))
+        app.installTranslator(&translator);
 
     // The look of the original: a classic light window with compact native controls and the
     // 8 pt dialog font its layout was made for.
@@ -23,7 +38,6 @@ int main(int argc, char *argv[])
 
     MainWindow w;
     w.show();
-    const QStringList args = app.arguments();
     if (args.size() > 1)
         w.openFile(args[1]);
     return app.exec();

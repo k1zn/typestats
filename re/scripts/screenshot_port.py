@@ -1,4 +1,4 @@
-"""Screenshot of the port's main window: python re/scripts/screenshot_port.py <file.tsf> <out.png> [sel_start sel_len]"""
+"""Screenshot of the port's main window: python re/scripts/screenshot_port.py <file.tsf> <out.png> [application arguments, e.g. --lang en]"""
 import os
 import subprocess
 import sys
@@ -17,7 +17,7 @@ MINGW_BIN = Path(r"C:\Users\kizn\Qt\Tools\mingw1310_64\bin")
 
 env = dict(os.environ)
 env["PATH"] = os.pathsep.join([str(QT_BIN), str(MINGW_BIN), env.get("PATH", "")])
-proc = subprocess.Popen([str(ROOT / "build" / "TypingStatistics.exe")] + sys.argv[1:2], env=env)
+proc = subprocess.Popen([str(ROOT / "build" / "TypingStatistics.exe")] + sys.argv[1:2] + sys.argv[3:], env=env)
 try:
     deadline = time.time() + 20
     win = None

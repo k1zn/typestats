@@ -4,6 +4,7 @@
 #include "GraphWidget.h"
 #include "KlavogramWidget.h"
 #include "TextView.h"
+#include "Texts.h"
 #include "core/Journal.h"
 #include "core/KeyList.h"
 #include "core/MainStats.h"
@@ -501,8 +502,8 @@ void MainWindow::updateStats()
     const RecalcOptions opt = options();
     const QLocale loc;
     const auto [b, e] = Stats::range(m_model, m_text->selectionStart(), m_text->selectionLength(), opt.byPauses);
-    const QStringList names = Stats::rowNames();
-    const QStringList values = m_model.size() ? Stats::format(Stats::compute(m_model, b, e, opt.splitMs, opt.byPauses), loc)
+    const QStringList names = Texts::statsRowNames();
+    const QStringList values = m_model.size() ? Stats::format(Stats::compute(m_model, b, e, opt.splitMs, opt.byPauses), loc, Texts::units())
                                               : QStringList();
     const QSettings s;
     QVector<QStringList> rows;
