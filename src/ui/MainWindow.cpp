@@ -286,7 +286,7 @@ QWidget *MainWindow::createToolBar()
             [this] { exportTable(keyTable(), true); });
     action(12, 150, 4, 23, tr("Дополнительная статистика"), &MainWindow::showExtraStats);
     action(19, 174, 4, 23, tr("Статистические гистограммы"), &MainWindow::showHistograms);
-    action(20, 198, 4, 23, tr("Видео"), &MainWindow::showVideo);
+    action(20, 198, 4, 23, tr("Видео"), &MainWindow::showVideo)->setEnabled(VideoWindow::available());
     action(22, 222, 4, 23, tr("Настройки..."), &MainWindow::showSettings);
     action(4, 246, 4, 23, tr("Оперативная статистика"), &MainWindow::showLiveStats);
     m_helpButton = action(3, 270, 4, 23, tr("Справка"), &MainWindow::showHelpMenu);
@@ -299,7 +299,7 @@ QWidget *MainWindow::createToolBar()
     action(14, 78, 32, 22, tr("Отменить (Ctrl+Z)"), &MainWindow::undo);
     action(18, 102, 32, 22, tr("Удалить нетекстовые клавиши"), &MainWindow::removeNonText);
     action(15, 126, 32, 22, tr("Пометить (Ins)"), &MainWindow::mark);
-    action(21, 150, 32, 22, tr("Свойства видео"), &MainWindow::videoProperties);
+    action(21, 150, 32, 22, tr("Свойства видео"), &MainWindow::videoProperties)->setEnabled(VideoWindow::available());
     m_axisButton = action(16, 174, 32, 22, tr("Настройка оси Y графиков"), &MainWindow::showAxisPanel);
     m_legendButton = action(17, 198, 32, 22, tr("Легенда"), &MainWindow::showLegend);
     action(23, 222, 32, 22, tr("Ввод текста (F4)"), &MainWindow::showTextInput);

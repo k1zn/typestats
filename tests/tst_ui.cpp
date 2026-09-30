@@ -198,6 +198,8 @@ private slots:
 
     void video()
     {
+        if (!VideoWindow::available())
+            QSKIP("built without QtMultimedia (TS_VIDEO=OFF)");
         // A recording with a video next to it: 4 frames at 10 fps, shifted by 150 ms.
         QTemporaryDir dir;
         writeAvi(dir.filePath(QStringLiteral("v.avi")), {Qt::red, Qt::green, Qt::blue, Qt::white}, 10, 32, 16);

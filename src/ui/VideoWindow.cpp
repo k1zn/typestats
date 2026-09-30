@@ -2,12 +2,19 @@
 
 #include "core/Video.h"
 
+#include <QPainter>
+
+#ifndef TS_NO_VIDEO
 #include <QMediaMetaData>
 #include <QMediaPlayer>
-#include <QPainter>
 #include <QUrl>
 #include <QVideoFrame>
 #include <QVideoSink>
+
+bool VideoWindow::available()
+{
+    return true;
+}
 
 VideoWindow::VideoWindow(QWidget *parent)
     : QWidget(parent, Qt::Tool | Qt::WindowStaysOnTopHint | Qt::WindowTitleHint | Qt::WindowCloseButtonHint),
@@ -88,6 +95,35 @@ void VideoWindow::frameArrived(const QVideoFrame &frame)
         setFixedSize(m_frame.size());
     update();
 }
+
+#else // TS_NO_VIDEO
+
+#include <QTimer>
+
+bool VideoWindow::available()
+{
+    return false;
+}
+
+VideoWindow::VideoWindow(QWidget *parent)
+    : QWidget(parent, Qt::Tool | Qt::WindowStaysOnTopHint | Qt::WindowTitleHint | Qt::WindowCloseButtonHint)
+{
+    setWindowTitle(tr("Видео"));
+}
+
+void VideoWindow::open(const QString &)
+{
+    QTimer::singleShot(0, this, [this] { emit opened(false); });
+}
+
+void VideoWindow::unload() {}
+
+void VideoWindow::setPositionMs(qint64 ms)
+{
+    m_position = ms;
+}
+
+#endif
 
 void VideoWindow::paintEvent(QPaintEvent *)
 {

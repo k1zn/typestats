@@ -6,7 +6,15 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Multimedia LinguistTools Test)
+# TS_VIDEO=OFF: no attached video (Form5/Form6), no QtMultimedia - for the minimal static build.
+option(TS_VIDEO "Attached video through QtMultimedia" ON)
+
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Test)
+if(TS_VIDEO)
+    find_package(Qt6 REQUIRED COMPONENTS Multimedia)
+endif()
+# A static Qt has no Linguist tools: TS_LRELEASE then names lrelease.exe of another Qt.
+find_package(Qt6 QUIET COMPONENTS LinguistTools)
 
 # --- third party ---
 set(BUILD_SHARED_LIBS OFF)
@@ -31,15 +39,31 @@ file(GLOB UI_SOURCES CONFIGURE_DEPENDS
     src/export/*.cpp src/export/*.h)
 add_library(tsui STATIC ${UI_SOURCES})
 target_include_directories(tsui PUBLIC src)
-target_link_libraries(tsui PUBLIC tscore Qt6::Widgets Qt6::Multimedia uiohook QXlsx::QXlsx)
+target_link_libraries(tsui PUBLIC tscore Qt6::Widgets uiohook QXlsx::QXlsx)
+if(TS_VIDEO)
+    target_link_libraries(tsui PUBLIC Qt6::Multimedia)
+else()
+    target_compile_definitions(tsui PUBLIC TS_NO_VIDEO)
+endif()
 
 qt_add_executable(TypingStatistics WIN32 MACOSX_BUNDLE src/main.cpp resources/resources.qrc)
 target_compile_definitions(TypingStatistics PRIVATE TS_VERSION="${PROJECT_VERSION}")
 target_link_libraries(TypingStatistics PRIVATE tsui)
 
 file(GLOB TS_FILES CONFIGURE_DEPENDS i18n/*.ts)
-if(TS_FILES)
+if(TS_FILES AND TARGET Qt6::lrelease)
     qt_add_translations(TypingStatistics TS_FILES ${TS_FILES} RESOURCE_PREFIX /i18n)
+elseif(TS_FILES)
+    find_program(TS_LRELEASE NAMES lrelease lrelease-qt6 REQUIRED)
+    set(QM_FILES)
+    foreach(ts ${TS_FILES})
+        get_filename_component(base ${ts} NAME_WE)
+        set(qm ${CMAKE_BINARY_DIR}/i18n/${base}.qm)
+        add_custom_command(OUTPUT ${qm} COMMAND ${TS_LRELEASE} -silent ${ts} -qm ${qm} DEPENDS ${ts} VERBATIM)
+        list(APPEND QM_FILES ${qm})
+    endforeach()
+    set_source_files_properties(${QM_FILES} PROPERTIES GENERATED TRUE)
+    qt_add_resources(TypingStatistics i18n PREFIX /i18n BASE ${CMAKE_BINARY_DIR}/i18n FILES ${QM_FILES})
 endif()
 
 # --- tests ---
