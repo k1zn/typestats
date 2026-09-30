@@ -30,6 +30,7 @@ class QTableWidget;
 class QToolButton;
 class TextInputWindow;
 class TextView;
+class VideoWindow;
 
 // The main window (Form1); geometry from re/forms_geometry.txt.
 class MainWindow : public QWidget
@@ -42,7 +43,7 @@ public:
     bool openFile(const QString &path);
     // Installs the keyboard hook: from now on what is typed elsewhere is recorded.
     void startCapture();
-    // Opens a form by name (`--show NAME`, for screenshots): settings, extra, hist, hist-fingers, hist-extra, kbd, about, input.
+    // Opens a form by name (`--show NAME`, for screenshots): settings, extra, hist, hist-fingers, hist-extra, kbd, about, input, video.
     void showForm(const QString &name);
 
 protected:
@@ -72,6 +73,12 @@ private:
     void showHistograms();
     void captureToggled(bool on);
     void showTextInput();
+    // The attached video (re/video.md).
+    void showVideo();
+    void videoProperties();
+    void attachVideo();
+    void videoOpened(bool ok);
+    void updateVideo();
     void showHelpMenu();
     void selectPreset(const QString &name);
     void createPreset();
@@ -170,6 +177,9 @@ private:
     ExtraStatsWindow *m_extra = nullptr;
     HistogramWindow *m_hist = nullptr;
     TextInputWindow *m_input = nullptr;
+    VideoWindow *m_video = nullptr;
+    bool m_videoAttached = false; // the video of m_doc is open (g_videoAttached)
+    QString m_fileDir;            // folder of the recording: relative video names start there (g_fileDir)
     QSystemTrayIcon *m_tray = nullptr;
     bool m_needRecalc = false;   // keys were recorded since the text was built
     QElapsedTimer m_lastKey;

@@ -20,7 +20,10 @@ n-граммы и слова, зоны пальцев, оперативная с
 
 ## Сборка
 
-Тулчейн установлен через aqtinstall в `C:\Users\kizn\Qt`: Qt 6.8.3 mingw_64, MinGW 13.1, CMake, Ninja.
+Тулчейн установлен через aqtinstall в `C:\Users\kizn\Qt`: Qt 6.8.3 mingw_64 + QtMultimedia (с FFmpeg), MinGW 13.1,
+CMake, Ninja. `download.qt.io` отсюда недоступен (сброс соединения); работает зеркало
+`https://mirrors.ocf.berkeley.edu/qt/` (`aqt ... --base <зеркало>`), но на нём нет `.sha256`, которые aqt требует, —
+QtMultimedia поставлен вручную: архив из `Updates.xml` зеркала + сверка его `.sha1`, распаковка в `6.8.3/mingw_64`.
 
 ```bash
 source env.sh
@@ -81,6 +84,8 @@ src/core/      только QtCore, тестируемо
                       тесты на синтетике (руками на живом вводе НЕ проверялось)
   Editing.*           правка и копирование (`re/editing.md`): recordRange (FUN_004254b4), deleteRange, removeNonText,
                       labelStart/markRange/removeLabel, copyText, copyTagged, convertLayout — ГОТОВО, тесты на синтетике
+  Video.*             видео (`re/video.md`): positionMs (время видео по левому краю клавограммы), frameStartMs (начало
+                      кадра, как AVIStreamTimeToSample), resolvePath
   NumberFormat.*      formatFixed(v, decimals, loc): округление половинок от нуля, как FloatToStrF оригинала
                       (QLocale округляет к чётному) — используется всеми списками
 src/cli/tsstat.cpp  консольная утилита: `tsstat [--split MS] [--only-text] [--by-pauses] [--sel S L] [--text|--runs] f.tsf`
@@ -136,6 +141,10 @@ src/ui/
                       однократный перенос реестра оригинала (флаг `RegistryImported`, вызывается из main)
   TextInputWindow.*   Form9 «Ввод текста» (F4; Esc — скрыть, F2 — очистить); набор в нём записывается
   AboutDialog.*       Form7 «О программе» (меню кнопки «Справка»)
+  VideoWindow.*       Form5 «Видео»: QMediaPlayer на паузе + QVideoSink, кадр по позиции (`setPositionMs`), размер окна =
+                      размер кадра, поверх всех; `opened(bool)`. В MainWindow: `attachVideo`/`videoOpened`/`updateVideo`
+                      (из `klavogramMoved`), `m_videoAttached`, `m_fileDir`
+  VideoPropertiesDialog.*  Form6 «Свойства видео» (кнопка 21; `--show video`)
   TextView.*          Memo4: QTextEdit, Arial 16 px, стили TextRun (красный/синий/зелёный/подчёркивание),
                       `setVisibleRange` — жёлтая подсветка участка, видимого на клавограмме
   KlavogramWidget.*   PaintBox3 по `re/klavogram.md`: 9 дорожек по пальцам, цвета по числу зажатых клавиш, шкала
@@ -159,6 +168,8 @@ tests/tst_ui.cpp    главное окно без экрана (ctest став�
                     графике, запись через `keyEvent`, настройки, Form3, Form4, Tkbd, пресеты, выключение перехвата,
                     экспорт, свёрнутый график. Тест — друг окон (`friend class TstUi`). Окна собраны в
                     библиотеку `tsui` (src/ui + src/platform + src/export), ресурсы — в самих exe
+tests/tst_video.cpp Video на синтетике (время по клавограмме с паузой разбиения, кадры, пути); окно видео — в tst_ui
+                    (тест сам пишет несжатый AVI из цветных кадров)
 tests/tst_recorder.cpp Recorder: записи и dt, игнорируемые события, хоткеи, автокомментарии, мёртвые клавиши, оперативная
                     статистика
 tests/tst_orig.cpp  ядро против записанного вывода оригинала (tests/golden/orig/*.json): ListView2, текст, стили,
@@ -368,10 +379,11 @@ python re/scripts/diffstand.py файл --journal                               
    Сознательные отличия: смена языка — после перезапуска (у оригинала так для возврата к встроенному); столбики Form4
    не обрезаются по высоте; кнопка «Дополнительная статистика» в Form4 открывает и Form3; кнопка на панели задач
    прячется только у свёрнутого в трей окна; экспорт пишет файл (xlsx/csv) и открывает его, а не управляет Excel по OLE;
-   подписи Tkbd вне Windows — по US-раскладке.
+   подписи Tkbd вне Windows — по US-раскладке; время видео после паузы разбиения — настоящее, а не сжатое
+   (`re/video.md`); «Преобразовать в текущую раскладку» не трогает VK_PACKET.
+   Видео (Form5, Form6, кнопки 20/21) — сделано (`re/video.md`, QtMultimedia).
    **СЛЕДУЮЩЕЕ**:
-   - видео (Form5 «Видео», Form6 «Свойства видео», кнопки 20/21; `g_attachedVideo`, `g_videoTimeShift`) —
-     последним, через QtMultimedia;
+   - пройтись по оставшимся выключенным кнопкам и пунктам меню главного окна;
    - не проверено руками (пользователь пока не пробовал): запись в чужих окнах, мышь графика и клавограммы, панели,
      трей, Form9 (набор в нём должен записываться).
 

@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets LinguistTools Test)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Multimedia LinguistTools Test)
 
 # --- third party ---
 set(BUILD_SHARED_LIBS OFF)
@@ -31,7 +31,7 @@ file(GLOB UI_SOURCES CONFIGURE_DEPENDS
     src/export/*.cpp src/export/*.h)
 add_library(tsui STATIC ${UI_SOURCES})
 target_include_directories(tsui PUBLIC src)
-target_link_libraries(tsui PUBLIC tscore Qt6::Widgets uiohook QXlsx::QXlsx)
+target_link_libraries(tsui PUBLIC tscore Qt6::Widgets Qt6::Multimedia uiohook QXlsx::QXlsx)
 
 qt_add_executable(TypingStatistics WIN32 MACOSX_BUNDLE src/main.cpp resources/resources.qrc)
 target_compile_definitions(TypingStatistics PRIVATE TS_VERSION="${PROJECT_VERSION}")

@@ -11,6 +11,8 @@
 #include "LiveStatsWindow.h"
 #include "SettingsDialog.h"
 #include "TextView.h"
+#include "VideoPropertiesDialog.h"
+#include "VideoWindow.h"
 #include "Texts.h"
 #include "FilePropertiesDialog.h"
 #include "FingerZonesDialog.h"
@@ -19,6 +21,7 @@
 #include "core/KeyList.h"
 #include "core/MainStats.h"
 #include "core/NumberFormat.h"
+#include "core/Video.h"
 
 #include <QApplication>
 #include <QCheckBox>
@@ -210,6 +213,8 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_extra, &ExtraStatsWindow::elementSelected, this, &MainWindow::scrollKlavogramToElement);
     connect(m_extra, &ExtraStatsWindow::exportRequested, this, [this] { exportTable(extraTable(), false); });
     m_input = new TextInputWindow(this);
+    m_video = new VideoWindow(this);
+    connect(m_video, &VideoWindow::opened, this, &MainWindow::videoOpened);
     connect(new QShortcut(QKeySequence(Qt::Key_F4), this), &QShortcut::activated, this, &MainWindow::showTextInput);
     m_tray = new QSystemTrayIcon(QApplication::windowIcon(), this);
     auto *trayMenu = new QMenu(this);
@@ -281,7 +286,7 @@ QWidget *MainWindow::createToolBar()
             [this] { exportTable(keyTable(), true); });
     action(12, 150, 4, 23, tr("Дополнительная статистика"), &MainWindow::showExtraStats);
     action(19, 174, 4, 23, tr("Статистические гистограммы"), &MainWindow::showHistograms);
-    action(20, 198, 4, 23, tr("Видео"), nullptr);
+    action(20, 198, 4, 23, tr("Видео"), &MainWindow::showVideo);
     action(22, 222, 4, 23, tr("Настройки..."), &MainWindow::showSettings);
     action(4, 246, 4, 23, tr("Оперативная статистика"), &MainWindow::showLiveStats);
     m_helpButton = action(3, 270, 4, 23, tr("Справка"), &MainWindow::showHelpMenu);
@@ -294,7 +299,7 @@ QWidget *MainWindow::createToolBar()
     action(14, 78, 32, 22, tr("Отменить (Ctrl+Z)"), &MainWindow::undo);
     action(18, 102, 32, 22, tr("Удалить нетекстовые клавиши"), &MainWindow::removeNonText);
     action(15, 126, 32, 22, tr("Пометить (Ins)"), &MainWindow::mark);
-    action(21, 150, 32, 22, tr("Свойства видео"), nullptr);
+    action(21, 150, 32, 22, tr("Свойства видео"), &MainWindow::videoProperties);
     action(16, 174, 32, 22, tr("Настройка оси Y графиков"), &MainWindow::toggleAxisPanel);
     action(17, 198, 32, 22, tr("Легенда"), &MainWindow::toggleLegend);
     action(23, 222, 32, 22, tr("Ввод текста (F4)"), &MainWindow::showTextInput);
@@ -492,6 +497,8 @@ void MainWindow::showForm(const QString &name)
         showTextInput();
     else if (name == QLatin1String("kbd"))
         editFingerZones();
+    else if (name == QLatin1String("video"))
+        videoProperties();
     else if (name.startsWith(QLatin1String("hist"))) {
         showHistograms();
         if (name == QLatin1String("hist-fingers"))
@@ -543,6 +550,58 @@ void MainWindow::showTextInput()
     m_input->show();
     m_input->raise();
     m_input->activateWindow();
+}
+
+void MainWindow::showVideo()
+{
+    if (m_videoAttached) {
+        m_video->show();
+        m_video->raise();
+    }
+}
+
+void MainWindow::videoProperties()
+{
+    // SpeedButton21Click: the fields, then the video is opened again with what they say.
+    VideoPropertiesDialog dialog(this);
+    dialog.setProperties(!m_doc.attachedVideo.isEmpty(), m_doc.attachedVideo, m_doc.videoTimeShiftMs);
+    dialog.exec();
+    if (dialog.attached() && !dialog.fileName().isEmpty()) {
+        m_doc.attachedVideo = dialog.fileName();
+        m_doc.videoTimeShiftMs = dialog.shiftMs();
+    } else {
+        m_doc.attachedVideo.clear();
+        m_doc.videoTimeShiftMs = 0;
+    }
+    attachVideo();
+}
+
+void MainWindow::attachVideo()
+{
+    // The video of the document is opened; the window shows up once it is (videoOpened).
+    m_videoAttached = false;
+    m_video->unload();
+    m_video->hide();
+    if (!m_doc.attachedVideo.isEmpty())
+        m_video->open(Video::resolvePath(m_fileDir, m_doc.attachedVideo));
+}
+
+void MainWindow::videoOpened(bool ok)
+{
+    m_videoAttached = ok;
+    if (!ok) {
+        m_video->hide();
+        return;
+    }
+    updateVideo();
+    showVideo();
+}
+
+void MainWindow::updateVideo()
+{
+    // PaintBox3Paint: the frame at the left edge of the klavogram.
+    if (m_videoAttached)
+        m_video->setPositionMs(Video::positionMs(m_model, m_klav->scrollMs(), m_doc.videoTimeShiftMs));
 }
 
 void MainWindow::showHelpMenu()
@@ -1134,6 +1193,7 @@ void MainWindow::klavogramMoved()
     m_graph->setKlavogramRange(from, to);
     syncGraphScrollBar();
     updateKeyList();
+    updateVideo();
 }
 
 RecalcOptions MainWindow::options() const
@@ -1256,6 +1316,7 @@ bool MainWindow::openFile(const QString &path)
         m_undo.clear();
         m_clean = true;
         setDocument(doc, tr("Журнал %1").arg(name), false);
+        attachVideo();
         return true;
     }
     TsfDocument doc;
@@ -1277,7 +1338,9 @@ bool MainWindow::openFile(const QString &path)
             m_fingers->addItem(scheme);
         m_fingers->setCurrentText(scheme);
     }
+    m_fileDir = QFileInfo(path).path();
     setDocument(doc, name, doc.signed_ && !doc.signatureValid);
+    attachVideo();
     return true;
 }
 
@@ -1356,6 +1419,11 @@ void MainWindow::saveDocument(bool block)
     m_path = path;
     m_loaded = true;
     setWindowTitle(appTitle() + QStringLiteral(" - ") + QFileInfo(path).fileName());
+    if (QFileInfo(path).path() != m_fileDir) {
+        // The video name is relative to the file: it is looked for next to the file now.
+        m_fileDir = QFileInfo(path).path();
+        attachVideo();
+    }
 }
 
 void MainWindow::clear()
@@ -1368,4 +1436,5 @@ void MainWindow::clear()
     m_capture->setChecked(true);
     m_input->clear();
     setDocument({}, {}, false);
+    attachVideo();
 }
