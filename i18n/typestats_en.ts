@@ -167,6 +167,13 @@
     </message>
 </context>
 <context>
+    <name>FingerZonesDialog</name>
+    <message>
+        <source>Клавиатура</source>
+        <translation>Keyboard</translation>
+    </message>
+</context>
+<context>
     <name>GraphWidget</name>
     <message>
         <source>Мгновенная скорость</source>
@@ -637,6 +644,30 @@
     <message>
         <source>Для смены языка перезапустите Ts</source>
         <translation>Restart Ts to change the language</translation>
+    </message>
+    <message>
+        <source>Создание расстановки пальцев</source>
+        <translation>New finger layout</translation>
+    </message>
+    <message>
+        <source>Название расстановки</source>
+        <translation>Name of the layout</translation>
+    </message>
+    <message>
+        <source>Ошибка удаления расстановки</source>
+        <translation>Cannot delete the layout</translation>
+    </message>
+    <message>
+        <source>Стандартную расстановку удалить нельзя</source>
+        <translation>The standard layout cannot be deleted</translation>
+    </message>
+    <message>
+        <source>Удаление расстановки пальцев</source>
+        <translation>Deleting a finger layout</translation>
+    </message>
+    <message>
+        <source>Вы действительно хотите удалить расстановку?</source>
+        <translation>Do you really want to delete the layout?</translation>
     </message>
 </context>
 <context>

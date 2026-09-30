@@ -3,6 +3,7 @@
 
 #include "core/Editing.h"
 #include "ui/ExtraStatsWindow.h"
+#include "ui/FingerZonesDialog.h"
 #include "ui/GraphPanels.h"
 #include "ui/GraphWidget.h"
 #include "ui/HistogramWindow.h"
@@ -347,6 +348,41 @@ private slots:
         QTest::mouseRelease(c, Qt::RightButton, {}, QPoint(250, 100));
         QVERIFY(c->m_zoomX > zoom);
         QVERIFY(!h->grab().isNull());
+    }
+
+    void fingerZonesEditor()
+    {
+        FingerZones zones = FingerZones::standard();
+        {
+            FingerZonesDialog d(QStringLiteral("Стандарт"), zones);
+            QVERIFY(!d.grab().isNull());
+            QWidget *keyboard = d.findChildren<QWidget *>().at(0);
+            // The built-in layout is read-only: a click changes nothing.
+            QTest::mouseClick(keyboard, Qt::LeftButton, {}, QPoint(30, 30));
+            QVERIFY(d.zones() == zones);
+        }
+        zones.setReadOnly(false);
+        FingerZonesDialog d(QStringLiteral("Моя"), zones);
+        QWidget *keyboard = d.findChildren<QWidget *>().at(0), *palette = d.findChildren<QWidget *>().at(1);
+        QCOMPARE(d.zones().finger(0x29), quint8(0)); // the key left of "1"
+        QTest::mouseClick(palette, Qt::LeftButton, {}, QPoint(20, palette->height() * 5 / 9 + 3));
+        QCOMPARE(d.m_finger, 5);
+        QTest::mouseClick(keyboard, Qt::LeftButton, {}, QPoint(30, 30));
+        QCOMPARE(d.zones().finger(0x29), quint8(5));
+        QVERIFY(!d.zones().isHome(0x29));
+        QTest::mouseClick(keyboard, Qt::RightButton, {}, QPoint(30, 30));
+        QVERIFY(d.zones().isHome(0x29));
+        // Enter: the left button only.
+        const QPoint enter(keyboard->width() - 40, 100);
+        QCOMPARE(d.zones().finger(0x1C), FingerZones::kNone);
+        QTest::mouseClick(keyboard, Qt::RightButton, {}, enter);
+        QCOMPARE(d.zones().finger(0x1C), FingerZones::kNone);
+        QTest::mouseClick(keyboard, Qt::LeftButton, {}, enter);
+        QCOMPARE(d.zones().finger(0x1C), quint8(5));
+        // Between the keys: nothing.
+        const FingerZones before = d.zones();
+        QTest::mouseClick(keyboard, Qt::LeftButton, {}, QPoint(3, 3));
+        QVERIFY(d.zones() == before);
     }
 
 private:

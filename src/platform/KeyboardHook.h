@@ -29,6 +29,9 @@ public:
     // The active window of the system: a value that changes with it, and the title of its top-level window.
     static quint64 foregroundWindow();
     static QString foregroundTitle();
+    // Name of the key with this scan code in the current keyboard layout, as the text shows it
+    // (the original's 0x448fe8); `dead` tells a dead key. Without layout access: the US layout.
+    static QString layoutKeyName(quint8 scan, bool *dead = nullptr);
 
     // Used by the platform callbacks.
     void deliver(const HookEvent &e) { emit key(e); }

@@ -38,7 +38,7 @@ public:
     bool openFile(const QString &path);
     // Installs the keyboard hook: from now on what is typed elsewhere is recorded.
     void startCapture();
-    // Opens a form by name (`--show NAME`, for screenshots): settings, extra, hist, hist-fingers, hist-extra.
+    // Opens a form by name (`--show NAME`, for screenshots): settings, extra, hist, hist-fingers, hist-extra, kbd.
     void showForm(const QString &name);
 
 protected:
@@ -65,6 +65,10 @@ private:
     void showExtraStats();
     void updateHistograms();
     void showHistograms();
+    void zonesChanged();
+    void editFingerZones();
+    void createFingerZones();
+    void deleteFingerZones();
     void scrollKlavogramToElement(int element);
     void klavogramMoved();
     void graphMoved();
@@ -133,6 +137,7 @@ private:
     QToolButton *m_saveButton = nullptr;
     QToolButton *m_deleteButton = nullptr;
     QToolButton *m_blockButton = nullptr;
+    QToolButton *m_newZonesButton = nullptr;
 
     KeyboardHook m_hook;
     Recorder m_recorder;

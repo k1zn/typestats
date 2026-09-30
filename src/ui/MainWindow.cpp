@@ -10,6 +10,7 @@
 #include "TextView.h"
 #include "Texts.h"
 #include "FilePropertiesDialog.h"
+#include "FingerZonesDialog.h"
 #include "core/Editing.h"
 #include "core/Journal.h"
 #include "core/KeyList.h"
@@ -313,14 +314,15 @@ QWidget *MainWindow::createToolBar()
     m_fingers->setToolTip(tr("Начальная позиция пальцев и расстановка по зонам"));
     m_fingers->setGeometry(592, 28, 152, 21);
     m_fingers->addItems(m_schemes.names());
-    connect(m_fingers, &QComboBox::currentTextChanged, this, [this](const QString &name) {
-        m_klav->setZones(m_schemes.zones(name));
-        updateExtraStats();
-        updateHistograms();
-    });
+    connect(m_fingers, &QComboBox::currentTextChanged, this, &MainWindow::zonesChanged);
     toolButton(bar, 8, 744, 3, 23, tr("Создать пресет (Правой кнопкой - удалить)"));
-    toolButton(bar, 9, 744, 27, 23, tr("Создать расстановку (Правой кнопкой - удалить)"));
-    toolButton(bar, 2, 768, 27, 23, tr("Редактировать расстановку"));
+    m_newZonesButton = toolButton(bar, 9, 744, 27, 23, tr("Создать расстановку (Правой кнопкой - удалить)"));
+    m_newZonesButton->setEnabled(true);
+    m_newZonesButton->installEventFilter(this);
+    connect(m_newZonesButton, &QToolButton::clicked, this, &MainWindow::createFingerZones);
+    QToolButton *editZones = toolButton(bar, 2, 768, 27, 23, tr("Редактировать расстановку"));
+    editZones->setEnabled(true);
+    connect(editZones, &QToolButton::clicked, this, &MainWindow::editFingerZones);
 
     connect(m_onlyText, &QCheckBox::toggled, this, &MainWindow::recalculate);
     connect(m_byPauses, &QCheckBox::toggled, this, &MainWindow::recalculate);
@@ -438,6 +440,8 @@ void MainWindow::showForm(const QString &name)
         showSettings();
     else if (name == QLatin1String("extra"))
         showExtraStats();
+    else if (name == QLatin1String("kbd"))
+        editFingerZones();
     else if (name.startsWith(QLatin1String("hist"))) {
         showHistograms();
         if (name == QLatin1String("hist-fingers"))
@@ -712,7 +716,61 @@ bool MainWindow::eventFilter(QObject *o, QEvent *e)
             m_graphScroll->setValue(m_graphScroll->value() + (delta > 0 ? -1 : 1) * m_graphScroll->singleStep());
         return true;
     }
+    // The right button on "create a layout" deletes the current one.
+    if (o == m_newZonesButton && e->type() == QEvent::MouseButtonPress
+        && static_cast<QMouseEvent *>(e)->button() == Qt::RightButton) {
+        deleteFingerZones();
+        return true;
+    }
     return QWidget::eventFilter(o, e);
+}
+
+void MainWindow::zonesChanged()
+{
+    m_klav->setZones(m_schemes.zones(m_fingers->currentText()));
+    updateExtraStats();
+    updateHistograms();
+}
+
+void MainWindow::editFingerZones()
+{
+    // SpeedButton2Click: the editor works on the current layout, which is stored afterwards.
+    const QString name = m_fingers->currentText();
+    FingerZonesDialog dialog(name, m_schemes.zones(name), this);
+    dialog.exec();
+    if (dialog.zones().readOnly())
+        return;
+    m_schemes.store(name, dialog.zones());
+    zonesChanged();
+}
+
+void MainWindow::createFingerZones()
+{
+    // SpeedButton9Click: the current layout under a new name.
+    bool ok = false;
+    const QString name = QInputDialog::getText(this, tr("Создание расстановки пальцев"), tr("Название расстановки"),
+                                               QLineEdit::Normal, QString(), &ok);
+    if (!ok || name.isEmpty() || m_fingers->findText(name) >= 0)
+        return;
+    FingerZones zones = m_schemes.zones(m_fingers->currentText());
+    zones.setReadOnly(false);
+    m_schemes.store(name, zones);
+    m_fingers->addItem(name);
+    m_fingers->setCurrentText(name);
+}
+
+void MainWindow::deleteFingerZones()
+{
+    if (m_fingers->currentIndex() <= 0) {
+        QMessageBox::warning(this, tr("Ошибка удаления расстановки"), tr("Стандартную расстановку удалить нельзя"));
+        return;
+    }
+    if (QMessageBox::question(this, tr("Удаление расстановки пальцев"), tr("Вы действительно хотите удалить расстановку?"))
+        != QMessageBox::Yes)
+        return;
+    m_schemes.remove(m_fingers->currentText());
+    m_fingers->removeItem(m_fingers->currentIndex());
+    m_fingers->setCurrentIndex(0);
 }
 
 void MainWindow::createGraphPanels()

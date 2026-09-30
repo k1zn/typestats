@@ -173,5 +173,12 @@
   "Правый средний": "Right middle finger",
   "Правый безымянный": "Right ring finger",
   "Правый мизинец": "Right little finger",
-  "Остальные клавиши": "The other keys"
+  "Остальные клавиши": "The other keys",
+  "Клавиатура": "Keyboard",
+  "Создание расстановки пальцев": "New finger layout",
+  "Название расстановки": "Name of the layout",
+  "Ошибка удаления расстановки": "Cannot delete the layout",
+  "Стандартную расстановку удалить нельзя": "The standard layout cannot be deleted",
+  "Удаление расстановки пальцев": "Deleting a finger layout",
+  "Вы действительно хотите удалить расстановку?": "Do you really want to delete the layout?"
 }
