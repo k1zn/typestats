@@ -106,19 +106,36 @@ src/ui/
                       `klavogramMoved` / `graphMoved` / `syncGraphScrollBar`, меню оси `showAxisMenu`.
                       Ключи QSettings = ключи пресета оригинала (Vgr*, Vhs*, SpeedYmin…, Legend*, TextWinHeight,
                       KlavWinHeight, RightPanelWidth, DlitCol*Width, FingerZonesName, op*, GlobalOnOff, GlobalClear,
-                      AutoComments, JournalOn)
+                      AutoComments, JournalOn, StatWin*, TextWin*, UserName…). `applySettings()` — FUN_00429bbc (шрифты,
+                      DlitDigits → `m_keyDigits`, трей, пересчёт). Окна Form3/Form4 получают источник в `updateStats()`
+                      (`updateExtraStats`/`updateHistograms`, только видимые). Пресеты (`selectPreset`/`createPreset`/
+                      `deletePreset`, правый клик по SpeedButton8), расстановки (SpeedButton9 создать/правый — удалить,
+                      SpeedButton2 — Tkbd), трей (`m_tray`, меню, сворачивание в трей), `captureToggled` (отпускания
+                      зажатых клавиш, `Ts: ON/OFF`), экспорт (`keyTable`/`extraTable`/`exportTable`), свёрнутый график
+                      (`graphPaneResized`, `m_graphFolded`). `showForm(name)` — для `--show NAME` (снимки форм):
+                      settings, extra, hist, hist-fingers, hist-extra, kbd, about, input
   GraphWidget.*       PaintBox1 по `re/graph_paint.md`: ось Y (три подписи на линию), 8 серий, строка текста, линейка
                       (двойной правый клик), курсор (двойной клик), мышь (ЛКМ — сдвиг, ПКМ — масштаб, СКМ — быстрый сдвиг,
                       ЛКМ+ПКМ — масштаб клавограммы), `setKlavogramRange`/`pullKlavogramRange` (FUN_0043a918),
                       `scrollParams` (FUN_0043c170), масштабы осей `rescale` (FUN_00405b34). Сверено с эталоном на глаз;
-                      мышь руками не проверялась. «Свёрнутый» режим (высота < 100: ScrollBar1 управляет клавограммой)
-                      не сделан
+                      мышь руками не проверялась. Сетка — перо PS_DOT как в GDI (штрих 3/3)
   GraphPanels.*       FloatingPanel (заголовок-перетаскивание, красная кнопка), LegendPanel (Panel2), AxisPanel (Panel9)
   TextView.*          + клавиши Del/Ins/Ctrl+C, контекстное меню, `hovered(pos)` для подсказок
   FilePropertiesDialog.*  Form2 «Свойства файла» (автор, дата, описание) — перед сохранением
   LiveStatsWindow.*   Form10 «Оперативная статистика»: скорость (цвет — радуга FUN_0042a17c), % ошибок, строка состояния
-  Texts.*             переводимые подписи для ядра (StatsUnits, названия строк ListView2); сюда же — Histograms::Names и
-                      заголовки Form3, когда появятся эти формы
+  Texts.*             переводимые подписи для ядра (StatsUnits, названия строк ListView2, `histogramNames()`), список
+                      языков и `currentLanguage()`
+  SettingsDialog.*    Form8 «Настройки» (`re/settings.md`): читает/пишет QSettings; язык — после перезапуска
+  ExtraStatsWindow.*  Form3: виды, средние + нижний список вхождений, «Заблокировать», фильтр, шаблоны (ExStats.ini),
+                      сортировка по клику заголовка, копировать/сохранить; строка → клавограмма (`elementSelected`).
+                      После расчёта выбирает строку 0, как оригинал. `StringTableModel.h` — модель списков
+  HistogramWindow.*   Form4: `HistogramWidget` (столбики, ось, подписи, мышь — `re/histograms.md`) + стек страниц,
+                      drill по двойному клику, подсказка при зажатой кнопке. Столбики всегда влезают по высоте (отличие)
+  FingerZonesDialog.* Tkbd: клавиатура + палитра пальцев; подписи клавиш — `KeyboardHook::layoutKeyName`
+  Presets.*           пресеты = группы `Presets/<имя>` в QSettings, текущий — `Profile`; `importFromOriginal()` —
+                      однократный перенос реестра оригинала (флаг `RegistryImported`, вызывается из main)
+  TextInputWindow.*   Form9 «Ввод текста» (F4; Esc — скрыть, F2 — очистить); набор в нём записывается
+  AboutDialog.*       Form7 «О программе» (меню кнопки «Справка»)
   TextView.*          Memo4: QTextEdit, Arial 16 px, стили TextRun (красный/синий/зелёный/подчёркивание),
                       `setVisibleRange` — жёлтая подсветка участка, видимого на клавограмме
   KlavogramWidget.*   PaintBox3 по `re/klavogram.md`: 9 дорожек по пальцам, цвета по числу зажатых клавиш, шкала
@@ -126,7 +143,7 @@ src/ui/
                       прокрутка, колесо, двойной клик — режим курсора, ЛКМ+ПКМ — измерение с плашкой),
                       `visibleSpanUs()` для списка клавиш, `visibleRecords()`. Сверено с эталоном на глаз (снимки);
                       режим курсора и измерение руками не проверялись. `setScrollMs`/`setZoom` — для графика
-src/export/         пусто
+src/export/TableExport.*  таблица → .xlsx (QXlsx, с диаграммой) или .csv (UTF-8 BOM, «;» при десятичной запятой)
 i18n/               `typestats_en.ts` (исходные строки русские), `en.json` (словарь), `update.py`: lupdate + заполнение .ts
                     из словаря, печатает непереведённое. После новых `tr()`: `source env.sh && python i18n/update.py`
 resources/icons/    оригинальные иконки кнопок (<Form>_<SpeedButtonN>.png) + app.ico/png; resources.qrc
@@ -139,8 +156,9 @@ tests/tst_journal.cpp  Journal: формат записи, битый хвост
 tests/tst_editing.cpp  Editing на синтетике
 tests/tst_ui.cpp    главное окно без экрана (ctest ставит QT_QPA_PLATFORM=offscreen; настройки — во временный INI):
                     открытие и отрисовка, удалить/отменить/копировать, метки, связка графика с клавограммой и мышь на
-                    графике, запись через `keyEvent`. Тест — друг MainWindow (`friend class TstUi`). Окна собраны в
-                    библиотеку `tsui` (src/ui + src/platform), ресурсы — в самих exe
+                    графике, запись через `keyEvent`, настройки, Form3, Form4, Tkbd, пресеты, выключение перехвата,
+                    экспорт, свёрнутый график. Тест — друг окон (`friend class TstUi`). Окна собраны в
+                    библиотеку `tsui` (src/ui + src/platform + src/export), ресурсы — в самих exe
 tests/tst_recorder.cpp Recorder: записи и dt, игнорируемые события, хоткеи, автокомментарии, мёртвые клавиши, оперативная
                     статистика
 tests/tst_orig.cpp  ядро против записанного вывода оригинала (tests/golden/orig/*.json): ListView2, текст, стили,
@@ -212,6 +230,7 @@ python re/scripts/diffstand.py файл --journal                               
     алгоритм отрисовки, мышь, ScrollBar1 и синхронизация с клавограммой, легенда, «Настройка оси Y»;
   - `editing.md` — **правка и копирование**: диапазон записей выделения, удаление, нетекстовые клавиши, отмена, метки,
     копирование с тегами, свойства файла при сохранении;
+  - `settings.md` — **Form8, пресеты и реестр, трей, Form9, Form7, экспорт в Excel**;
   - `recording.md` — **запись**: хук 0x404598, OnKeyEvent 0x40a7a4 по шагам, таймер, оперативная статистика (Form10);
   - `journal.md` — **журнал `.tsj`**: формат записи, имя файла, чтение/запись, отличия порта, стенд;
   - `metrics.md` — **формулы основной статистики** (0x4255a8, 0x438304), форматы строк, разметка стёртых;
@@ -339,21 +358,22 @@ python re/scripts/diffstand.py файл --journal                               
    **Не проверено руками** (нужен живой ввод/мышь, стенд этого не покрывает): запись в чужих окнах (флаги хука,
    мёртвые клавиши, хоткеи), мышь на графике, перетаскивание панелей. Попросить пользователя попробовать.
    Правка, копирование, «Сохранить блок», «Свойства файла» — сделаны (`re/editing.md`).
-   **СЛЕДУЮЩЕЕ**, по порядку:
-   - Form8 «Настройки» (начато: только разведка, кода нет). Геометрия — `re/forms_geometry.txt` (TFORM8, 589×317,
-     модальная, Ok/Отмена). Контролы → ключи пресета (порядок и умолчания — `FUN_0041ab08`): CheckBox1 `GlobalClear` (1),
-     CheckBox2 `GlobalOnOff` (1), UpDown1 `TextFontSize` (8..24, 12), UpDown2 `KlavogrFontSize` (8..24, 9), UpDown3
-     `DlitDigits` (0..3, 3 — знаков в ListView1), Edit1/Edit2 `opLoSpeed`/`opHiSpeed`, CheckListBox1 `MainOption0..16`,
-     CheckBox3..5 `CopyBlock1..3`, CheckBox7 `JournalOn` (0), CheckBox8 `AutoComments` (0), CheckBox9 `MinimizeToTray`,
-     CheckBox10 `AutoMinimize`, ComboBox1 — язык (`Language`; у оригинала список `*.lng`, в порту Russian/English).
-     CheckBox6 «Запускать Ts на одном ядре» выкинут. Применение — `FUN_00429bbc`: шрифты текста и клавограммы,
-     строки и высота ListView2, Recalculate, точность ListView1. Порт уже ЧИТАЕТ эти ключи из QSettings (кроме
-     шрифтов, DlitDigits и трея) — нужна сама форма, применение и смена языка на лету (или после перезапуска);
-   - остальные формы: Form3, Form4 (движок панелей 0x43c6bc тот же, что у графика: группа `DAT_005b1688`, ось
-     `DAT_005b16b0`, подписи `DAT_005b16b4`), Tkbd, Form8 (настройки: GlobalOnOff, GlobalClear, AutoComments,
-     JournalOn, MainOption*, Language, шрифты — сейчас читаются из QSettings без UI), Form2, Form9, Form7;
-     пресеты (ComboBox1); трей; импорт настроек из реестра; экспорт xlsx/csv; видео;
-   - «свёрнутый» режим графика (Panel1 ниже 100 px); языки: новые строки — через `i18n/update.py`.
+   Сделано также: Form8 «Настройки», Form3, Form4, Tkbd, Form9, Form7 и меню справки, пресеты, трей, импорт реестра
+   оригинала (при первом запуске порта на Windows), экспорт xlsx/csv, свёрнутый график (все — `re/settings.md`,
+   `re/extra_stats.md`, `re/histograms.md`, `re/finger_zones.md`, `re/graph_paint.md`). Эталоны вида вспомогательных
+   форм — `re/ui_reference/form3*.png`, `form4_*.png` (`python re/scripts/screenshot_forms.py <tsf> re/ui_reference`,
+   PrintWindow, фокус не отбирает). Снимок формы порта: `screenshot_port.py <tsf> out.png --window <часть заголовка>
+   --show <имя>`.
+   Сознательные отличия: смена языка — после перезапуска (у оригинала так для возврата к встроенному); столбики Form4
+   не обрезаются по высоте; кнопка «Дополнительная статистика» в Form4 открывает и Form3; кнопка на панели задач
+   прячется только у свёрнутого в трей окна; экспорт пишет файл (xlsx/csv) и открывает его, а не управляет Excel по OLE;
+   подписи Tkbd вне Windows — по US-раскладке.
+   **СЛЕДУЮЩЕЕ**:
+   - «Преобразовать в текущую раскладку» (SpeedButton25, `ConvCurLayout` 0x429e80) — кнопка пока выключена;
+   - видео (Form5 «Видео», Form6 «Свойства видео», кнопки 20/21; `g_attachedVideo`, `g_videoTimeShift`) —
+     последним, через QtMultimedia;
+   - не проверено руками (пользователь пока не пробовал): запись в чужих окнах, мышь графика и клавограммы, панели,
+     трей, Form9 (набор в нём должен записываться).
 
 ## Технический долг: артефакты оригинала в ядре
 
