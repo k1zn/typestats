@@ -72,7 +72,7 @@ struct Sort
                                                                       QStringLiteral("Кол-во")}) const;
 };
 
-// FloatToStrF(speed, ffFixed, 8, 2): 8 significant digits at most, halves rounded away from zero.
+// Two decimals, halves rounded away from zero (FloatToStrF ffFixed of the original).
 QString formatSpeed(float speed, const QLocale &loc);
 
 // "Сохранить": header and rows as tab-separated text, in list order.

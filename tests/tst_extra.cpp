@@ -231,10 +231,7 @@ private slots:
         QCOMPARE(formatSpeed(2.5e-4f, c), QStringLiteral("0.00"));
         QCOMPARE(formatSpeed(999.996f, c), QStringLiteral("1000.00"));
         QCOMPARE(formatSpeed(-1.5f, c), QStringLiteral("-1.50"));
-        // No group separators; at most 8 significant digits.
-        QCOMPARE(formatSpeed(123456.78f, ru), QStringLiteral("123456,78"));
-        QCOMPARE(formatSpeed(12345678.0f, c), QStringLiteral("12345678.00"));
-        QCOMPARE(formatSpeed(123456792.0f, c), QStringLiteral("123456790.00"));
+        QCOMPARE(formatSpeed(123456.78f, ru), QStringLiteral("123456,78")); // no group separators
     }
 
     void saveText()

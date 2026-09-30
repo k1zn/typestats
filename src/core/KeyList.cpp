@@ -1,6 +1,7 @@
 #include "KeyList.h"
 
 #include "KeyName.h"
+#include "NumberFormat.h"
 
 namespace KeyList {
 
@@ -15,10 +16,8 @@ float scrollForPosition(const TextModel &m, int selStart)
 }
 
 QVector<KeyListRow> rows(const QVector<KlavRecord> &klav, float scrollMs, int widthPx, float zoom, int maxRows,
-                         const QLocale &locale)
+                         const QLocale &loc)
 {
-    QLocale loc = locale;
-    loc.setNumberOptions(QLocale::OmitGroupSeparator);
     const float start = scrollMs * 1000.0f - 10.0f;
     const float end = float(double(float(widthPx * 1000)) / double(zoom) + double(start));
 
@@ -37,7 +36,7 @@ QVector<KeyListRow> rows(const QVector<KlavRecord> &klav, float scrollMs, int wi
         const quint8 scan = r.flags & KeyRecord::ScanMask; // indexed by scan code, not VK
         if (!r.down) {
             if (pressRow[scan] >= 0) {
-                out[pressRow[scan]].duration = loc.toString(double(0.001L * (r.t - pressT[scan])), 'f', 3);
+                out[pressRow[scan]].duration = formatFixed(double(0.001L * (r.t - pressT[scan])), 3, loc);
                 pressRow[scan] = -1;
             }
             continue;
@@ -47,7 +46,7 @@ QVector<KeyListRow> rows(const QVector<KlavRecord> &klav, float scrollMs, int wi
         KeyListRow row;
         const float pause = float(0.001L * (r.t - prev));
         if (pause <= 59000.0f)
-            row.pause = loc.toString(double(pause), 'f', 3);
+            row.pause = formatFixed(double(pause), 3, loc);
         row.key = keyDisplayName(r.flags, r.ch);
         if (row.key == QLatin1String("\r"))
             row.key = QStringLiteral("[Enter]");

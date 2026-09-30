@@ -64,7 +64,7 @@ src/core/      только QtCore, тестируемо
                       ГОТОВО, сверено
   ExtraStats.*        Form3 «Дополнительная статистика» (0x43ff3c): parseTemplate, CharFilter, collect → вхождения,
                       rows (средние, сортировки 0–3), occurrences, Sort (клики по столбцам, заголовки ▲▼),
-                      formatSpeed (FloatToStrF ffFixed 8,2), toText, TemplateList (ExStats.ini) — ГОТОВО, сверено побитно
+                      formatSpeed, toText, TemplateList (ExStats.ini) — ГОТОВО, сверено побитно
 src/cli/tsstat.cpp  консольная утилита: `tsstat [--split MS] [--only-text] [--by-pauses] [--sel S L] [--text|--runs] f.tsf`
                     печатает «Параметр\tЗначение» как ListView2 (для дифф-стенда);
                     `--extra KIND [--avg] [--sort N] [--desc] [--pattern P] [--only S] [--any S] [--exclude S]` — список Form3

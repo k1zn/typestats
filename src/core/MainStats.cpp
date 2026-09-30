@@ -1,5 +1,7 @@
 #include "MainStats.h"
 
+#include "NumberFormat.h"
+
 #include <cmath>
 
 namespace {
@@ -207,7 +209,7 @@ MainStats compute(const TextModel &m, int b, int e, int splitMs, bool byPauses)
 QString formatTime(int ms, int digits, const QLocale &loc, const StatsUnits &u)
 {
     const int minutes = ms / 60000;
-    QString s = loc.toString((ms % 60000) * 0.001, 'f', digits) + u.s;
+    QString s = formatFixed((ms % 60000) * 0.001, digits, loc) + u.s;
     if (minutes != 0) {
         s = QString::number(minutes % 60) + u.m + QLatin1Char(' ') + s;
         if (minutes / 60 != 0)
@@ -216,11 +218,9 @@ QString formatTime(int ms, int digits, const QLocale &loc, const StatsUnits &u)
     return s;
 }
 
-QStringList format(const MainStats &s, const QLocale &locale, const StatsUnits &u)
+QStringList format(const MainStats &s, const QLocale &loc, const StatsUnits &u)
 {
-    QLocale loc = locale;
-    loc.setNumberOptions(QLocale::OmitGroupSeparator);
-    auto f = [&](double v, int d) { return loc.toString(v, 'f', d); };
+    auto f = [&](double v, int d) { return formatFixed(v, d, loc); };
     auto pair = [&](double a, double b) { return f(a, 2) + QLatin1String(" (") + f(b, 2) + QLatin1Char(')'); };
     auto cnt = [&](int n, float pct) {
         return QString::number(n) + QLatin1String(" (") + f(pct, 2) + QLatin1String("%)");

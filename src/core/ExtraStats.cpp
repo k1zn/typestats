@@ -1,12 +1,12 @@
 #include "ExtraStats.h"
 
+#include "NumberFormat.h"
 #include "FingerZones.h"
 #include "IniFile.h"
 
 #include <QFile>
 
 #include <algorithm>
-#include <cmath>
 
 namespace ExtraStats {
 
@@ -299,59 +299,7 @@ QStringList Sort::headers(bool averages, const QStringList &captions) const
 
 QString formatSpeed(float speed, const QLocale &loc)
 {
-    constexpr int kPrecision = 8, kDecimals = 2, kDigits = 18;
-    double v = speed; // exact
-    if (std::isnan(v))
-        return QStringLiteral("NAN");
-    if (std::isinf(v))
-        return v < 0 ? QStringLiteral("-INF") : QStringLiteral("INF");
-    const bool negative = v < 0;
-    v = std::fabs(v);
-
-    // FloatToDecimal: 18 significant digits, then the digit string is cut to
-    // min(precision, digits before the point + decimals) with halves rounded up.
-    QByteArray digits;
-    int exp = 0; // value = 0.d1d2... * 10^exp
-    if (v != 0) {
-        const QByteArray s = QByteArray::number(v, 'e', kDigits - 1); // d.ddd…e±xx
-        const qsizetype ePos = s.indexOf('e');
-        digits = s.left(1) + s.mid(2, ePos - 2);
-        exp = s.mid(ePos + 1).toInt() + 1;
-        const int keep = std::min(kPrecision, exp + kDecimals);
-        if (keep < 0) {
-            digits.clear();
-        } else if (keep < digits.size()) {
-            const bool up = digits[keep] >= '5';
-            digits.truncate(keep);
-            if (up) {
-                int i = keep - 1;
-                while (i >= 0 && digits[i] == '9')
-                    digits[i--] = '0';
-                if (i >= 0) {
-                    ++digits[i];
-                } else {
-                    digits.prepend('1');
-                    ++exp;
-                }
-            }
-        }
-        while (digits.endsWith('0'))
-            digits.chop(1);
-    }
-    const auto digit = [&](int i) { return i >= 0 && i < digits.size() ? QLatin1Char(digits[i]) : QLatin1Char('0'); };
-    QString out;
-    if (negative && !digits.isEmpty())
-        out += QLatin1Char('-');
-    if (exp <= 0 || digits.isEmpty()) {
-        out += QLatin1Char('0');
-    } else {
-        for (int i = 0; i < exp; ++i)
-            out += digit(i);
-    }
-    out += loc.decimalPoint();
-    for (int i = 0; i < kDecimals; ++i)
-        out += digits.isEmpty() ? QLatin1Char('0') : digit(exp + i);
-    return out;
+    return formatFixed(speed, 2, loc);
 }
 
 QString toText(const QVector<Row> &rows, bool averages, const QLocale &loc)

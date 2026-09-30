@@ -5,7 +5,6 @@
 
 #include <algorithm>
 #include <bitset>
-#include <list>
 
 namespace {
 
@@ -20,12 +19,12 @@ class Klavogram
 public:
     explicit Klavogram(QVector<KlavRecord> &out) : m_out(out) {}
 
-    bool hasPressedKeys() const { return !m_pressed.empty(); }
+    bool hasPressedKeys() const { return !m_pressed.isEmpty(); }
 
     void addPress(const KeyRecord &r, qint64 t, quint32 extraFlags = 0)
     {
         m_out.append({t, t - m_baseSeg, t - m_baseDraw, r.flags | extraFlags, r.ch, true});
-        m_pressed.push_back(r.flags & KeyRecord::VkMask);
+        m_pressed.append(r.flags & KeyRecord::VkMask);
     }
 
     void addSegmentStart(const KeyRecord &r, qint64 t)
@@ -43,9 +42,7 @@ public:
     bool addRelease(const KeyRecord &r, qint64 t)
     {
         const quint32 vk = r.flags & KeyRecord::VkMask;
-        const auto before = m_pressed.size();
-        m_pressed.remove(vk);
-        if (m_pressed.size() == before)
+        if (m_pressed.removeAll(vk) == 0)
             return false;
         m_out.append({t, t - m_baseSeg, t - m_baseDraw, r.flags, r.ch, false});
         return true;
@@ -53,7 +50,7 @@ public:
 
 private:
     QVector<KlavRecord> &m_out;
-    std::list<quint32> m_pressed;
+    QVector<quint32> m_pressed;
     qint64 m_baseSeg = 0;
     qint64 m_baseDraw = 0;
 };
