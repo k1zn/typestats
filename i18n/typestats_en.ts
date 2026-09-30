@@ -202,6 +202,156 @@
     </message>
 </context>
 <context>
+    <name>HistogramWindow</name>
+    <message>
+        <source>Статистические гистограммы</source>
+        <translation>Statistical histograms</translation>
+    </message>
+    <message>
+        <source>Назад</source>
+        <translation>Back</translation>
+    </message>
+    <message>
+        <source>Клавиши</source>
+        <translation>Keys</translation>
+    </message>
+    <message>
+        <source>Пальцы</source>
+        <translation>Fingers</translation>
+    </message>
+    <message>
+        <source>Дополнительная статистика</source>
+        <translation>Additional statistics</translation>
+    </message>
+    <message>
+        <source>Поверх всех окон</source>
+        <translation>Always on top</translation>
+    </message>
+</context>
+<context>
+    <name>Histograms</name>
+    <message>
+        <source>Все клавиши</source>
+        <translation>All keys</translation>
+    </message>
+    <message>
+        <source>Клавиша</source>
+        <translation>Key</translation>
+    </message>
+    <message>
+        <source>Длительности сочетаний</source>
+        <translation>Durations of combinations</translation>
+    </message>
+    <message>
+        <source>Все пальцы</source>
+        <translation>All fingers</translation>
+    </message>
+    <message>
+        <source>Палец</source>
+        <translation>Finger</translation>
+    </message>
+    <message>
+        <source>Рука</source>
+        <translation>Hand</translation>
+    </message>
+    <message>
+        <source>Прочее</source>
+        <translation>Other</translation>
+    </message>
+    <message>
+        <source>Двойное нажатие на клавишу</source>
+        <translation>The same key twice</translation>
+    </message>
+    <message>
+        <source>Разные клавиши</source>
+        <translation>Different keys</translation>
+    </message>
+    <message>
+        <source>Та же рука (другой палец)</source>
+        <translation>The same hand (another finger)</translation>
+    </message>
+    <message>
+        <source>Другая рука</source>
+        <translation>The other hand</translation>
+    </message>
+    <message>
+        <source>ЛМ</source>
+        <translation>LP</translation>
+    </message>
+    <message>
+        <source>ЛБ</source>
+        <translation>LR</translation>
+    </message>
+    <message>
+        <source>ЛС</source>
+        <translation>LM</translation>
+    </message>
+    <message>
+        <source>ЛУ</source>
+        <translation>LI</translation>
+    </message>
+    <message>
+        <source>ПУ</source>
+        <translation>RI</translation>
+    </message>
+    <message>
+        <source>ПС</source>
+        <translation>RM</translation>
+    </message>
+    <message>
+        <source>ПБ</source>
+        <translation>RR</translation>
+    </message>
+    <message>
+        <source>ПМ</source>
+        <translation>RP</translation>
+    </message>
+    <message>
+        <source>Прочие</source>
+        <translation>Others</translation>
+    </message>
+    <message>
+        <source>Левый мизинец</source>
+        <translation>Left little finger</translation>
+    </message>
+    <message>
+        <source>Левый безымянный</source>
+        <translation>Left ring finger</translation>
+    </message>
+    <message>
+        <source>Левый средний</source>
+        <translation>Left middle finger</translation>
+    </message>
+    <message>
+        <source>Левый указательный</source>
+        <translation>Left index finger</translation>
+    </message>
+    <message>
+        <source>Правый указательный</source>
+        <translation>Right index finger</translation>
+    </message>
+    <message>
+        <source>Правый средний</source>
+        <translation>Right middle finger</translation>
+    </message>
+    <message>
+        <source>Правый безымянный</source>
+        <translation>Right ring finger</translation>
+    </message>
+    <message>
+        <source>Правый мизинец</source>
+        <translation>Right little finger</translation>
+    </message>
+    <message>
+        <source>Остальные клавиши</source>
+        <translation>The other keys</translation>
+    </message>
+    <message>
+        <source>Дополнительная статистика</source>
+        <translation>Additional statistics</translation>
+    </message>
+</context>
+<context>
     <name>KlavogramWidget</name>
     <message>
         <source>зн/мин</source>

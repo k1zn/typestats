@@ -2,6 +2,7 @@
 
 #include "GraphPanels.h"
 #include "GraphWidget.h"
+#include "HistogramWindow.h"
 #include "KlavogramWidget.h"
 #include "ExtraStatsWindow.h"
 #include "LiveStatsWindow.h"
@@ -198,6 +199,12 @@ MainWindow::MainWindow(QWidget *parent)
     m_extra = new ExtraStatsWindow(this);
     connect(m_extra, &ExtraStatsWindow::shown, this, &MainWindow::updateExtraStats);
     connect(m_extra, &ExtraStatsWindow::elementSelected, this, &MainWindow::scrollKlavogramToElement);
+    m_hist = new HistogramWindow(this);
+    connect(m_hist, &HistogramWindow::shown, this, &MainWindow::updateHistograms);
+    connect(m_hist, &HistogramWindow::elementSelected, this, &MainWindow::scrollKlavogramToElement);
+    connect(m_hist, &HistogramWindow::extraRowSelected, m_extra, &ExtraStatsWindow::selectRow);
+    connect(m_hist, &HistogramWindow::extraRequested, this, &MainWindow::showExtraStats);
+    connect(m_extra, &ExtraStatsWindow::rowsChanged, this, [this] { m_hist->setExtraRows(m_extra->rows()); });
     connect(&m_hook, &KeyboardHook::key, this, &MainWindow::keyEvent);
     auto *timer = new QTimer(this);
     connect(timer, &QTimer::timeout, this, &MainWindow::tick);
@@ -245,7 +252,7 @@ QWidget *MainWindow::createToolBar()
     action(26, 102, 4, 23, tr("Открыть журнал"), &MainWindow::openJournal);
     action(7, 126, 4, 23, tr("Экспортировать в Excel"), nullptr);
     action(12, 150, 4, 23, tr("Дополнительная статистика"), &MainWindow::showExtraStats);
-    action(19, 174, 4, 23, tr("Статистические гистограммы"), nullptr);
+    action(19, 174, 4, 23, tr("Статистические гистограммы"), &MainWindow::showHistograms);
     action(20, 198, 4, 23, tr("Видео"), nullptr);
     action(22, 222, 4, 23, tr("Настройки..."), &MainWindow::showSettings);
     action(4, 246, 4, 23, tr("Оперативная статистика"), &MainWindow::showLiveStats);
@@ -309,6 +316,7 @@ QWidget *MainWindow::createToolBar()
     connect(m_fingers, &QComboBox::currentTextChanged, this, [this](const QString &name) {
         m_klav->setZones(m_schemes.zones(name));
         updateExtraStats();
+        updateHistograms();
     });
     toolButton(bar, 8, 744, 3, 23, tr("Создать пресет (Правой кнопкой - удалить)"));
     toolButton(bar, 9, 744, 27, 23, tr("Создать расстановку (Правой кнопкой - удалить)"));
@@ -430,6 +438,15 @@ void MainWindow::showForm(const QString &name)
         showSettings();
     else if (name == QLatin1String("extra"))
         showExtraStats();
+    else if (name.startsWith(QLatin1String("hist"))) {
+        showHistograms();
+        if (name == QLatin1String("hist-fingers"))
+            m_hist->setRoot(Histograms::Node::AllFingers);
+        if (name == QLatin1String("hist-extra")) {
+            showExtraStats();
+            m_hist->setRoot(Histograms::Node::Extra);
+        }
+    }
 }
 
 void MainWindow::closeEvent(QCloseEvent *e)
@@ -842,6 +859,29 @@ void MainWindow::updateStats()
         updateKeyList();
     }
     updateExtraStats();
+    updateHistograms();
+}
+
+void MainWindow::updateHistograms()
+{
+    if (!m_hist || !m_hist->isVisible())
+        return;
+    const auto [b, e] = Stats::range(m_model, m_text->selectionStart(), m_text->selectionLength(), m_byPauses->isChecked());
+    Histograms::Source source;
+    source.model = &m_model;
+    std::tie(source.recBegin, source.recEnd) = Histograms::recordRange(m_model, b, e);
+    source.splitUs = quint32(m_pause->value()) * 1000;
+    source.zones = m_schemes.zones(m_fingers->currentText());
+    source.label = Histograms::labelsFromRecords(m_model.records);
+    source.names = Texts::histogramNames();
+    m_hist->setSource(source);
+}
+
+void MainWindow::showHistograms()
+{
+    m_hist->show();
+    m_hist->raise();
+    m_hist->activateWindow();
 }
 
 void MainWindow::updateExtraStats()

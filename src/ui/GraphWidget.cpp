@@ -425,7 +425,8 @@ void GraphWidget::drawGrid(QPainter &p, const QRect &g, int stripFont)
     const int w = g.width(), h = g.height();
     const QFontMetrics fm(font());
     const int cy = fm.height() / 2;
-    const QPen dotted(kGrid, 1, Qt::DotLine);
+    QPen dotted(kGrid, 1);
+    dotted.setDashPattern({3, 3}); // PS_DOT of GDI
     const QLocale loc;
 
     // Vertical lines at the spaces of the text.

@@ -31,6 +31,24 @@ QStringList statsRowNames()
             tr("Серий исправлений"), tr("max без исправлений")};
 }
 
+Histograms::Names histogramNames()
+{
+    Histograms::Names n;
+    n.allKeys = tr("Все клавиши");
+    n.key = tr("Клавиша");
+    n.pairs = tr("Длительности сочетаний");
+    n.allFingers = tr("Все пальцы");
+    n.relations = {tr("Клавиша"), tr("Палец"), tr("Рука"), tr("Прочее")};
+    n.relationTitles = {tr("Двойное нажатие на клавишу"), tr("Разные клавиши"), tr("Та же рука (другой палец)"),
+                        tr("Другая рука")};
+    n.fingersShort = {tr("ЛМ"), tr("ЛБ"), tr("ЛС"), tr("ЛУ"), tr("ПУ"), tr("ПС"), tr("ПБ"), tr("ПМ"), tr("Прочие")};
+    n.fingers = {tr("Левый мизинец"),       tr("Левый безымянный"), tr("Левый средний"),
+                 tr("Левый указательный"),  tr("Правый указательный"), tr("Правый средний"),
+                 tr("Правый безымянный"),   tr("Правый мизинец"),   tr("Остальные клавиши")};
+    n.extra = tr("Дополнительная статистика");
+    return n;
+}
+
 QStringList languages()
 {
     return {QStringLiteral("Russian"), QStringLiteral("English")};

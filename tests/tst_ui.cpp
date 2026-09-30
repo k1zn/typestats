@@ -5,6 +5,7 @@
 #include "ui/ExtraStatsWindow.h"
 #include "ui/GraphPanels.h"
 #include "ui/GraphWidget.h"
+#include "ui/HistogramWindow.h"
 #include "ui/KlavogramWidget.h"
 #include "ui/MainWindow.h"
 #include "ui/SettingsDialog.h"
@@ -280,6 +281,72 @@ private slots:
         x->m_list->selectAll();
         x->copy();
         QCOMPARE(QApplication::clipboard()->text().count(QLatin1Char(' ')), int(x->rows().size()) - 1);
+    }
+
+    void histograms()
+    {
+        MainWindow w;
+        w.resize(876, 579);
+        w.show();
+        QVERIFY(w.openFile(golden("обыка.tsf")));
+        HistogramWindow *h = w.m_hist;
+        w.showHistograms();
+        QVERIFY(h->isVisible());
+        QCOMPARE(h->m_title->text(), QStringLiteral("Все клавиши"));
+        const int keys = int(h->m_page.bars.size());
+        QVERIFY(keys > 20);
+        QVERIFY(!h->grab().isNull());
+
+        // All the bars fit: the last one ends inside the widget, the first starts at the axis.
+        HistogramWidget *c = h->m_chart;
+        QCOMPARE(c->barAt(c->m_axisWidth + 1), 0);
+        QCOMPARE(c->barAt(c->width() - 2), keys - 1);
+        QCOMPARE(c->barAt(3), -1);
+
+        // A double click opens the page of the key, another one its pairs; "back" returns.
+        h->drill(0);
+        QCOMPARE(h->m_stack.size(), 2);
+        QVERIFY(h->m_title->text().startsWith(QStringLiteral("Клавиша")));
+        h->drill(0);
+        QCOMPARE(h->m_stack.size(), 3);
+        QVERIFY(!h->m_page.bars.isEmpty());
+        QVERIFY(h->m_page.bars.first().rec >= 0);
+        h->drill(0); // a single press: the klavogram goes there
+        QCOMPARE(h->m_stack.size(), 3);
+        QCOMPARE(w.m_graph->klavogramFrom(), w.m_model.elementOfRecord(h->m_page.bars.first().rec));
+        h->back();
+        h->back();
+        h->back();
+        QCOMPARE(h->m_stack.size(), 1);
+
+        h->setRoot(Histograms::Node::AllFingers);
+        QCOMPARE(int(h->m_page.bars.size()), 9);
+        h->drill(3);
+        QCOMPARE(int(h->m_page.bars.size()), 4);
+
+        // A change of the selection returns to the root.
+        select(w, 0, 60);
+        QCOMPARE(h->m_stack.size(), 1);
+        QCOMPARE(int(h->m_page.bars.size()), 9);
+        select(w, 0, 0);
+
+        // The page of the extra statistics follows the list of that window.
+        h->setRoot(Histograms::Node::Extra);
+        QVERIFY(h->m_page.bars.isEmpty());
+        w.showExtraStats();
+        QCOMPARE(h->m_page.bars.size(), w.m_extra->rows().size());
+        QVERIFY(!h->m_page.bars.isEmpty());
+        QCOMPARE(h->m_page.bars.first().label, w.m_extra->rows().first().text);
+        h->drill(2);
+        QCOMPARE(w.m_graph->klavogramFrom(), w.m_extra->rows().at(2).value);
+
+        // The mouse: the left button drags, the right one zooms.
+        const float zoom = c->m_zoomX;
+        QTest::mousePress(c, Qt::RightButton, {}, QPoint(200, 100));
+        QTest::mouseMove(c, QPoint(250, 100));
+        QTest::mouseRelease(c, Qt::RightButton, {}, QPoint(250, 100));
+        QVERIFY(c->m_zoomX > zoom);
+        QVERIFY(!h->grab().isNull());
     }
 
 private:

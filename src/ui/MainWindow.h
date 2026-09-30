@@ -12,6 +12,7 @@
 class AxisPanel;
 class ExtraStatsWindow;
 class GraphWidget;
+class HistogramWindow;
 class KlavogramWidget;
 class LegendPanel;
 class LiveStatsWindow;
@@ -37,7 +38,7 @@ public:
     bool openFile(const QString &path);
     // Installs the keyboard hook: from now on what is typed elsewhere is recorded.
     void startCapture();
-    // Opens a form by name (`--show NAME`, for screenshots): settings, extra.
+    // Opens a form by name (`--show NAME`, for screenshots): settings, extra, hist, hist-fingers, hist-extra.
     void showForm(const QString &name);
 
 protected:
@@ -62,6 +63,8 @@ private:
     void updateKeyList();
     void updateExtraStats();
     void showExtraStats();
+    void updateHistograms();
+    void showHistograms();
     void scrollKlavogramToElement(int element);
     void klavogramMoved();
     void graphMoved();
@@ -136,6 +139,7 @@ private:
     JournalWriter m_journal;
     LiveStatsWindow *m_live = nullptr;
     ExtraStatsWindow *m_extra = nullptr;
+    HistogramWindow *m_hist = nullptr;
     bool m_needRecalc = false;   // keys were recorded since the text was built
     QElapsedTimer m_lastKey;
     bool m_livePending = false;  // the running statistics changed since they were shown
