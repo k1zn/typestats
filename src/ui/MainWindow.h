@@ -107,6 +107,10 @@ private:
     void updatePanelButtons();
     void showAxisMenu(const QPoint &globalPos);
     void setDocument(const TsfDocument &doc, const QString &title, bool damaged);
+    // "Ts: ON - Typing statistics v… - file": the capture state goes first, as the original's
+    // application title (Application->Title) shows it on the task bar.
+    void setTitle(const QString &document);
+    void updateTitle();
 
     // Recording.
     void keyEvent(const HookEvent &e);
@@ -141,6 +145,7 @@ private:
     Editing::ToUnicode m_toUnicode = &KeyboardHook::toUnicode; // the current layout (tests put their own)
     int m_labelRecord = -1; // the record whose label is under the mouse
     QString m_path; // empty: not saved yet
+    QString m_titleDocument; // what the title names after the program: the file or the journal
     int m_keyDigits = 3;    // decimals of the times in the key list (DlitDigits)
     TextModel m_model;
     FingerZoneSchemes m_schemes;

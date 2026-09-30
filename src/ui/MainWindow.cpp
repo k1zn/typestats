@@ -117,7 +117,7 @@ MainWindow::MainWindow(QWidget *parent)
     : QWidget(parent), m_schemes(QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("FingerZones.ini"))),
       m_journal(QCoreApplication::applicationDirPath())
 {
-    setWindowTitle(appTitle());
+    updateTitle();
     setMinimumWidth(220);
 
     auto *root = new QVBoxLayout(this);
@@ -536,9 +536,26 @@ void MainWindow::restoreFromTray()
     activateWindow();
 }
 
+void MainWindow::setTitle(const QString &document)
+{
+    m_titleDocument = document;
+    updateTitle();
+}
+
+void MainWindow::updateTitle()
+{
+    // Qt has no application window of its own: the task bar shows the title of this one.
+    QString title = (!m_capture || m_capture->isChecked() ? QStringLiteral("Ts: ON - ") : QStringLiteral("Ts: OFF - "))
+                    + appTitle();
+    if (!m_titleDocument.isEmpty())
+        title += QStringLiteral(" - ") + m_titleDocument;
+    setWindowTitle(title);
+}
+
 void MainWindow::captureToggled(bool on)
 {
     m_tray->setToolTip(on ? QStringLiteral("Ts: ON") : QStringLiteral("Ts: OFF"));
+    updateTitle();
     const QIcon icon = QApplication::windowIcon();
     m_tray->setIcon(on ? icon : QIcon(icon.pixmap(32, 32, QIcon::Disabled)));
     // Switched off: the keys still held get their releases.
@@ -1314,7 +1331,7 @@ void MainWindow::updateKeyList()
 void MainWindow::setDocument(const TsfDocument &doc, const QString &title, bool damaged)
 {
     m_doc = doc;
-    setWindowTitle(title.isEmpty() ? appTitle() : appTitle() + QStringLiteral(" - ") + title);
+    setTitle(title);
     m_damaged->setVisible(damaged);
     m_damaged->raise();
     recalculate();
@@ -1437,7 +1454,7 @@ void MainWindow::saveDocument(bool block)
     m_doc.records = records;
     m_path = path;
     m_loaded = true;
-    setWindowTitle(appTitle() + QStringLiteral(" - ") + QFileInfo(path).fileName());
+    setTitle(QFileInfo(path).fileName());
     if (QFileInfo(path).path() != m_fileDir) {
         // The video name is relative to the file: it is looked for next to the file now.
         m_fileDir = QFileInfo(path).path();

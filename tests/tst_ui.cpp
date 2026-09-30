@@ -142,6 +142,14 @@ private slots:
         QVERIFY(w.m_keys->rowCount() > 5);
         QVERIFY(!w.grab().isNull()); // every widget paints itself
         QVERIFY(w.m_legend->isVisible());
+        // The capture state goes first in the title: it is what the task bar shows.
+        QVERIFY(w.windowTitle().startsWith(QStringLiteral("Ts: ON - Typing statistics v")));
+        QVERIFY(w.windowTitle().endsWith(QStringLiteral(" - обыка.tsf")));
+        w.m_capture->setChecked(false);
+        QVERIFY(w.windowTitle().startsWith(QStringLiteral("Ts: OFF - ")));
+        QVERIFY(w.windowTitle().endsWith(QStringLiteral(" - обыка.tsf")));
+        w.m_capture->setChecked(true);
+        QVERIFY(w.windowTitle().startsWith(QStringLiteral("Ts: ON - ")));
     }
 
     void deleteUndoCopy()

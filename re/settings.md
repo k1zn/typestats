@@ -105,6 +105,10 @@ UpDown'ы привязаны (Associate) к белым плоским StaticText
 
 Порт: `Recorder::appendReleases`, `MainWindow::captureToggled`; значок — `QSystemTrayIcon` (иконка приложения, при
 выключенном перехвате — её серый вариант). Кнопка на панели задач прячется только у свёрнутого окна.
+Заголовок приложения (`Application->Title`: «Ts: ON» при старте — FormCreate 0x407c34, «Ts: ON»/«Ts: OFF» —
+CheckBox1Click) у VCL принадлежит скрытому окну приложения, которое и держит кнопку на панели задач. В Qt кнопку держит
+главное окно, поэтому состояние стоит в начале его заголовка: «Ts: ON - Typing statistics v… - файл»
+(`MainWindow::updateTitle`).
 
 ## Form9 «Ввод текста»
 
