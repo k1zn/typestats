@@ -7,3 +7,5 @@ re/decomp/
 re/decomp_clean/
 __pycache__/
 /*.tsj
+build-release/
+dist/
