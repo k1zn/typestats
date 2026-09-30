@@ -46,6 +46,20 @@ void TextView::setModel(const TextModel &m)
     moveCursor(QTextCursor::Start);
 }
 
+void TextView::setVisibleRange(int from, int to)
+{
+    QList<QTextEdit::ExtraSelection> selections;
+    if (from < to) {
+        QTextEdit::ExtraSelection s;
+        s.cursor = QTextCursor(document());
+        s.cursor.setPosition(from);
+        s.cursor.setPosition(std::min(to, document()->characterCount() - 1), QTextCursor::KeepAnchor);
+        s.format.setBackground(QColor(255, 255, 0));
+        selections.append(s);
+    }
+    setExtraSelections(selections);
+}
+
 int TextView::selectionStart() const
 {
     return textCursor().selectionStart();

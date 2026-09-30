@@ -40,6 +40,7 @@ private:
     void recalculate();
     void updateStats();
     void updateKeyList();
+    void klavogramMoved();
     void setDocument(const TsfDocument &doc, const QString &title, bool damaged);
 
     void open();

@@ -17,4 +17,7 @@ public:
     // Selection in text positions of the model (a paragraph break is one position).
     int selectionStart() const;
     int selectionLength() const;
+
+    // Highlights the part of the text shown on the klavogram.
+    void setVisibleRange(int from, int to);
 };

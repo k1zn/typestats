@@ -159,8 +159,9 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_text, &QTextEdit::selectionChanged, this, [this] {
         m_klav->scrollToPosition(m_text->selectionStart());
         updateStats();
-        updateKeyList();
+        klavogramMoved();
     });
+    connect(m_klav, &KlavogramWidget::viewChanged, this, &MainWindow::klavogramMoved);
 
     resize(876, 579);
     loadSettings();
@@ -261,6 +262,8 @@ QWidget *MainWindow::createToolBar()
     m_fingers->setToolTip(tr("Начальная позиция пальцев и расстановка по зонам"));
     m_fingers->setGeometry(592, 28, 152, 21);
     m_fingers->addItems(m_schemes.names());
+    connect(m_fingers, &QComboBox::currentTextChanged, this,
+            [this](const QString &name) { m_klav->setZones(m_schemes.zones(name)); });
     toolButton(bar, 8, 744, 3, 23, tr("Создать пресет (Правой кнопкой - удалить)"));
     toolButton(bar, 9, 744, 27, 23, tr("Создать расстановку (Правой кнопкой - удалить)"));
     toolButton(bar, 2, 768, 27, 23, tr("Редактировать расстановку"));
@@ -302,7 +305,16 @@ void MainWindow::closeEvent(QCloseEvent *e)
 void MainWindow::resizeEvent(QResizeEvent *e)
 {
     QWidget::resizeEvent(e);
-    updateKeyList(); // the klavogram shows another span, the list another number of rows
+    updateKeyList(); // the list holds another number of rows
+}
+
+void MainWindow::klavogramMoved()
+{
+    // The part of the text that is on the klavogram is highlighted (FUN_00424e64).
+    const auto [first, last] = m_klav->visibleRecords();
+    m_text->setVisibleRange(m_model.positionOfElement(m_model.elementOfKlav(first)),
+                            m_model.positionOfElement(m_model.elementOfKlav(last)));
+    updateKeyList();
 }
 
 RecalcOptions MainWindow::options() const
@@ -321,7 +333,7 @@ void MainWindow::recalculate()
     m_klav->setModel(&m_model);
     m_saveButton->setEnabled(!m_doc.records.isEmpty());
     updateStats();
-    updateKeyList();
+    klavogramMoved();
 }
 
 void MainWindow::updateStats()

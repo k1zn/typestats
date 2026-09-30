@@ -87,6 +87,8 @@ struct TextModel
     int klavOfElement(int elem) const { return lookup(&TextAnchor::elem, elem, &TextAnchor::klav); }
     int recordOfElement(int elem) const { return lookup(&TextAnchor::elem, elem, &TextAnchor::rec); }
     int elementOfRecord(int rec) const { return std::min(lookup(&TextAnchor::rec, rec, &TextAnchor::elem), size()); }
+    int elementOfKlav(int klav) const { return std::min(lookup(&TextAnchor::klav, klav, &TextAnchor::elem), size()); }
+    int positionOfElement(int elem) const { return std::min<int>(lookup(&TextAnchor::elem, elem, &TextAnchor::pos), text.size()); }
 
 private:
     int lookup(int TextAnchor::*key, int x, int TextAnchor::*value) const;
