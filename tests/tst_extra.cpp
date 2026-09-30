@@ -23,8 +23,9 @@ TextModel model(const QString &s, float pause = 100.0f)
             erased = true;
         } else {
             m.names << QString(c);
-            m.flags << (erased ? quint32(KeyRecord::Erased) : 0u);
+            m.flags << 0u;
             m.recIndex << m.names.size() - 1;
+            m.recErased << erased;
             m.pauses << (fragment ? kFragmentStart : pause);
             fragment = erased = false;
         }

@@ -21,13 +21,13 @@ public:
 
     bool hasPressedKeys() const { return !m_pressed.isEmpty(); }
 
-    void addPress(const KeyRecord &r, qint64 t, quint32 extraFlags = 0)
+    void addPress(const KeyRecord &r, qint64 t, bool erased, bool fragmentStart = false)
     {
-        m_out.append({t, t - m_baseSeg, t - m_baseDraw, r.flags | extraFlags, r.ch, true});
+        m_out.append({t, t - m_baseSeg, t - m_baseDraw, r.flags, r.ch, true, erased, fragmentStart});
         m_pressed.append(r.flags & KeyRecord::VkMask);
     }
 
-    void addSegmentStart(const KeyRecord &r, qint64 t)
+    void addFragmentStart(const KeyRecord &r, qint64 t, bool erased)
     {
         if (m_out.isEmpty()) {
             m_baseSeg = m_baseDraw = t;
@@ -36,7 +36,7 @@ public:
             m_baseSeg = last;
             m_baseDraw += (t - last) - 200000;
         }
-        addPress(r, t, KeyRecord::SegmentStart);
+        addPress(r, t, erased, true);
     }
 
     bool addRelease(const KeyRecord &r, qint64 t)
@@ -85,20 +85,18 @@ bool isParenthesized(const QString &c)
 
 namespace Recalc {
 
-void normalize(KeyRecords &recs)
+KeyRecords normalized(const KeyRecords &recs)
 {
-    auto first = std::find_if(recs.begin(), recs.end(), [](const KeyRecord &r) { return r.isDown(); });
-    recs.erase(recs.begin(), first);
-    if (recs.isEmpty())
-        return;
-    recs[0].dtUs = 60000000;
+    KeyRecords out;
+    const auto first = std::find_if(recs.begin(), recs.end(), [](const KeyRecord &r) { return r.isDown(); });
+    out.reserve(recs.end() - first);
 
     std::bitset<256> down;
     quint64 acc = 0;
-    int out = 0;
-    for (int i = 0; i < recs.size(); ++i) {
-        KeyRecord r = recs[i];
-        acc += r.dtUs;
+    for (auto it = first; it != recs.end(); ++it) {
+        KeyRecord r = *it;
+        r.flags &= ~(KeyRecord::Transient | KeyRecord::SegmentStart); // in-memory marks of the original
+        acc += it == first ? 60000000u : r.dtUs;
         const quint8 vk = r.vk();
         bool keep = true;
         if (r.isUp()) {
@@ -109,23 +107,22 @@ void normalize(KeyRecords &recs)
         }
         if (keep) {
             r.dtUs = quint32(acc);
-            recs[out++] = r;
+            out.append(r);
             acc = 0;
         }
     }
-    recs.resize(out);
+    return out;
 }
 
-void markErased(KeyRecords &recs)
+QVector<bool> erasedRecords(const KeyRecords &recs)
 {
+    QVector<bool> erased(recs.size(), false);
     static const QByteArray punct = QByteArrayLiteral("!\";%:?*(-=+\\/#@`~[]{}'<>,.");
     int bs = 0;     // pending BackSpace
     int cbs = 0;    // pending Ctrl+BackSpace
     int mode = 0;   // Ctrl+BackSpace: 0 undecided, 1 eating punctuation, 2 eating a word
-    for (KeyRecord &r : recs)
-        r.flags &= ~(KeyRecord::Erased | KeyRecord::SegmentStart);
     for (int i = recs.size() - 1; i >= 0; --i) {
-        KeyRecord &r = recs[i];
+        const KeyRecord &r = recs[i];
         if (r.isUp())
             continue;
         if (r.vk() == 0x08) {
@@ -142,7 +139,7 @@ void markErased(KeyRecords &recs)
             continue;
         if (cbs == 0) {
             if (bs != 0) {
-                r.flags |= KeyRecord::Erased;
+                erased[i] = true;
                 --bs;
             }
             continue;
@@ -155,19 +152,19 @@ void markErased(KeyRecords &recs)
                 if (mode == 0)
                     mode = 1;
                 if (mode == 1)
-                    r.flags |= KeyRecord::Erased;
+                    erased[i] = true;
                 else
                     stop = true;
             } else if (c == ' ') {
                 if (mode == 0)
-                    r.flags |= KeyRecord::Erased;
+                    erased[i] = true;
                 else
                     stop = true;
             } else {
                 if (mode == 0)
                     mode = 2;
                 if (mode == 2)
-                    r.flags |= KeyRecord::Erased;
+                    erased[i] = true;
                 else
                     stop = true;
             }
@@ -178,11 +175,15 @@ void markErased(KeyRecords &recs)
             }
         } while (cbs != 0 && stop);
     }
+    return erased;
 }
 
-TextModel build(KeyRecords &recs, const RecalcOptions &opt)
+TextModel run(const KeyRecords &document, const RecalcOptions &opt)
 {
     TextModel m;
+    m.records = normalized(document);
+    m.recErased = erasedRecords(m.records);
+    const KeyRecords &recs = m.records;
     Klavogram klav(m.klav);
     QVector<Segment> segs;
     const double split = opt.splitMs * 1000.0;
@@ -211,7 +212,8 @@ TextModel build(KeyRecords &recs, const RecalcOptions &opt)
     };
 
     for (int ri = 0; ri < recs.size(); ++ri) {
-        KeyRecord &r = recs[ri];
+        const KeyRecord &r = recs[ri];
+        const bool erased = m.recErased[ri];
         acc += r.dtUs;
         absT += r.dtUs;
         sinceKlav += r.dtUs;
@@ -234,16 +236,16 @@ TextModel build(KeyRecords &recs, const RecalcOptions &opt)
             continue;
         pushMap(ri);
         if (sinceKlav <= split || klav.hasPressedKeys()) {
-            klav.addPress(r, absT);
+            klav.addPress(r, absT, erased);
         } else {
-            klav.addSegmentStart(r, absT);
+            klav.addFragmentStart(r, absT, erased);
             pendingSplit = true;
             splitMapIdx = m.mapPos.size() - 1;
         }
         sinceKlav = 0;
 
         quint8 style = 0;
-        if (r.flags & KeyRecord::Erased) {
+        if (erased) {
             style |= TextStyle::Erased;
             if (name == QLatin1String(" "))
                 name = QString(QChar(0x2588));
@@ -255,9 +257,9 @@ TextModel build(KeyRecords &recs, const RecalcOptions &opt)
 
         if ((!opt.onlyText || name.size() == 1) && !(r.flags & KeyRecord::DeadKey)
             && (!opt.onlyInjected || (style & TextStyle::Injected))) {
+            const bool startsFragment = pendingSplit;
             if (pendingSplit) {
                 pendingSplit = false;
-                r.flags |= KeyRecord::SegmentStart;
                 if (pos != 0) {
                     if (!opt.byPauses) {
                         segs.append({QString(QChar(0x2021)), TextStyle::Separator});
@@ -292,7 +294,7 @@ TextModel build(KeyRecords &recs, const RecalcOptions &opt)
                 pos = flushParagraph(m, segs);
             }
             lastElemMapIdx = m.mapPos.size();
-            m.pauses.append((r.flags & KeyRecord::SegmentStart) ? kFragmentStart : float(0.001L * acc));
+            m.pauses.append(startsFragment ? kFragmentStart : float(0.001L * acc));
             m.names.append(name);
             m.flags.append(r.flags);
             m.recIndex.append(ri);
@@ -303,13 +305,6 @@ TextModel build(KeyRecords &recs, const RecalcOptions &opt)
     }
     flushParagraph(m, segs);
     return m;
-}
-
-TextModel run(KeyRecords &recs, const RecalcOptions &opt)
-{
-    normalize(recs);
-    markErased(recs);
-    return build(recs, opt);
 }
 
 int lowerBound(const QVector<int> &v, int x)

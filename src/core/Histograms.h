@@ -72,7 +72,7 @@ KeyLabel labelsFromRecords(const KeyRecords &recs);
 
 struct Source
 {
-    const KeyRecords *recs = nullptr; // after Recalc::run
+    const TextModel *model = nullptr; // its records are analysed
     int recBegin = 0, recEnd = 0;     // recordRange()
     quint32 splitUs = 2000000;        // RecalcOptions::splitMs * 1000
     FingerZones zones;

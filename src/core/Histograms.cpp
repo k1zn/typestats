@@ -36,7 +36,7 @@ template <typename F>
 void forEachPress(const Source &src, F f)
 {
     quint64 acc = 0;
-    const KeyRecords &recs = *src.recs;
+    const KeyRecords &recs = src.model->records;
     for (int i = std::max(src.recBegin, 0); i < src.recEnd && i < recs.size(); ++i) {
         const KeyRecord &r = recs[i];
         acc += r.dtUs;
@@ -45,7 +45,7 @@ void forEachPress(const Source &src, F f)
         Press p;
         p.rec = i;
         p.us = acc;
-        p.good = acc < src.splitUs && !(r.flags & KeyRecord::Erased);
+        p.good = acc < src.splitUs && !src.model->recErased[i];
         p.key = r.scan();
         p.finger = src.zones.finger(r.flags);
         p.hand = p.finger < 4 ? 0 : p.finger == FingerZones::kNone ? kNoHand : 1;

@@ -79,9 +79,9 @@ void speedAndHold(const QVector<KlavRecord> &klav, int rb, int re, quint32 split
         pressT[vk] = r.t;
         if (i >= re)
             continue;
-        const bool erasedPress = r.flags & KeyRecord::Erased;
+        const bool erasedPress = r.erased;
         const qint64 dt = r.t - prev;
-        const bool counted = !(r.flags & KeyRecord::SegmentStart) && dt < qint64(splitUs);
+        const bool counted = !r.fragmentStart && dt < qint64(splitUs);
         if (counted)
             T += quint64(dt);
         if (vk == 0x08 || erasedPress) {

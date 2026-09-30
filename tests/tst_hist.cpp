@@ -12,11 +12,11 @@ namespace {
 // US scan codes of a few keys: a (left little), s, d, f (left index), j (right index), k.
 constexpr quint8 A = 0x1E, S = 0x1F, F = 0x21, J = 0x24, K = 0x25;
 
-KeyRecord press(quint8 scan, quint32 dtMs, char16_t ch, quint32 extra = 0)
+KeyRecord press(quint8 scan, quint32 dtMs, char16_t ch)
 {
     KeyRecord r;
     r.dtUs = dtMs * 1000;
-    r.flags = scan | KeyRecord::HasChar | extra;
+    r.flags = scan | KeyRecord::HasChar;
     r.ch = ch;
     return r;
 }
@@ -29,13 +29,13 @@ KeyRecord release(quint8 scan, quint32 dtMs)
     return r;
 }
 
-Source source(const KeyRecords &recs)
+Source source(const TextModel &m)
 {
     Source s;
-    s.recs = &recs;
-    s.recEnd = recs.size();
+    s.model = &m;
+    s.recEnd = m.records.size();
     s.zones = FingerZones::standard();
-    s.label = labelsFromRecords(recs);
+    s.label = labelsFromRecords(m.records);
     return s;
 }
 
@@ -61,11 +61,18 @@ class TstHist : public QObject
 {
     Q_OBJECT
     // a(first) a j . f(erased) a | pause | k a ; releases add to the time of the next press
-    KeyRecords recs{press(A, 60000, u'a'), press(A, 100, u'A'), release(A, 20), press(J, 180, u'j'),
-                    press(F, 300, u'f', KeyRecord::Erased), press(A, 100, u'a'), press(K, 5000, u'k'),
-                    press(A, 400, u'a'), press(S, 50, u's')};
+    TextModel recs;
 
 private slots:
+    void initTestCase()
+    {
+        recs.records = {press(A, 60000, u'a'), press(A, 100, u'A'), release(A, 20), press(J, 180, u'j'),
+                        press(F, 300, u'f'), press(A, 100, u'a'), press(K, 5000, u'k'),
+                        press(A, 400, u'a'), press(S, 50, u's')};
+        recs.recErased.fill(false, recs.records.size());
+        recs.recErased[4] = true;
+    }
+
     void keys()
     {
         const Source src = source(recs);

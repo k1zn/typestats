@@ -256,11 +256,11 @@ private slots:
             const QJsonArray sel = h[QLatin1String("sel")].toArray();
             const auto [b, e] = Stats::range(m, sel[0].toInt(), sel[1].toInt(), opt.byPauses);
             Histograms::Source src;
-            src.recs = &d.records;
+            src.model = &m;
             std::tie(src.recBegin, src.recEnd) = Histograms::recordRange(m, b, e);
             src.splitUs = quint32(opt.splitMs) * 1000u;
             src.zones = FingerZones::standard();
-            src.label = Histograms::labelsFromRecords(d.records); // the file is digits: no layout involved
+            src.label = Histograms::labelsFromRecords(m.records); // the file is digits: no layout involved
             const Histograms::Page page = Histograms::build(src, node);
             QVector<float> values;
             QStringList names, counts, keys, recs;

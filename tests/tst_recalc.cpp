@@ -41,12 +41,15 @@ struct Typist
     }
 };
 
-QString erasedMask(const KeyRecords &recs)
+// 'x' for every press whose character gets erased.
+QString erasedMask(const KeyRecords &document)
 {
+    const KeyRecords recs = Recalc::normalized(document);
+    const QVector<bool> erased = Recalc::erasedRecords(recs);
     QString s;
-    for (const KeyRecord &r : recs)
-        if (r.isDown())
-            s += (r.flags & KeyRecord::Erased) ? QLatin1Char('x') : QLatin1Char('.');
+    for (int i = 0; i < recs.size(); ++i)
+        if (recs[i].isDown())
+            s += erased[i] ? QLatin1Char('x') : QLatin1Char('.');
     return s;
 }
 
@@ -78,8 +81,6 @@ private slots:
         t.type(u'\b', 100000);
         t.type(u'\b', 100000);
         t.text(QStringLiteral("d"), 100000);
-        Recalc::normalize(t.recs);
-        Recalc::markErased(t.recs);
         QCOMPARE(erasedMask(t.recs), QStringLiteral(".xx...")); // a b c BS BS d
     }
 
@@ -89,8 +90,6 @@ private slots:
         t.text(QStringLiteral("one two  "), 100000);
         t.press(0x08, 0x7F, 100000, KeyRecord::Ctrl);
         t.release(0x08, 50000);
-        Recalc::normalize(t.recs);
-        Recalc::markErased(t.recs);
         // "one two  " + Ctrl+BS: trailing spaces and "two" go, the space before it stays.
         QCOMPARE(erasedMask(t.recs), QStringLiteral("....xxxxx."));
     }
@@ -101,8 +100,6 @@ private slots:
         t.text(QStringLiteral("ab.,"), 100000);
         t.press(0x08, 0x7F, 100000, KeyRecord::Ctrl);
         t.release(0x08, 50000);
-        Recalc::normalize(t.recs);
-        Recalc::markErased(t.recs);
         QCOMPARE(erasedMask(t.recs), QStringLiteral("..xx."));
     }
 
@@ -114,10 +111,11 @@ private slots:
         t.press(0x41, u'A', 20000);
         t.release(0x41, 10000);
         t.release(0xA0, 10000);
-        Recalc::normalize(t.recs);
-        QCOMPARE(t.recs.size(), 4);
-        QCOMPARE(t.recs[0].dtUs, 60000000u);
-        QCOMPARE(t.recs[1].dtUs, 50000u);
+        const KeyRecords n = Recalc::normalized(t.recs);
+        QCOMPARE(t.recs.size(), 5); // the document is not touched
+        QCOMPARE(n.size(), 4);
+        QCOMPARE(n[0].dtUs, 60000000u);
+        QCOMPARE(n[1].dtUs, 50000u);
     }
 
     void textAndFragments()

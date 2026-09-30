@@ -31,9 +31,11 @@ struct KlavRecord
     qint64 t = 0;      // absolute time, µs
     qint64 tSeg = 0;   // time since the last record before the current fragment
     qint64 tDraw = 0;  // drawing time: the gap before every fragment is squeezed to 200 ms
-    quint32 flags = 0; // record flags, plus SegmentStart on the first press of a fragment
+    quint32 flags = 0; // record flags
     char16_t ch = 0;
     bool down = false;
+    bool erased = false;        // a press whose character was later removed
+    bool fragmentStart = false; // the first press after a split pause
 };
 
 // Pause value that marks the first element of a fragment.
@@ -41,12 +43,17 @@ constexpr float kFragmentStart = -2147483648.0f;
 
 struct TextModel
 {
+    // The records the model is built from: the document's without leading releases and auto-repeated
+    // modifiers (the first one gets dt = 60 s). Record indexes below refer to this vector.
+    KeyRecords records;
+    QVector<bool> recErased; // per record: a character later removed by BackSpace / Ctrl+BackSpace
+
     // One element per key press that made it into the text.
     QVector<QString> names;   // KeyDisplayName; a "character" is a name of length 1
     QVector<quint32> flags;   // flags of the source record
     QVector<int> recIndex;    // index of the source record
     QVector<float> pauses;    // ms since the previous element, or kFragmentStart
-    bool erased(int i) const { return i >= 0 && i < flags.size() && (flags[i] & KeyRecord::Erased); }
+    bool erased(int i) const { return i >= 0 && i < recIndex.size() && recErased[recIndex[i]]; }
     bool isChar(int i) const { return names[i].size() == 1; }
     int size() const { return names.size(); }
 
@@ -61,14 +68,14 @@ struct TextModel
 };
 
 namespace Recalc {
+// Builds the text model of a document; the document itself is not touched.
+TextModel run(const KeyRecords &document, const RecalcOptions &opt);
+
+// The steps of run(), for tests.
 // Drops leading releases and auto-repeated modifier presses; sets dt of the first record to 60 s.
-void normalize(KeyRecords &recs);
-// Clears Erased/SegmentStart and marks characters removed by BackSpace / Ctrl+BackSpace.
-void markErased(KeyRecords &recs);
-// Builds the text model; sets SegmentStart on records that start a fragment.
-TextModel build(KeyRecords &recs, const RecalcOptions &opt);
-// normalize + markErased + build.
-TextModel run(KeyRecords &recs, const RecalcOptions &opt);
+KeyRecords normalized(const KeyRecords &recs);
+// Marks the characters removed by BackSpace / Ctrl+BackSpace (one flag per record).
+QVector<bool> erasedRecords(const KeyRecords &recs);
 
 // FUN_0040382c: index of the first element >= x.
 int lowerBound(const QVector<int> &v, int x);
