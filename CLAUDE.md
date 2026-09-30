@@ -51,6 +51,21 @@ windeployqt --release --no-translations --no-opengl-sw --no-system-d3d-compiler 
 `iconengines/`, `imageformats/{qgif,qjpeg,qsvg}.dll`, `Qt6Svg.dll` (Qt6Network нужна QtMultimedia). ~54 МБ, zip ~24 МБ.
 Проверено запуском с `PATH` без Qt/MinGW (главное окно и окно видео на AVI).
 
+**Один exe** (`dist/TypingStatistics-single.exe`, ~15,5 МБ, без видео): статический qtbase 6.8.3 собран из исходников
+(`C:\Users\kizn\Qt\src`, сборка `C:\Users\kizn\Qt\sb2`, установка `6.8.3\mingw_64_static_min`). Конфигурация qtbase:
+`-DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Release -DFEATURE_optimize_size=ON -DFEATURE_static_runtime=ON`, выключены
+`opengl dynamicgl dbus sql network printsupport concurrent xml jpeg gif freetype textodfwriter textmarkdownreader
+textmarkdownwriter pdf vulkan colordialog fontdialog wizard mdiarea calendarwidget dockwidget undoview columnview
+fontcombobox` (`-DFEATURE_x=OFF`). Грабли: без `dynamicgl=OFF` при `opengl=OFF` не собирается плагин windows;
+`graphicsview` нужен стилю windows11; LTO невозможно (slim-LTO не дружит с `-Wa,-mbig-obj`, а без него GCC 13.1 падает
+с ICE). Программа (PATH — только MinGW/CMake/Ninja, без динамического Qt):
+```bash
+cmake -S . -B build-static-min -G Ninja -DCMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_PREFIX_PATH=C:/Users/kizn/Qt/6.8.3/mingw_64_static_min -DTS_VIDEO=OFF -DTS_LRELEASE=C:/Users/kizn/Qt/6.8.3/mingw_64/bin/lrelease.exe "-DCMAKE_CXX_FLAGS=-ffunction-sections -fdata-sections" "-DCMAKE_C_FLAGS=-ffunction-sections -fdata-sections" "-DCMAKE_EXE_LINKER_FLAGS=-s -Wl,--gc-sections"
+cmake --build build-static-min --target TypingStatistics
+```
+В exe только системные DLL Windows; плагины — qwindows, qmodernwindowsstyle, qico. Вес: Qt Gui/Widgets/Core ~4 МБ
+каждый, libstdc++ 0,9, HarfBuzz 0,7, QXlsx 0,7.
+
 **Сторонние библиотеки (vendored):**
 - `third_party/libuiohook` (LGPL-3) — глобальный хук;
 - `third_party/QXlsx` (MIT). В его `CMakeLists.txt` закомментирован `include(CPackConfig)`.

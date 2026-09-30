@@ -9,3 +9,4 @@ __pycache__/
 /*.tsj
 build-release/
 dist/
+build-static-min/
