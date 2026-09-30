@@ -297,7 +297,9 @@ private slots:
             std::tie(src.recBegin, src.recEnd) = Histograms::recordRange(m, b, e);
             src.splitUs = quint32(opt.splitMs) * 1000u;
             src.zones = FingerZones::standard();
-            src.label = Histograms::labelsFromRecords(m.records); // the file is digits: no layout involved
+            // The original names keys by the keyboard layout of its window; the recordings were made
+            // with the layout the text was typed in, so the names agree.
+            src.label = Histograms::labelsFromRecords(m.records);
             const Histograms::Page page = Histograms::build(src, node);
             QVector<float> values;
             QStringList names, counts, keys, recs;

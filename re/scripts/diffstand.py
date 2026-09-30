@@ -580,7 +580,8 @@ def collect_extra(orig):
     text = orig.text()
     orig.select(text, 0, 0)
     orig.extra_kind(6)
-    for pattern in ("/0/0/0", "1/*", "/(/)", "/)/)/)", "/1", "/4/*", "/е", "/0 /0", "/*/е", "/с/0", "9 "):
+    for pattern in ("/б/б/б", "/Б/б", "/б/,", "/, /б", "о/*", "/б /б", "/е/е", "/(/(/)", "/8/*/1", "/C/c", "//",
+                    "/0/0/0", "1/*", "/(/)", "/)/)/)", "/1", "/4/*", "/е", "/0 /0", "/*/е", "/с/0", "9 "):
         orig.extra_pattern(pattern)
         snap(kind=6, pattern=pattern)
     orig.set_check(orig.x_avg, True)
@@ -598,6 +599,17 @@ def collect_extra(orig):
     snap(kind=0, filter={"only": "123456 "})
     orig.extra_kind(3)
     snap(kind=3, filter={"only": "123456 "})
+    orig.extra_filter(0, None)
+    orig.extra_filter(1, "оа")
+    snap(kind=3, filter={"any": "оа"})
+    orig.extra_filter(2, "е")
+    snap(kind=3, filter={"any": "оа", "exclude": "е"})
+    orig.extra_kind(1)
+    snap(kind=1, filter={"any": "оа", "exclude": "е"})
+    orig.extra_filter(1, None)
+    orig.extra_filter(2, None)
+    orig.extra_filter(0, "абвгдежзийклмнопрстуфхцчшщъыьэюя")
+    snap(kind=1, filter={"only": "абвгдежзийклмнопрстуфхцчшщъыьэюя"})
     orig.extra_filter(0, None)
     for s, n in ((40, 120), (7, 33), (0, 0)):
         orig.select(text, s, n)
@@ -703,10 +715,15 @@ def run_file(tsf, opts, args, rep):
     elif args.extra or args.hist:
         # Only Form3 / Form4, merged into the variant recorded earlier with the current options.
         recs = json.loads(out.read_text(encoding="utf-8"))["variants"]
+        if args.variant:
+            text_only, by_pauses, pause = VARIANTS[args.variant - 1]
+            opts = {"Pause": pause, "TextOnly": text_only, "SplitOnEnter": by_pauses}
         rec = next(r for r in recs if r["options"] == opts)
         snap = reg_snapshot()
         orig = Original(tsf)
         try:
+            if args.variant:
+                orig.set_options(opts)
             assert orig.text() == rec["text"], "the recorded variant does not match the original's text"
             if args.extra:
                 rec["extra"] = collect_extra(orig)
@@ -785,6 +802,8 @@ def main():
                     help="run the original only for Form3 (extra statistics) and add it to the recorded JSON")
     ap.add_argument("--hist", action="store_true",
                     help="run the original only for Form4 (histograms) and add it to the recorded JSON")
+    ap.add_argument("--variant", type=int, default=0, choices=range(len(VARIANTS) + 1),
+                    help="with --extra / --hist: record them for VARIANTS[N-1] instead of the registry options")
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
     files = [Path(f).resolve() for f in args.files] or sorted((ROOT / "tests" / "golden").glob("*.tsf"))

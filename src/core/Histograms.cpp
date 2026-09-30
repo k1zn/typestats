@@ -105,8 +105,10 @@ QVector<Bar> averages(const float *sum, const int *count, const QStringList &lab
 
 KeyLabel labelsFromRecords(const KeyRecords &recs)
 {
-    // Per key: how often every (lower-case) character was produced, and a record without a character.
-    std::array<QHash<char16_t, int>, 256> chars;
+    // Per key: how often every (lower-case) character was produced without Shift (what the key
+    // itself gives, as the original's ToUnicodeEx without modifiers) and with it, and a record
+    // without a character.
+    std::array<std::array<QHash<char16_t, int>, 2>, 256> chars;
     std::array<quint32, 256> plain{};
     std::array<bool, 256> seen{};
     for (const KeyRecord &r : recs) {
@@ -114,7 +116,7 @@ KeyLabel labelsFromRecords(const KeyRecords &recs)
             continue;
         const quint8 key = r.scan();
         if (r.hasChar() && r.ch != 0 && !(r.flags & (KeyRecord::Ctrl | KeyRecord::Alt)))
-            ++chars[key][QChar(r.ch).toLower().unicode()];
+            ++chars[key][bool(r.flags & KeyRecord::Shift)][QChar(r.ch).toLower().unicode()];
         if (!seen[key]) {
             seen[key] = true;
             plain[key] = r.flags & (KeyRecord::ScanMask | KeyRecord::VkMask | KeyRecord::Extended);
@@ -126,13 +128,18 @@ KeyLabel labelsFromRecords(const KeyRecords &recs)
             continue;
         char16_t best = 0;
         int n = 0;
-        for (auto it = chars[key].cbegin(); it != chars[key].cend(); ++it)
+        const auto &counts = chars[key][chars[key][0].isEmpty()];
+        for (auto it = counts.cbegin(); it != counts.cend(); ++it)
             if (it.value() > n || (it.value() == n && it.key() < best)) {
                 best = it.key();
                 n = it.value();
             }
-        (*names)[key] = n ? keyDisplayName(plain[key] | KeyRecord::HasChar, best)
-                          : keyDisplayName(plain[key] | KeyRecord::NoChar, 0);
+        // BackSpace, Tab, Enter and Esc always give a character; they may have been recorded only
+        // with Ctrl or Alt (Alt+Tab).
+        const quint8 vk = (plain[key] & KeyRecord::VkMask) >> 16;
+        const bool control = vk == Vk::Back || vk == Vk::Tab || vk == Vk::Return || vk == Vk::Escape;
+        (*names)[key] = n || control ? keyDisplayName(plain[key] | KeyRecord::HasChar, best)
+                                     : keyDisplayName(plain[key] | KeyRecord::NoChar, 0);
     }
     return [names](quint8 key) { return (*names)[key]; };
 }

@@ -67,7 +67,8 @@ struct Page
 
 // Name of a key by its scan code.
 using KeyLabel = std::function<QString(quint8 key)>;
-// Labels taken from the recording itself: the character the key produced most often.
+// Labels taken from the recording itself: the character the key produced most often without
+// Shift (with it, if it was never pressed alone).
 KeyLabel labelsFromRecords(const KeyRecords &recs);
 
 struct Source
