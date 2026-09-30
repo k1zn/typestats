@@ -198,6 +198,11 @@ void ExtraStatsWindow::setSource(const TextModel *model, const QVector<quint8> &
     compute();
 }
 
+bool ExtraStatsWindow::averages() const
+{
+    return m_averages->isChecked();
+}
+
 ExtraStats::Kind ExtraStatsWindow::kind() const
 {
     for (int i = 0; i < ExtraStats::KindCount; ++i)

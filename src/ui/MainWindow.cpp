@@ -206,6 +206,7 @@ MainWindow::MainWindow(QWidget *parent)
     m_extra = new ExtraStatsWindow(this);
     connect(m_extra, &ExtraStatsWindow::shown, this, &MainWindow::updateExtraStats);
     connect(m_extra, &ExtraStatsWindow::elementSelected, this, &MainWindow::scrollKlavogramToElement);
+    connect(m_extra, &ExtraStatsWindow::exportRequested, this, [this] { exportTable(extraTable(), false); });
     m_input = new TextInputWindow(this);
     connect(new QShortcut(QKeySequence(Qt::Key_F4), this), &QShortcut::activated, this, &MainWindow::showTextInput);
     m_tray = new QSystemTrayIcon(QApplication::windowIcon(), this);
@@ -274,7 +275,8 @@ QWidget *MainWindow::createToolBar()
     m_blockButton = action(27, 78, 4, 23, tr("Сохранить блок"), nullptr);
     connect(m_blockButton, &QToolButton::clicked, this, [this] { saveDocument(true); });
     action(26, 102, 4, 23, tr("Открыть журнал"), &MainWindow::openJournal);
-    action(7, 126, 4, 23, tr("Экспортировать в Excel"), nullptr);
+    connect(action(7, 126, 4, 23, tr("Экспортировать в Excel"), nullptr, true), &QToolButton::clicked, this,
+            [this] { exportTable(keyTable(), true); });
     action(12, 150, 4, 23, tr("Дополнительная статистика"), &MainWindow::showExtraStats);
     action(19, 174, 4, 23, tr("Статистические гистограммы"), &MainWindow::showHistograms);
     action(20, 198, 4, 23, tr("Видео"), nullptr);
@@ -870,6 +872,58 @@ bool MainWindow::eventFilter(QObject *o, QEvent *e)
         return true;
     }
     return QWidget::eventFilter(o, e);
+}
+
+TableExport::Table MainWindow::keyTable() const
+{
+    // SpeedButton7Click: every press of the recording - key, pause before it, how long it was held.
+    const QLocale loc;
+    const QString ms = QStringLiteral(", ") + Texts::units().ms;
+    TableExport::Table table;
+    table.header = {tr("Клавиша"), tr("Пауза") + ms, tr("Длительность") + ms};
+    auto number = [&loc](const QString &text) {
+        bool ok = false;
+        const double v = loc.toDouble(text, &ok);
+        return ok ? QVariant(v) : QVariant();
+    };
+    const auto all = KeyList::rows(m_model.klav, loc);
+    for (const KeyListRow &row : all)
+        table.rows.append({row.key, number(row.pause), number(row.duration)});
+    return table;
+}
+
+TableExport::Table MainWindow::extraTable() const
+{
+    const bool averages = m_extra->averages();
+    TableExport::Table table;
+    table.header = {tr("Текст"), tr("Скорость")};
+    if (averages)
+        table.header << tr("Кол-во");
+    for (const ExtraStats::Row &row : m_extra->rows()) {
+        QVariantList cells{row.text, double(qRound(double(row.speed) * 100.0)) / 100.0};
+        if (averages)
+            cells << row.value;
+        table.rows.append(cells);
+    }
+    return table;
+}
+
+void MainWindow::exportTable(const TableExport::Table &table, bool chart)
+{
+    if (table.rows.isEmpty())
+        return;
+    QString filter;
+    QString path = QFileDialog::getSaveFileName(this, {}, QFileInfo(m_path).path(),
+                                                QStringLiteral("Excel (*.xlsx);;CSV (*.csv)"), &filter);
+    if (path.isEmpty())
+        return;
+    if (QFileInfo(path).suffix().isEmpty())
+        path += filter.contains(QLatin1String("csv")) ? QStringLiteral(".csv") : QStringLiteral(".xlsx");
+    if (!TableExport::write(path, table, chart, QLocale())) {
+        QMessageBox::warning(this, appTitle(), tr("Не удалось сохранить файл %1").arg(path));
+        return;
+    }
+    QDesktopServices::openUrl(QUrl::fromLocalFile(path)); // the original shows the table in Excel at once
 }
 
 void MainWindow::zonesChanged()

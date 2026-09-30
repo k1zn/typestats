@@ -774,6 +774,14 @@ Special thanks to Urikor (for the great site and the hosting), Avtandilina, Dron
         <source>Вы действительно хотите удалить пресет?</source>
         <translation>Do you really want to delete the preset?</translation>
     </message>
+    <message>
+        <source>Текст</source>
+        <translation>Text</translation>
+    </message>
+    <message>
+        <source>Кол-во</source>
+        <translation>Count</translation>
+    </message>
 </context>
 <context>
     <name>SettingsDialog</name>

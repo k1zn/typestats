@@ -4,6 +4,7 @@
 #include "core/Journal.h"
 #include "core/Recalc.h"
 #include "core/TsfFile.h"
+#include "export/TableExport.h"
 #include "platform/KeyboardHook.h"
 
 #include <QElapsedTimer>
@@ -75,6 +76,10 @@ private:
     void createPreset();
     void deletePreset();
     void restoreFromTray();
+    // "Экспортировать в Excel": the key list of the whole recording / the list of the extra statistics.
+    TableExport::Table keyTable() const;
+    TableExport::Table extraTable() const;
+    void exportTable(const TableExport::Table &table, bool chart);
     void zonesChanged();
     void editFingerZones();
     void createFingerZones();

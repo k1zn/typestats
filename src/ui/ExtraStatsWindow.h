@@ -29,6 +29,8 @@ public:
 
     // The rows of the list, in the order shown.
     const QVector<ExtraStats::Row> &rows() const { return m_rows; }
+    // The rows are averages with a count.
+    bool averages() const;
     // Selects a row, as clicking it does.
     void selectRow(int row);
 

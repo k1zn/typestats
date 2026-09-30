@@ -28,6 +28,8 @@
 #include <QSettings>
 #include <QTableWidget>
 #include <QTemporaryDir>
+
+#include "xlsxdocument.h"
 #include <QTest>
 #include <QTextCursor>
 #include <QComboBox>
@@ -437,6 +439,52 @@ private slots:
         QCOMPARE(w.m_doc.records.size(), 2);
         QVERIFY(w.m_doc.records.last().isUp());
         QCOMPARE(w.m_model.text, QStringLiteral("a"));
+    }
+
+    void exportTables()
+    {
+        MainWindow w;
+        w.resize(876, 579);
+        w.show();
+        QVERIFY(w.openFile(golden("обыка.tsf")));
+        const TableExport::Table keys = w.keyTable();
+        QCOMPARE(keys.header.size(), 3);
+        QCOMPARE(keys.header.at(1), QStringLiteral("Пауза, мс"));
+        QVERIFY(keys.rows.size() > 250);
+        QVERIFY(!keys.rows.first().at(1).isValid()); // the first press has no pause
+        QVERIFY(keys.rows.at(1).at(1).toDouble() > 1.0);
+        QVERIFY(keys.rows.at(1).at(2).toDouble() > 1.0);
+
+        const QString xlsx = m_settings.filePath(QStringLiteral("keys.xlsx"));
+        QVERIFY(TableExport::write(xlsx, keys, true, QLocale(QLocale::Russian)));
+        QXlsx::Document doc(xlsx);
+        QVERIFY(doc.load());
+        QCOMPARE(doc.read(1, 1).toString(), keys.header.at(0));
+        QCOMPARE(doc.read(3, 1).toString(), keys.rows.at(1).at(0).toString());
+        QCOMPARE(doc.read(3, 2).toDouble(), keys.rows.at(1).at(1).toDouble());
+
+        const QString csv = QString::fromUtf8(TableExport::toCsv(keys, QLocale(QLocale::Russian)).mid(3));
+        const QStringList lines = csv.split(QStringLiteral("\r\n"));
+        QCOMPARE(lines.at(0), QStringLiteral("Клавиша;Пауза, мс;Длительность, мс"));
+        QCOMPARE(lines.at(1).count(QLatin1Char(';')), 2);
+        QVERIFY(lines.at(2).contains(QLatin1Char(',')));
+        QVERIFY(!lines.at(2).contains(QLatin1Char('.')));
+        // A cell with the separator or quotes is quoted.
+        TableExport::Table t;
+        t.header = {QStringLiteral("a;b"), QStringLiteral("say \"hi\"")};
+        t.rows.append({1, 2.5});
+        QCOMPARE(QString::fromUtf8(TableExport::toCsv(t, QLocale(QLocale::Russian)).mid(3)),
+                 QStringLiteral("\"a;b\";\"say \"\"hi\"\"\"\r\n1;2,5\r\n"));
+        QCOMPARE(QString::fromUtf8(TableExport::toCsv(t, QLocale::c()).mid(3)),
+                 QStringLiteral("a;b,\"say \"\"hi\"\"\"\r\n1,2.5\r\n"));
+
+        w.showExtraStats();
+        w.m_extra->m_averages->setChecked(true);
+        const TableExport::Table extra = w.extraTable();
+        QCOMPARE(extra.header.size(), 3);
+        QCOMPARE(extra.rows.size(), w.m_extra->rows().size());
+        QCOMPARE(extra.rows.first().at(0).toString(), w.m_extra->rows().first().text);
+        QCOMPARE(extra.rows.first().at(2).toInt(), w.m_extra->rows().first().value);
     }
 
 private:
