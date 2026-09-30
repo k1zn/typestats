@@ -2,6 +2,7 @@
 // recording, editing, copying, the graph and its link with the klavogram.
 
 #include "core/Editing.h"
+#include "ui/ExtraStatsWindow.h"
 #include "ui/GraphPanels.h"
 #include "ui/GraphWidget.h"
 #include "ui/KlavogramWidget.h"
@@ -12,6 +13,10 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QListWidget>
+#include <QRadioButton>
+#include <QTableView>
+#include <QHeaderView>
+#include <QLabel>
 #include <QSpinBox>
 #include <QCheckBox>
 #include <QLineEdit>
@@ -207,6 +212,74 @@ private slots:
             QVERIFY(d.languageChanged());
         }
         QSettings().clear(); // the other tests run with the defaults
+    }
+
+    void extraStats()
+    {
+        MainWindow w;
+        w.resize(876, 579);
+        w.show();
+        QVERIFY(w.openFile(golden("обыка.tsf")));
+        ExtraStatsWindow *x = w.m_extra;
+        QVERIFY(x->rows().isEmpty()); // nothing is computed while hidden
+        w.showExtraStats();
+        QVERIFY(x->isVisible());
+        const int words = int(x->rows().size());
+        QVERIFY(words > 10);
+        QCOMPARE(x->m_status->text(), QStringLiteral("Всего: %1").arg(words));
+        QCOMPARE(x->m_list->model()->columnCount(), 2);
+        QCOMPARE(x->m_list->model()->headerData(0, Qt::Horizontal).toString(), QStringLiteral("▲Скорость"));
+        QVERIFY(x->rows().first().speed <= x->rows().last().speed);
+        QVERIFY(!x->grab().isNull());
+
+        // A row takes the klavogram to its occurrence.
+        const int element = x->rows().at(3).value;
+        x->selectRow(3);
+        QCOMPARE(w.m_graph->klavogramFrom(), element);
+
+        // A click on the header reverses the order.
+        x->m_sort.clickColumn(0, false);
+        x->showRows();
+        QVERIFY(x->rows().first().speed >= x->rows().last().speed);
+        QCOMPARE(x->m_list->model()->headerData(0, Qt::Horizontal).toString(), QStringLiteral("▼Скорость"));
+
+        // The selection of the main window narrows the statistics.
+        select(w, 0, 40);
+        QVERIFY(x->rows().size() < words);
+        select(w, 0, 0);
+        QCOMPARE(int(x->rows().size()), words);
+
+        // Locked: the source may change, the list stays; a kind is computed at once.
+        x->m_lock->setChecked(true);
+        select(w, 0, 40);
+        QCOMPARE(int(x->rows().size()), words);
+        x->m_kinds[ExtraStats::Pairs]->setChecked(true);
+        QVERIFY(x->rows().size() != words);
+        x->m_lock->setChecked(false);
+        select(w, 0, 0);
+
+        // Averages: a count column and the occurrences of the selected row below.
+        x->m_averages->setChecked(true);
+        QCOMPARE(x->m_list->model()->columnCount(), 3);
+        QVERIFY(x->m_lowerList->isVisible());
+        QCOMPARE(int(x->m_lower.size()), x->rows().first().value);
+        x->m_averages->setChecked(false);
+        QVERIFY(!x->m_lowerList->isVisible());
+
+        // A template and the filter.
+        x->m_kinds[ExtraStats::Template]->setChecked(true);
+        x->m_template->setEditText(QStringLiteral("/б/б/б"));
+        const int triples = int(x->rows().size());
+        QVERIFY(triples > 0);
+        x->m_filterText[2]->setText(QStringLiteral("о"));
+        x->m_filterOn[2]->setChecked(true);
+        QVERIFY(x->rows().size() < triples);
+        for (const ExtraStats::Row &r : x->rows())
+            QVERIFY(!r.text.contains(QLatin1Char(u'о')));
+
+        x->m_list->selectAll();
+        x->copy();
+        QCOMPARE(QApplication::clipboard()->text().count(QLatin1Char(' ')), int(x->rows().size()) - 1);
     }
 
 private:

@@ -37,6 +37,109 @@
     </message>
 </context>
 <context>
+    <name>ExtraStatsWindow</name>
+    <message>
+        <source>Дополнительная статистика</source>
+        <translation>Additional statistics</translation>
+    </message>
+    <message>
+        <source>Копировать</source>
+        <translation>Copy</translation>
+    </message>
+    <message>
+        <source>Экспортировать в Excel</source>
+        <translation>Export to Excel</translation>
+    </message>
+    <message>
+        <source>Сохранить</source>
+        <translation>Save</translation>
+    </message>
+    <message>
+        <source>Средние значения</source>
+        <translation>Averages</translation>
+    </message>
+    <message>
+        <source>Заблокировать</source>
+        <translation>Lock</translation>
+    </message>
+    <message>
+        <source>Поверх всех окон</source>
+        <translation>Always on top</translation>
+    </message>
+    <message>
+        <source>Тип статистики</source>
+        <translation>Kind of statistics</translation>
+    </message>
+    <message>
+        <source>Двухсимвольные сочетания</source>
+        <translation>Two-character combinations</translation>
+    </message>
+    <message>
+        <source>Трёхсимвольные сочетания</source>
+        <translation>Three-character combinations</translation>
+    </message>
+    <message>
+        <source>Четырёхсимвольные сочетания</source>
+        <translation>Four-character combinations</translation>
+    </message>
+    <message>
+        <source>Слова</source>
+        <translation>Words</translation>
+    </message>
+    <message>
+        <source>Слова с ошибками</source>
+        <translation>Words with errors</translation>
+    </message>
+    <message>
+        <source>Предложения</source>
+        <translation>Sentences</translation>
+    </message>
+    <message>
+        <source>Шаблон</source>
+        <translation>Template</translation>
+    </message>
+    <message>
+        <source>Записать шаблон (Правой кнопкой - удалить)</source>
+        <translation>Store the template (right button - remove)</translation>
+    </message>
+    <message>
+        <source>Фильтр по символам</source>
+        <translation>Character filter</translation>
+    </message>
+    <message>
+        <source>Только эти</source>
+        <translation>Only these</translation>
+    </message>
+    <message>
+        <source>Один из</source>
+        <translation>One of</translation>
+    </message>
+    <message>
+        <source>Исключить</source>
+        <translation>Exclude</translation>
+    </message>
+    <message>
+        <source>Скорость</source>
+        <translation>Speed</translation>
+    </message>
+    <message>
+        <source>Текст</source>
+        <translation>Text</translation>
+    </message>
+    <message>
+        <source>Кол-во</source>
+        <translation>Count</translation>
+    </message>
+    <message>
+        <source>Всего:</source>
+        <translation>Total:</translation>
+    </message>
+    <message>
+        <source>Не удалось сохранить файл %1</source>
+        <translation>Cannot save file %1</translation>
+    </message>
+</context>
+<context>
     <name>FilePropertiesDialog</name>
     <message>
         <source>Свойства файла</source>

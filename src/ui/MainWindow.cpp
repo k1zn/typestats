@@ -3,6 +3,7 @@
 #include "GraphPanels.h"
 #include "GraphWidget.h"
 #include "KlavogramWidget.h"
+#include "ExtraStatsWindow.h"
 #include "LiveStatsWindow.h"
 #include "SettingsDialog.h"
 #include "TextView.h"
@@ -194,6 +195,9 @@ MainWindow::MainWindow(QWidget *parent)
     createGraphPanels();
 
     m_live = new LiveStatsWindow(this);
+    m_extra = new ExtraStatsWindow(this);
+    connect(m_extra, &ExtraStatsWindow::shown, this, &MainWindow::updateExtraStats);
+    connect(m_extra, &ExtraStatsWindow::elementSelected, this, &MainWindow::scrollKlavogramToElement);
     connect(&m_hook, &KeyboardHook::key, this, &MainWindow::keyEvent);
     auto *timer = new QTimer(this);
     connect(timer, &QTimer::timeout, this, &MainWindow::tick);
@@ -240,7 +244,7 @@ QWidget *MainWindow::createToolBar()
     connect(m_blockButton, &QToolButton::clicked, this, [this] { saveDocument(true); });
     action(26, 102, 4, 23, tr("Открыть журнал"), &MainWindow::openJournal);
     action(7, 126, 4, 23, tr("Экспортировать в Excel"), nullptr);
-    action(12, 150, 4, 23, tr("Дополнительная статистика"), nullptr);
+    action(12, 150, 4, 23, tr("Дополнительная статистика"), &MainWindow::showExtraStats);
     action(19, 174, 4, 23, tr("Статистические гистограммы"), nullptr);
     action(20, 198, 4, 23, tr("Видео"), nullptr);
     action(22, 222, 4, 23, tr("Настройки..."), &MainWindow::showSettings);
@@ -302,8 +306,10 @@ QWidget *MainWindow::createToolBar()
     m_fingers->setToolTip(tr("Начальная позиция пальцев и расстановка по зонам"));
     m_fingers->setGeometry(592, 28, 152, 21);
     m_fingers->addItems(m_schemes.names());
-    connect(m_fingers, &QComboBox::currentTextChanged, this,
-            [this](const QString &name) { m_klav->setZones(m_schemes.zones(name)); });
+    connect(m_fingers, &QComboBox::currentTextChanged, this, [this](const QString &name) {
+        m_klav->setZones(m_schemes.zones(name));
+        updateExtraStats();
+    });
     toolButton(bar, 8, 744, 3, 23, tr("Создать пресет (Правой кнопкой - удалить)"));
     toolButton(bar, 9, 744, 27, 23, tr("Создать расстановку (Правой кнопкой - удалить)"));
     toolButton(bar, 2, 768, 27, 23, tr("Редактировать расстановку"));
@@ -337,6 +343,7 @@ void MainWindow::loadSettings()
     m_fingers->setCurrentIndex(std::max(0, m_fingers->findText(s.value(QStringLiteral("FingerZonesName")).toString())));
 
     m_live->loadSettings();
+    m_extra->loadSettings();
 
     static const bool shownByDefault[GraphWidget::SeriesCount] = {false, true, false, false, false, true, true, false};
     for (int i = 0; i < GraphWidget::SeriesCount; ++i)
@@ -371,6 +378,7 @@ void MainWindow::saveSettings() const
     s.setValue(QStringLiteral("SplitOnEnter"), m_byPauses->isChecked());
     s.setValue(QStringLiteral("WindowGeometry"), saveGeometry());
     m_live->saveSettings();
+    m_extra->saveSettings();
     s.setValue(QStringLiteral("TextWinHeight"), m_leftSplit->sizes().value(0));
     s.setValue(QStringLiteral("KlavWinHeight"), m_leftSplit->sizes().value(2));
     s.setValue(QStringLiteral("RightPanelWidth"), m_mainSplit->sizes().value(1));
@@ -420,6 +428,8 @@ void MainWindow::showForm(const QString &name)
 {
     if (name == QLatin1String("settings"))
         showSettings();
+    else if (name == QLatin1String("extra"))
+        showExtraStats();
 }
 
 void MainWindow::closeEvent(QCloseEvent *e)
@@ -697,11 +707,7 @@ void MainWindow::createGraphPanels()
     connect(m_graph, &GraphWidget::viewChanged, this, &MainWindow::graphMoved);
     connect(m_graph, &GraphWidget::axisMenuRequested, this, &MainWindow::showAxisMenu);
     connect(m_graph, &GraphWidget::autoLimitsChanged, this, [this] { m_axisPanel->setAutoLimits(m_graph->autoLimits()); });
-    connect(m_graph, &GraphWidget::elementClicked, this, [this](int element) {
-        // The klavogram starts at the clicked element.
-        m_klav->setScrollMs(float(0.001L * (drawTimeOfElement(element) - 100)));
-        klavogramMoved();
-    });
+    connect(m_graph, &GraphWidget::elementClicked, this, &MainWindow::scrollKlavogramToElement);
     connect(m_graph, &GraphWidget::klavogramSpanRequested, this, [this](int element) {
         // The klavogram is zoomed to span from its first element to the one under the mouse.
         const float from = float(0.001L * drawTimeOfElement(m_graph->klavogramFrom()));
@@ -718,6 +724,13 @@ void MainWindow::createGraphPanels()
         klavogramMoved();
     });
     connect(m_axisPanel, &AxisPanel::lockYChanged, m_graph, &GraphWidget::setLockY);
+}
+
+void MainWindow::scrollKlavogramToElement(int element)
+{
+    // The klavogram starts at the element (FUN_004050cc).
+    m_klav->setScrollMs(float(0.001L * (drawTimeOfElement(element) - 100)));
+    klavogramMoved();
 }
 
 void MainWindow::toggleAxisPanel()
@@ -828,6 +841,23 @@ void MainWindow::updateStats()
         m_stats->setFixedHeight(height);
         updateKeyList();
     }
+    updateExtraStats();
+}
+
+void MainWindow::updateExtraStats()
+{
+    // The extra statistics are about the same part of the text as the main ones.
+    if (!m_extra || !m_extra->isVisible())
+        return;
+    const auto [b, e] = Stats::range(m_model, m_text->selectionStart(), m_text->selectionLength(), m_byPauses->isChecked());
+    m_extra->setSource(&m_model, fingerSeries(m_model, m_schemes.zones(m_fingers->currentText())), b, e);
+}
+
+void MainWindow::showExtraStats()
+{
+    m_extra->show();
+    m_extra->raise();
+    m_extra->activateWindow();
 }
 
 void MainWindow::updateKeyList()
