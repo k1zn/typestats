@@ -13,7 +13,8 @@ HKCU\\Software\\TypingStatistics[\\<Profile>] exactly as the original reads them
     python re/scripts/diffstand.py [files...] [--sel N] [--seed S] [--no-styles] [--record]
 
 --extra runs the original only for Form3 "Дополнительная статистика" (a few seconds) and adds the
-key "extra" to the variant recorded earlier; see re/extra_stats.md.
+key "extra" to the variant recorded earlier; see re/extra_stats.md. --hist does the same for Form4
+"Статистические гистограммы" (key "hist", re/histograms.md; compared by tests/tst_orig.cpp only).
 
 Without files all tests/golden/*.tsf are used. --record saves what the original shows to
 tests/golden/orig/<name>.json (used by the C++ tests, so they do not need the original).
@@ -323,16 +324,18 @@ class Original:
             obj = self.rd(obj + field)
         return self.rd(obj + self._handle_off)
 
-    def open_extra(self):
-        """Clicks SpeedButton12 (a TSpeedButton has no window: the click goes to its parent panel)."""
-        form1 = self.rd(self.rd(0x5B09FC))
-        btn = self.rd(form1 + 972)
+    def click_speedbutton(self, form_global, field):
+        """Clicks a TSpeedButton (it has no window: the click goes to its parent panel)."""
+        btn = self.rd(self.rd(self.rd(form_global)) + field)
         left, top, width, height = struct.unpack("<4i", wr.read_process(self.proc.pid, btn + 0x40, 16))
         assert 0 < width < 100 and 0 < height < 100, (left, top, width, height)
         panel = self.rd(self.rd(btn + 0x30) + self._handle_offset())
         lp = ((top + height // 2) << 16) | (left + width // 2)
         wr.send(panel, 0x0201, 1, lp)  # WM_LBUTTONDOWN
         wr.send(panel, 0x0202, 0, lp)  # WM_LBUTTONUP
+
+    def open_extra(self):
+        self.click_speedbutton(0x5B09FC, 972)  # Form1.SpeedButton12
         F3 = 0x5B0A08
         self.form3 = self.control_handle(F3)
         deadline = time.time() + 5
@@ -397,6 +400,68 @@ class Original:
                 "sort": self.rd(0x59B764, "<B"), "desc": bool(self.rd(0x59B768, "<B")),
                 "rows": self.extra_rows(), "lv": wr.listview_rows(self.x_list),
                 "headers": wr.header_texts(self.x_list)}
+
+    # ---- Form4 "Статистические гистограммы" (re/histograms.md)
+
+    HIST_PAGES = {0x5A0A64: "allKeys", 0x5A0A7C: "key", 0x5A0A4C: "pair", 0x5A0690: "allFingers",
+                  0x5A0A34: "finger", 0x5A0A1C: "relation0", 0x5A0A04: "relation1", 0x5A09EC: "relation2",
+                  0x5A09D4: "relation3", 0x5A0678: "extra"}
+    F4 = 0x5B0A10
+
+    def open_hist(self):
+        self.click_speedbutton(0x5B09FC, 1092)  # Form1.SpeedButton19
+        self.form4 = self.control_handle(self.F4)
+        deadline = time.time() + 5
+        while not wr.user32.IsWindowVisible(self.form4):
+            assert time.time() < deadline, "Form4 did not open"
+            time.sleep(0.1)
+        time.sleep(0.3)
+
+    def hist_button(self, name):
+        self.click_speedbutton(self.F4, {"back": 764, "keys": 768, "fingers": 772, "extra": 776}[name])
+
+    def _vector(self, addr, fmt):
+        begin, end = struct.unpack("<II", wr.read_process(self.proc.pid, addr, 8))
+        raw = wr.read_process(self.proc.pid, begin, end - begin) if end > begin else b""
+        return [v[0] for v in struct.iter_unpack(fmt, raw)]
+
+    def hist_snapshot(self, **what):
+        """The page on top of the stack: bars (float bits), labels, counts, keys and records of the bars."""
+        time.sleep(0.1)
+        page = self.rd(self.rd(0x5B165C) - 4)
+        kind = self.HIST_PAGES[self.rd(page)]
+        names = []
+        for ptr in self._vector(self.rd(0x5B16BC) + 0x40, "<I"):
+            names.append(wr.read_process(self.proc.pid, ptr, self.rd(ptr - 4)).decode("utf-16-le") if ptr else "")
+        rec = {**what, "kind": kind,
+               "values": [f"{v:08x}" for v in self._vector(self.rd(0x5B16B8) + 0x24, "<I")],
+               "names": names, "counts": self._vector(0x5B1670, "<i")}
+        if kind in ("allKeys", "key"):
+            rec["keys"] = self._vector(page + 0x414, "<B")
+        if kind in ("key", "pair"):
+            rec["key"] = self.rd(page + 0x430, "<B")
+        if kind == "pair":
+            rec["prevKey"] = self.rd(page + 0x438, "<B")
+        if kind == "finger":
+            rec["finger"] = self.rd(page + 0x430)
+        if kind.startswith("relation"):
+            rec["finger"] = self.rd(page + 0x458)
+        if kind == "pair" or kind.startswith("relation"):
+            rec["recs"] = self._vector(page + 0x440, "<i")
+        return rec
+
+    def hist_drill(self, index):
+        """Double click on bar `index` (PaintBox1DblClick takes x from DAT_0059e694, set by MouseMove)."""
+        chart = self.rd(0x5B16BC)
+        left, scale, offset = self.rd(chart + 0x10, "<i"), self.rd(chart + 0xAC, "<f"), self.rd(chart + 0xA4, "<f")
+        x = left + int((index + 0.5 + offset) * scale)
+        assert int((x - left) / scale - offset) == index and (x - left) / scale - offset > 0, (x, left, scale, offset)
+        wr.write_process(self.proc.pid, 0x59E694, struct.pack("<i", x))
+        box = self.rd(self.rd(self.rd(self.F4)) + 756)
+        bl, bt = struct.unpack("<2i", wr.read_process(self.proc.pid, box + 0x40, 8))
+        lp = ((bt + 10) << 16) | (bl + x)
+        wr.send(self.form4, 0x0203, 1, lp)  # WM_LBUTTONDBLCLK
+        wr.send(self.form4, 0x0202, 0, lp)  # WM_LBUTTONUP
 
     def close(self):
         self.proc.kill()
@@ -542,6 +607,48 @@ def collect_extra(orig):
     return out
 
 
+def collect_hist(orig):
+    """Form4 of the original: a few branches of the key tree, the whole finger tree, both roots for a selection."""
+    orig.open_hist()
+    out = []
+
+    def snap(path, **what):
+        out.append(orig.hist_snapshot(path=list(path), **what))
+        return out[-1]
+
+    root = snap(["keys"])
+    for i in range(min(4, len(root["values"]))):
+        orig.hist_drill(i)
+        key = snap(["keys", i])
+        for j in range(min(3, len(key["values"]))):
+            orig.hist_drill(j)
+            snap(["keys", i, j])
+            orig.hist_button("back")
+        orig.hist_button("back")
+    orig.hist_button("fingers")
+    snap(["fingers"])
+    for f in range(9):
+        orig.hist_drill(f)
+        snap(["fingers", f])
+        for r in range(4):
+            orig.hist_drill(r)
+            snap(["fingers", f, r])
+            orig.hist_button("back")
+        orig.hist_button("back")
+    text = orig.text()
+    for s, n in ((40, 120), (0, 0)):
+        orig.select(text, s, n)  # the stack is reset to its root
+        snap(["fingers"], sel=[s, n])
+        orig.hist_drill(4)
+        snap(["fingers", 4], sel=[s, n])
+        orig.hist_button("keys")
+        snap(["keys"], sel=[s, n])
+        orig.hist_drill(0)
+        snap(["keys", 0], sel=[s, n])
+        orig.hist_button("fingers")
+    return out
+
+
 def compare_extra(tsf, base, x, rep):
     a = base + ["--extra", str(x["kind"]), "--sort", str(x["sort"])]
     title = f"extra kind={x['kind']} sort={x['sort']}"
@@ -593,15 +700,18 @@ def run_file(tsf, opts, args, rep):
     out = recorded_path(tsf)
     if args.offline:
         recs = json.loads(out.read_text(encoding="utf-8"))["variants"]
-    elif args.extra:
-        # Only Form3, merged into the variant recorded earlier with the current options.
+    elif args.extra or args.hist:
+        # Only Form3 / Form4, merged into the variant recorded earlier with the current options.
         recs = json.loads(out.read_text(encoding="utf-8"))["variants"]
         rec = next(r for r in recs if r["options"] == opts)
         snap = reg_snapshot()
         orig = Original(tsf)
         try:
             assert orig.text() == rec["text"], "the recorded variant does not match the original's text"
-            rec["extra"] = collect_extra(orig)
+            if args.extra:
+                rec["extra"] = collect_extra(orig)
+            if args.hist:
+                rec["hist"] = collect_hist(orig)
         finally:
             orig.close()
             reg_restore(snap)
@@ -673,6 +783,8 @@ def main():
                          "the key is snapshotted and restored afterwards)")
     ap.add_argument("--extra", action="store_true",
                     help="run the original only for Form3 (extra statistics) and add it to the recorded JSON")
+    ap.add_argument("--hist", action="store_true",
+                    help="run the original only for Form4 (histograms) and add it to the recorded JSON")
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
     files = [Path(f).resolve() for f in args.files] or sorted((ROOT / "tests" / "golden").glob("*.tsf"))

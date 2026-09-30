@@ -65,6 +65,11 @@ src/core/      только QtCore, тестируемо
   ExtraStats.*        Form3 «Дополнительная статистика» (0x43ff3c): parseTemplate, CharFilter, collect → вхождения,
                       rows (средние, сортировки 0–3), occurrences, Sort (клики по столбцам, заголовки ▲▼),
                       formatSpeed, toText, TemplateList (ExStats.ini) — ГОТОВО, сверено побитно
+  Histograms.*        Form4 «Статистические гистограммы»: Node (страница) → build() → Page{title, bars}, drill(),
+                      fromExtra(), hint(), labelsFromRecords() (подписи клавиш из записи, а не из раскладки окна) —
+                      ГОТОВО, сверено побитно (`re/histograms.md`)
+  NumberFormat.*      formatFixed(v, decimals, loc): округление половинок от нуля, как FloatToStrF оригинала
+                      (QLocale округляет к чётному) — используется всеми списками
 src/cli/tsstat.cpp  консольная утилита: `tsstat [--split MS] [--only-text] [--by-pauses] [--sel S L] [--text|--runs] f.tsf`
                     печатает «Параметр\tЗначение» как ListView2 (для дифф-стенда);
                     `--extra KIND [--avg] [--sort N] [--desc] [--pattern P] [--only S] [--any S] [--exclude S]` — список Form3
@@ -76,8 +81,10 @@ tests/tst_tsf.cpp   юнит-тесты + golden: подпись и побайт
 tests/tst_recalc.cpp  KeyName, разметка BS/Ctrl+BS, нормализация, текст/фрагменты, статистика на синтетике, golden-прогон
 tests/tst_zones.cpp FingerZones, FingerZoneSchemes, IniFile
 tests/tst_extra.cpp ExtraStats на синтетике
+tests/tst_hist.cpp  Histograms и formatFixed на синтетике
 tests/tst_orig.cpp  ядро против записанного вывода оригинала (tests/golden/orig/*.json): ListView2, текст, стили,
-                    выделения, ListView1 — 4 файла × 5 наборов опций; серии графиков и Form3 (ключ `extra`) — 824
+                    выделения, ListView1 — 4 файла × 5 наборов опций; серии графиков, Form3 (ключ `extra`) и
+                    Form4 (ключ `hist`) — 824
 tests/golden/       реальные .tsf пользователя с рабочего стола (801, 824, обыка, цифры13зн)
 tests/golden/orig/  что показывал оригинал (пишет re/scripts/diffstand.py)
 ```
@@ -92,6 +99,7 @@ tests/golden/orig/  что показывал оригинал (пишет re/sc
 python re/scripts/diffstand.py [файлы] [--variants] [--sel N] [--no-styles]   # запуск оригинала, ~1.5 мин/файл
 python re/scripts/diffstand.py [файлы] --offline                              # по записанным JSON, секунды
 python re/scripts/diffstand.py файл --extra                                   # только Form3, ~10 с, дописывает ключ extra
+python re/scripts/diffstand.py файл --hist                                    # только Form4, ~10 с, дописывает ключ hist
 ```
 - Запускает `TypeStats.exe <файл>`, читает ListView2/ListView1/текст/стили RichEdit, выделения и курсор.
   64-битный Python против 32-битного процесса: структуры LVITEM/CHARFORMAT собираются вручную
@@ -229,10 +237,9 @@ python re/scripts/diffstand.py файл --extra                                 
      стенд `--extra`; там же грабли стенда: CN_NOTIFY вместо WM_NOTIFY, `id & 0xFFFF` в WM_COMMAND). Сверено на
      824.tsf (цифры): слов с ошибками и предложений там мало — при случае прогнать `--extra` на текстовом файле
      (обыка.tsf) и при «Только текст» = 0;
-   - **СЛЕДУЮЩЕЕ:** Form4 «Дополнительные гистограммы» (0x451b88; функции 0x44d124, 0x44da90, 0x44e57c, 0x44ed0c, 0x44f52c,
-     0x44fe88 используют `DAT_005b1278`; строки «Длительности сочетаний», «Двойное нажатие на клавишу»,
-     «Та же рука (другой палец)», «Другая рука», «Все клавиши», «Все пальцы» — 0x58ecbe…);
-   - журнал `.tsj` (запись с `dt ^ 0x554973`, `FUN_0040b288`); оригинал создаёт пустой `<год>_<месяц>.tsj`
+   - ~~Form4 «Статистические гистограммы»~~ — готово (`re/histograms.md`, `src/core/Histograms`, стенд `--hist`);
+     отрисовка столбиков и подсказка — на UI-этапе;
+   - **СЛЕДУЮЩЕЕ:** журнал `.tsj` (запись с `dt ^ 0x554973`, `FUN_0040b288`); оригинал создаёт пустой `<год>_<месяц>.tsj`
      рядом с exe при каждом старте (стенд его удаляет).
    Для сверки новых модулей стенд дополняется: открыть форму оригинала (кнопка/меню через WM_COMMAND или
    BM_CLICK, TSpeedButton — кликом по родителю) и считать её ListView, либо читать структуры из памяти
@@ -242,6 +249,33 @@ python re/scripts/diffstand.py файл --extra                                 
    - слева сверху вниз: RichEdit (текст, 120), PaintBox1 (график + скроллбар), PaintBox3 (клавограмма, 200);
    - справа панель 218 px: ListView2 (Параметр/Значение, высота 318) и ListView1 (Пауза/Длительность/Клавиша);
    - плавающие панели: «Настройка оси Y» (Panel9) и «Легенда» (Panel2).
+
+## Технический долг: артефакты оригинала в ядре
+
+Найдено при ревизии `src/core` (результаты верные, но внутри — перенос устройства оригинала). Убирать отдельным
+шагом, до UI; после каждого пункта — `ctest` (golden-сверка не должна измениться):
+
+1. **Recalc портит записи документа.** `normalize` удаляет записи, `markErased`/`build` пишут биты `Erased` (0x100) и
+   `SegmentStart` прямо в `KeyRecord::flags`; `Histograms` и клавограмма потом читают эти биты. Лучше: Recalc берёт
+   `const KeyRecords &`, нормализованную копию и признаки «стёрто»/«начало фрагмента» хранит в `TextModel`.
+2. **Маркер фрагмента `kFragmentStart` (−2³¹ в `pauses` и во всех сериях графиков)**, проверки `pause < 0` в
+   MainStats/ExtraStats/Graphs. Лучше: список фрагментов (диапазоны элементов) в `TextModel`; серии — без
+   элементов-маркеров (в `tst_orig` маркер подставлять при сравнении с памятью оригинала).
+3. **Четыре параллельных вектора `mapPos/mapElem/mapKlav/mapRec` + `Recalc::at` («последний + 1»).** Лучше: один
+   вектор якорей `{pos, elem, klav, rec}` и методы модели `elementAt(pos)`, `recordOf(elem)`, `elementOfRecord(rec)`.
+4. **`KeyList::rows(widthPx, zoom, maxRows)`** — ядро знает о пикселях клавограммы и о магическом
+   `maxRows >= 0x7fffffff`. Лучше: `rows(klav, fromUs, toUs, limit)`; окно времени считает UI.
+5. **`long double` как 80-битный x87** (Graphs, ExtraStats, Histograms, Recalc): побитное совпадение с оригиналом
+   есть только там, где `long double` 80-битный (MinGW/GCC x86). На MSVC и macOS arm64 он 64-битный — возможны
+   расхождения в последнем бите float (на экране, в 2–3 знаках, практически не видны). Решить на этапе портирования:
+   побитные проверки `tst_orig` включать только при `LDBL_MANT_DIG == 64`, иначе сравнивать отформатированные строки.
+6. `markErased` переводит имя клавиши в cp1251, чтобы сравнить с набором пунктуации (у оригинала ANSI). Символ вне
+   cp1251 превращается в `?` и считается пунктуацией — поведение оригинала; при переписывании на QChar сохранить.
+7. Мелочи: режим сортировки Form3 — `int` 0..3 (сделать enum); тексты `Histograms::Names`, заголовки `ExtraStats::Sort`,
+   `Stats::rowNames` — русские литералы, на этапе i18n перевести на `tr()`/таблицу `.lng`.
+
+Уже убрано: дословный порт `FloatToStrF` → `formatFixed` (обычное округление половинок от нуля, один форматтер на
+все списки); выбор максимума в цикле в гистограммах → сортировка; `std::list` нажатых клавиш → вектор.
 
 ## Правила работы
 

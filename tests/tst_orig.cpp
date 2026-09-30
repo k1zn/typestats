@@ -5,6 +5,7 @@
 #include "core/ExtraStats.h"
 #include "core/FingerZones.h"
 #include "core/Graphs.h"
+#include "core/Histograms.h"
 #include "core/KeyList.h"
 #include "core/MainStats.h"
 #include "core/TsfFile.h"
@@ -233,6 +234,74 @@ private slots:
                 for (const ExtraStats::Occurrence &oc : ExtraStats::occurrences(occ, o[QLatin1String("text")].toString()))
                     lower << ExtraStats::formatSpeed(oc.speed, ru) + QLatin1Char('|') + oc.text;
                 QCOMPARE(lower, lv1Rows(o[QLatin1String("lv")].toArray()));
+            }
+        }
+        // Form4: bars of the page on top of the stack, read from the original's memory.
+        const QJsonArray hist = variant[QLatin1String("hist")].toArray();
+        for (qsizetype hi = 0; hi < hist.size(); ++hi) {
+            const QJsonObject h = hist[hi].toObject();
+            const QString kind = h[QLatin1String("kind")].toString();
+            Histograms::Node node;
+            node.key = quint8(h[QLatin1String("key")].toInt());
+            node.prevKey = quint8(h[QLatin1String("prevKey")].toInt());
+            node.finger = h[QLatin1String("finger")].toInt();
+            if (kind.startsWith(QLatin1String("relation"))) {
+                node.kind = Histograms::Node::FingerRelation;
+                node.relation = kind.right(1).toInt();
+            } else {
+                node.kind = Histograms::Node::Kind(QStringList{QStringLiteral("allKeys"), QStringLiteral("key"),
+                                                               QStringLiteral("pair"), QStringLiteral("allFingers"),
+                                                               QStringLiteral("finger")}.indexOf(kind));
+            }
+            const QJsonArray sel = h[QLatin1String("sel")].toArray();
+            const auto [b, e] = Stats::range(m, sel[0].toInt(), sel[1].toInt(), opt.byPauses);
+            Histograms::Source src;
+            src.recs = &d.records;
+            std::tie(src.recBegin, src.recEnd) = Histograms::recordRange(m, b, e);
+            src.splitUs = quint32(opt.splitMs) * 1000u;
+            src.zones = FingerZones::standard();
+            src.label = Histograms::labelsFromRecords(d.records); // the file is digits: no layout involved
+            const Histograms::Page page = Histograms::build(src, node);
+            QVector<float> values;
+            QStringList names, counts, keys, recs;
+            for (const Histograms::Bar &bar : page.bars) {
+                values << bar.value;
+                names << bar.label;
+                if (bar.count >= 0)
+                    counts << QString::number(bar.count);
+                keys << QString::number(bar.key);
+                recs << QString::number(bar.rec);
+            }
+            auto ints = [](const QJsonValue &a) {
+                QStringList r;
+                for (const QJsonValue &v : a.toArray())
+                    r << QString::number(v.toInt());
+                return r;
+            };
+            if (bits(values) != bits(h[QLatin1String("values")].toArray()))
+                qWarning() << "hist" << hi << kind << h[QLatin1String("path")].toArray();
+            QCOMPARE(bits(values), bits(h[QLatin1String("values")].toArray()));
+            QCOMPARE(names, bits(h[QLatin1String("names")].toArray()));
+            QCOMPARE(counts, ints(h[QLatin1String("counts")]));
+            if (h.contains(QLatin1String("keys")))
+                QCOMPARE(keys, ints(h[QLatin1String("keys")]));
+            if (h.contains(QLatin1String("recs")))
+                QCOMPARE(recs, ints(h[QLatin1String("recs")]));
+            // The page the recorded double click led to.
+            const QJsonArray path = h[QLatin1String("path")].toArray();
+            if (hi + 1 < hist.size() && path.size() < 3) {
+                const QJsonArray next = hist[hi + 1][QLatin1String("path")].toArray();
+                if (next.size() == path.size() + 1) {
+                    const auto to = Histograms::drill(node, page, next.last().toInt());
+                    QVERIFY(to);
+                    const QJsonObject nh = hist[hi + 1].toObject();
+                    if (nh.contains(QLatin1String("key")))
+                        QCOMPARE(int(to->key), nh[QLatin1String("key")].toInt());
+                    if (nh.contains(QLatin1String("prevKey")))
+                        QCOMPARE(int(to->prevKey), nh[QLatin1String("prevKey")].toInt());
+                    if (nh.contains(QLatin1String("finger")))
+                        QCOMPARE(to->finger, nh[QLatin1String("finger")].toInt());
+                }
             }
         }
         if (variant.contains(QLatin1String("styles")))

@@ -195,3 +195,16 @@ def listview_select(listview, index):
 def set_text(hwnd, text):
     buf = ctypes.create_unicode_buffer(text)
     send(hwnd, 0x000C, 0, ctypes.addressof(buf))  # WM_SETTEXT
+
+
+def write_process(pid, addr, data: bytes):
+    """Writes memory of another process."""
+    proc = kernel32.OpenProcess(0x0008 | 0x0020 | 0x0400, False, pid)
+    if not proc:
+        raise ctypes.WinError(ctypes.get_last_error())
+    try:
+        n = ctypes.c_size_t()
+        if not kernel32.WriteProcessMemory(proc, addr, data, len(data), ctypes.byref(n)):
+            raise ctypes.WinError(ctypes.get_last_error())
+    finally:
+        kernel32.CloseHandle(proc)
