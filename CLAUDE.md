@@ -75,29 +75,53 @@ src/core/      только QtCore, тестируемо
   Histograms.*        Form4 «Статистические гистограммы»: Node (страница) → build() → Page{title, bars}, drill(),
                       fromExtra(), hint(), labelsFromRecords() (подписи клавиш из записи, а не из раскладки окна:
                       самый частый символ без Shift) — ГОТОВО, сверено побитно (`re/histograms.md`)
+  Recorder.*          порт OnKeyEvent 0x40a7a4 (`re/recording.md`): `handle(HookEvent, RecorderSettings, Context, records)`
+                      → Outcome {recorded, setCapture, clear, toggleLive, liveReset, liveChanged}; хоткеи, автокомментарии,
+                      фильтр отпусканий, мёртвые клавиши, таймер с отменой круга, оперативная статистика `live()` — ГОТОВО,
+                      тесты на синтетике (руками на живом вводе НЕ проверялось)
   NumberFormat.*      formatFixed(v, decimals, loc): округление половинок от нуля, как FloatToStrF оригинала
                       (QLocale округляет к чётному) — используется всеми списками
 src/cli/tsstat.cpp  консольная утилита: `tsstat [--split MS] [--only-text] [--by-pauses] [--sel S L] [--text|--runs] f.tsf`
                     печатает «Параметр\tЗначение» как ListView2 (для дифф-стенда);
                     `--extra KIND [--avg] [--sort N] [--desc] [--pattern P] [--only S] [--any S] [--exclude S]` — список Form3;
                     `--to-journal out.tsj f.tsf` — записи файла журналом
-src/platform/KeyboardHook.*   обёртка libuiohook → сигнал HookKey{vk, scan, kind Press/Release/Typed, timeUs, ch}
-src/main.cpp        QApplication: светлая схема, стиль windowsvista и шрифт 8 pt на Windows (вид оригинала), MainWindow,
-                    файл из аргумента командной строки
-src/ui/             первая веха UI:
+src/platform/KeyboardHook.*   сигнал `key(HookEvent{timeUs, flags, ch, chars, firstCh})` в потоке GUI. Windows — свой
+                    WH_KEYBOARD_LL, флаги как у 0x404598 (ToUnicodeEx, восстановление мёртвой клавиши через ToAsciiEx);
+                    прочие ОС — libuiohook (без injected/extended/мёртвых клавиш, не проверялось).
+                    `foregroundWindow()/foregroundTitle()` для автокомментариев
+src/main.cpp        QApplication: светлая схема, стиль windowsvista и шрифт 8 pt на Windows (вид оригинала), переводчик
+                    (ключ `Language` = Russian/English, иначе язык системы; `--lang ru|en`), MainWindow, файл из аргумента
+src/ui/
   MainWindow.*        Form1: тулбар по координатам DFM (иконки оригинала; неподключённые кнопки выключены),
-                      сплиттеры, ListView2/ListView1 (QTableWidget с сеткой), «Файл повреждён», открытие .tsf/.tsj,
-                      сохранение, очистка, «Открыть журнал», опции пересчёта (QSettings: Pause/TextOnly/SplitOnEnter,
-                      MainOption<i>), выделение в тексте → статистика и список клавиш
+                      сплиттеры, ListView2 (высота по числу строк + 1, как FUN_00429bbc) / ListView1, «Файл повреждён»,
+                      открытие .tsf/.tsj, сохранение (подпись по `m_clean` = g_fileClean; расстановка пальцев в файл и из
+                      файла), очистка, «Открыть журнал», опции пересчёта, выделение в тексте → статистика и список клавиш.
+                      Запись: `keyEvent` (Recorder + JournalWriter при `JournalOn`), `tick` 100 мс (пересчёт, когда окно
+                      активно; показ оперативной статистики раз в 5 тиков). Связка графика с клавограммой:
+                      `klavogramMoved` / `graphMoved` / `syncGraphScrollBar`, меню оси `showAxisMenu`.
+                      Ключи QSettings = ключи пресета оригинала (Vgr*, Vhs*, SpeedYmin…, Legend*, TextWinHeight,
+                      KlavWinHeight, RightPanelWidth, DlitCol*Width, FingerZonesName, op*, GlobalOnOff, GlobalClear,
+                      AutoComments, JournalOn)
+  GraphWidget.*       PaintBox1 по `re/graph_paint.md`: ось Y (три подписи на линию), 8 серий, строка текста, линейка
+                      (двойной правый клик), курсор (двойной клик), мышь (ЛКМ — сдвиг, ПКМ — масштаб, СКМ — быстрый сдвиг,
+                      ЛКМ+ПКМ — масштаб клавограммы), `setKlavogramRange`/`pullKlavogramRange` (FUN_0043a918),
+                      `scrollParams` (FUN_0043c170), масштабы осей `rescale` (FUN_00405b34). Сверено с эталоном на глаз;
+                      мышь руками не проверялась. «Свёрнутый» режим (высота < 100: ScrollBar1 управляет клавограммой)
+                      не сделан
+  GraphPanels.*       FloatingPanel (заголовок-перетаскивание, красная кнопка), LegendPanel (Panel2), AxisPanel (Panel9)
+  LiveStatsWindow.*   Form10 «Оперативная статистика»: скорость (цвет — радуга FUN_0042a17c), % ошибок, строка состояния
+  Texts.*             переводимые подписи для ядра (StatsUnits, названия строк ListView2); сюда же — Histograms::Names и
+                      заголовки Form3, когда появятся эти формы
   TextView.*          Memo4: QTextEdit, Arial 16 px, стили TextRun (красный/синий/зелёный/подчёркивание),
                       `setVisibleRange` — жёлтая подсветка участка, видимого на клавограмме
   KlavogramWidget.*   PaintBox3 по `re/klavogram.md`: 9 дорожек по пальцам, цвета по числу зажатых клавиш, шкала
                       времени, рамки стёртых/injected, мышь (ЛКМ — прокрутка, ПКМ — масштаб, СКМ — быстрая
                       прокрутка, колесо, двойной клик — режим курсора, ЛКМ+ПКМ — измерение с плашкой),
                       `visibleSpanUs()` для списка клавиш, `visibleRecords()`. Сверено с эталоном на глаз (снимки);
-                      режим курсора и измерение руками не проверялись.
-                      График (PaintBox1) — пока пустая панель
-src/export/, i18n/  пусто
+                      режим курсора и измерение руками не проверялись. `setScrollMs`/`setZoom` — для графика
+src/export/         пусто
+i18n/               `typestats_en.ts` (исходные строки русские), `en.json` (словарь), `update.py`: lupdate + заполнение .ts
+                    из словаря, печатает непереведённое. После новых `tr()`: `source env.sh && python i18n/update.py`
 resources/icons/    оригинальные иконки кнопок (<Form>_<SpeedButtonN>.png) + app.ico/png; resources.qrc
 tests/tst_tsf.cpp   юнит-тесты + golden: подпись и побайтовый round-trip 4 реальных файлов
 tests/tst_recalc.cpp  KeyName, разметка BS/Ctrl+BS, нормализация, текст/фрагменты, статистика на синтетике, golden-прогон
@@ -105,6 +129,8 @@ tests/tst_zones.cpp FingerZones, FingerZoneSchemes, IniFile
 tests/tst_extra.cpp ExtraStats на синтетике
 tests/tst_hist.cpp  Histograms и formatFixed на синтетике
 tests/tst_journal.cpp  Journal: формат записи, битый хвост, JournalWriter, golden-записи через журнал
+tests/tst_recorder.cpp Recorder: записи и dt, игнорируемые события, хоткеи, автокомментарии, мёртвые клавиши, оперативная
+                    статистика
 tests/tst_orig.cpp  ядро против записанного вывода оригинала (tests/golden/orig/*.json): ListView2, текст, стили,
                     выделения, ListView1 — 4 файла × 5 наборов опций; серии графиков — 824; Form3 (ключ `extra`) и
                     Form4 (ключ `hist`) — 824 и обыка (обыка — при «Только текст» = 1 и = 0).
@@ -145,7 +171,8 @@ python re/scripts/diffstand.py файл --journal                               
   - `cconv` — классификация cdecl/fastcall + param-id;
   - `types` — `re/rtl_names.json`, `re/globals.json`, структура KeyRec;
   - `decompile` — пишет `re/decomp/range_XX0000.c` для диапазона 0x401000–0x456000;
-  - `one:0xADDR[,..]` — одна функция с большим таймаутом → `re/decomp/one_0xADDR.c`.
+  - `one:0xADDR[+0xADDR..]` — отдельные функции с большим таймаутом → `re/decomp/one_0xADDR.c`. Разделитель — `+`
+    (запятую cmd.exe режет на аргументы). Если по адресу нет функции (вызывается только через vtable) — создаётся.
 - **Запуск:**
   ```
   cmd //c "tools\\ghidra_12.1.4_PUBLIC\\support\\analyzeHeadless.bat re\\ghidra_proj TypeStats -process TypeStats.exe -noanalysis -scriptPath re\\scripts -postScript TsImportAndDecompile.java C:\\Users\\kizn\\Desktop\\typestats <mode>"
@@ -168,6 +195,9 @@ python re/scripts/diffstand.py файл --journal                               
   - `finger_zones.md` — **зоны пальцев**: объект 0x5b1078, встроенная схема, FingerZones.ini, .tsf, Tkbd (геометрия, цвета);
   - `extra_stats.md` — **Form3**: n-граммы, слова, предложения, шаблоны, фильтр, сортировки, формат, ExStats.ini, стенд;
   - `klavogram.md` — **клавограмма**: состояние объекта, алгоритм отрисовки, цвета, шкала, мышь;
+  - `graph_paint.md` — **график PaintBox1**: панели (ось, строка текста, график, легенда) и их vtable, серии и масштабы,
+    алгоритм отрисовки, мышь, ScrollBar1 и синхронизация с клавограммой, легенда, «Настройка оси Y»;
+  - `recording.md` — **запись**: хук 0x404598, OnKeyEvent 0x40a7a4 по шагам, таймер, оперативная статистика (Form10);
   - `journal.md` — **журнал `.tsj`**: формат записи, имя файла, чтение/запись, отличия порта, стенд;
   - `metrics.md` — **формулы основной статистики** (0x4255a8, 0x438304), форматы строк, разметка стёртых;
   - `text_reconstruction.md` — **Recalculate**: нормализация, KeyDisplayName, построение текста/абзацев/стилей,
@@ -210,7 +240,13 @@ python re/scripts/diffstand.py файл --journal                               
 | Абзац в RichEdit + стили сегментов (flushParagraph) | 0x40c5d0 |
 | Добавить элемент в текстовую модель | 0x412c18 |
 | Клавограмма: press / segment start / release | 0x4377cc / 0x4379c0 / 0x43720c |
-| Расчёт серий графиков для фрагмента (НЕ разобрано) | 0x403868 |
+| Расчёт серий графиков для фрагмента (`re/graphs.md`) | 0x403868 |
+| Панели графика: отрисовка графика / оси / строки текста / легенды | 0x43ad84 / 0x43cb0c / 0x43ca8c / 0x43cf64 |
+| Серии: линия / гистограмма аритмии / гистограмма длительностей / границы фрагментов | 0x439ef4 / 0x439a5c / 0x439920 / 0x439dc0 |
+| График: мышь нажатие / движение, элемент под мышью, синхронизация, параметры ScrollBar1 | 0x43c0c8 / 0x43c264 / 0x43ad40 / 0x43a918 / 0x43c170 |
+| Масштабы осей Y (авто-пределы 0x439c5c) | 0x405b34 |
+| Применение настроек Form8 (шрифты, высота ListView2, Recalculate) | 0x429bbc |
+| Оперативная статистика: показ / цвет скорости / сброс | 0x42a37c / 0x42a17c / 0x402c70 |
 | «Пометить (Ins)» — ставит флаг 0x200 | 0x419ed4 (SpeedButton13Click) |
 | ListView1 (Пауза/Длительность/Клавиша) заполнение | 0x404c44 (данные через 0x437d98) |
 | Form3 — доп. статистика (расчёт; фильтр 0x43fcac, преобразование имени 0x43f6e8, вывод 0x44559c, сортировка 0x445d38/0x445ac0) | 0x43ff3c |
@@ -245,7 +281,8 @@ python re/scripts/diffstand.py файл --journal                               
   wpm = нетто·0.2; аритмия = среднее |интервал−среднее| в % от среднего.
 - **LoadLanguage 0x41c794:** `<exe>\<Language>.lng`, INI, секция `Main`, ключи-номера
   (i+0x12f, i+0x352, i+0x456); задаёт также «мс» (подпись Label2) и суффиксы времени ч/м/с.
-- **Хоткеи:** F8+F9 (вкл/выкл), LCtrl+LWin (очистить), LCtrl+RShift, LCtrl+RCtrl (автокомментарий), Ctrl+Alt+O (оперативная статистика).
+- **Хоткеи:** F8+F9 (вкл/выкл), LCtrl+LWin (очистить), LCtrl+RShift (сброс оперативной статистики), LCtrl+RCtrl
+  (автокомментарий), Ctrl+Alt+O (оперативная статистика). Порядок обработки и таймер — `re/recording.md`.
 - **Оперативная статистика:**
   - `speed = (n−1−pauses)·6e7 / Σdt_µs`;
   - `err% = серии BackSpace ·100 / n`.
@@ -281,26 +318,18 @@ python re/scripts/diffstand.py файл --journal                               
    - справа панель 218 px: ListView2 (Параметр/Значение, высота 318) и ListView1 (Пауза/Длительность/Клавиша);
    - плавающие панели: «Настройка оси Y» (Panel9) и «Легенда» (Panel2).
 
-   Сделано: каркас главного окна и клавограмма (см. `src/ui/` в «Структуре», `re/klavogram.md`), числа на экране
-   совпадают с оригиналом.
+   Сделано: главное окно, клавограмма, график с легендой и «Настройкой оси Y», запись с хука, оперативная
+   статистика, база i18n (см. `src/ui/` в «Структуре»); числа и вид совпадают с оригиналом.
+   Ключа zoom клавограммы в пресете оригинала НЕТ (`FUN_0040687c` — это параметры ScrollBar1), сохранять нечего.
+   **Не проверено руками** (нужен живой ввод/мышь, стенд этого не покрывает): запись в чужих окнах (флаги хука,
+   мёртвые клавиши, хоткеи), мышь на графике, перетаскивание панелей. Попросить пользователя попробовать.
    **СЛЕДУЮЩЕЕ**, по порядку:
-   - график: сначала реверс в `re/graph_paint.md`, потом `src/ui/GraphWidget`. `PaintBox1Paint` → движок 0x43c6bc
-     (им же рисуются гистограммы Form4: группа `DAT_005b1688`, ось `DAT_005b16b0`, подписи `DAT_005b16b4`);
-     текстовая модель `DAT_005b1410` рисует строку текста под графиком и хранит видимый диапазон
-     (`FUN_0043a8fc(model, e1, e2)`, `FUN_0043a918`); три режима меню PopupMenu2 «Скорость/Ритмичность/Гистограмма»,
-     оси Y слева (жёлтая полоса, несколько шкал), выделение мышью (PaintBox1MouseDown/Move/Up), ScrollBar1
-     (`ScrollBar1Scroll`, синхронизация с клавограммой — `FUN_00424e64`), «Легенда» (Panel2/PaintBox2, цвета и
-     названия серий, ключи `Vgr*` пресета), «Настройка оси Y» (Panel9). Серии уже считает `Graphs::compute`
-     (на первых элементах фрагментов — 0, рисовать по `TextModel::fragmentStarts`);
-   - мелочи главного окна: высота строк ListView1 (в оригинале 12 строк на ту же высоту, в порту 10), расстановка
-     из файла (`FingerZoneSchemes::adopt`) при открытии, сохранение zoom клавограммы в пресет (`FUN_0040687c`);
-   - запись: KeyboardHook → записи (порт 0x404598/0x40a7a4: флаги, мёртвые клавиши, хоткеи, автокомментарии,
-     JournalWriter), «Вкл», оперативная статистика (Form10);
    - правка: удалить/пометить/метки/отмена, копирование (обычное, без ошибок, с тегами), «Сохранить блок»;
-     правило подписи при сохранении (`g_fileClean`) — сейчас подпись сохраняется только у непомеченного файла с
-     верной подписью;
-   - остальные формы: Form3, Form4, Tkbd, Form8 (настройки), Form2, Form9, Form7; пресеты; трей; импорт настроек
-     из реестра; экспорт xlsx/csv; i18n; видео.
+   - остальные формы: Form3, Form4 (движок панелей 0x43c6bc тот же, что у графика: группа `DAT_005b1688`, ось
+     `DAT_005b16b0`, подписи `DAT_005b16b4`), Tkbd, Form8 (настройки: GlobalOnOff, GlobalClear, AutoComments,
+     JournalOn, MainOption*, Language, шрифты — сейчас читаются из QSettings без UI), Form2, Form9, Form7;
+     пресеты (ComboBox1); трей; импорт настроек из реестра; экспорт xlsx/csv; видео;
+   - «свёрнутый» режим графика (Panel1 ниже 100 px); языки: новые строки — через `i18n/update.py`.
 
 ## Технический долг: артефакты оригинала в ядре
 
@@ -341,9 +370,13 @@ python re/scripts/diffstand.py файл --journal                               
   (секунды); оригинал запускать редко, на одном файле (самом проблемном), в фоне.
 - Декомпиляция Ghidra врёт в x87 (пороги, аргументы fabs/FloatToStrF): любые формулы с плавающей точкой
   подтверждать `disasm.py` и константами из exe. Точность оригинала воспроизводится `long double` (MinGW = 80 бит).
-- UI проверять снимками: `screenshot_port.py` после сборки и сравнение с `re/ui_reference/` (или свежим
-  `screenshot_orig.py`). Для временных файлов стенда с подписью: файл без строки `signature=` оригинал показывает
+- UI проверять снимками: `screenshot_port.py <tsf> <out.png> [--lang en]` после сборки (снимает окно через
+  PrintWindow — фокус у пользователя не отбирается) и сравнение с `re/ui_reference/` (или свежим `screenshot_orig.py`).
+  Синтетический ввод (SendInput) для проверки хука НЕ слать: он попадёт в окно, где работает пользователь. Для временных файлов стенда с подписью: файл без строки `signature=` оригинал показывает
   как «Файл повреждён» — это нормально, пользователя предупреждать.
 - Коммитить после каждого законченного куска (пункт долга, модуль, веха UI), прямо в `master`.
 - Инструментальная ловушка: в Bash-хередоках через инструмент `\\` схлопывается в `\` и `"\n"` превращается в
-  перевод строки. Правки с обратными слэшами в Python/C++/md делать через Edit/Write, а не `python - <<EOF`.
+  перевод строки, а апострофы внутри `python - <<'EOF'` ломают разбор команды. Правки с обратными слэшами и большие
+  наборы замен — через Edit/Write (скрипт замен класть Write-ом во временный файл и запускать).
+- Строки интерфейса — только через `tr()` (исходный текст русский); подписи, которые формирует ядро, — через
+  `ui/Texts`. После добавления строк — `python i18n/update.py`, перевод дописать в `i18n/en.json`.
