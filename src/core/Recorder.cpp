@@ -1,5 +1,7 @@
 #include "Recorder.h"
 
+#include <array>
+
 #include "KeyName.h"
 
 #include <algorithm>
@@ -11,6 +13,25 @@ void Recorder::lap(qint64 timeUs)
     m_dtUs = quint32(std::clamp<qint64>(dt, 0, std::numeric_limits<quint32>::max()));
     m_prev = m_last;
     m_last = timeUs;
+}
+
+int Recorder::appendReleases(KeyRecords &records)
+{
+    // By virtual key; the release carries nothing but it and comes 50 ms after the record before.
+    std::array<bool, 256> down{};
+    for (const KeyRecord &r : records)
+        down[r.vk()] = r.isDown();
+    int added = 0;
+    for (quint32 vk = 0; vk < 256; ++vk) {
+        if (!down[vk])
+            continue;
+        KeyRecord release;
+        release.dtUs = 50000;
+        release.flags = vk << 16 | KeyRecord::KeyUp;
+        records.append(release);
+        ++added;
+    }
+    return added;
 }
 
 void Recorder::resetLive()

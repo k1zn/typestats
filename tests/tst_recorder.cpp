@@ -31,6 +31,28 @@ class TstRecorder : public QObject
 {
     Q_OBJECT
 private slots:
+    void releasesOfHeldKeys()
+    {
+        // Capture switched off with Shift and "a" still down: both get a release, "b" has its own.
+        KeyRecords records;
+        auto add = [&records](quint8 vk, bool down) {
+            KeyRecord r;
+            r.dtUs = 1000;
+            r.flags = quint32(vk) << 16 | (vk & 0x7F) | (down ? 0 : KeyRecord::KeyUp);
+            records.append(r);
+        };
+        add(0xA0, true);
+        add(0x41, true);
+        add(0x42, true);
+        add(0x42, false);
+        QCOMPARE(Recorder::appendReleases(records), 2);
+        QCOMPARE(records.size(), 6);
+        QCOMPARE(records[4].flags, quint32(0x41) << 16 | KeyRecord::KeyUp);
+        QCOMPARE(records[4].dtUs, quint32(50000));
+        QCOMPARE(records[5].flags, quint32(0xA0) << 16 | KeyRecord::KeyUp);
+        QCOMPARE(Recorder::appendReleases(records), 0);
+    }
+
     void recordsPressesAndReleases()
     {
         Recorder rec;

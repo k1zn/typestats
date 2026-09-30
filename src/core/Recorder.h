@@ -59,6 +59,10 @@ public:
 
     Outcome handle(const HookEvent &e, const RecorderSettings &s, const Context &c, KeyRecords &records);
 
+    // Capture was switched off (CheckBox1Click): the keys that are still down in the recording get
+    // releases, so that the klavogram does not hold them forever. Returns their number.
+    static int appendReleases(KeyRecords &records);
+
     const LiveStats &live() const { return m_live; }
     void resetLive();
 

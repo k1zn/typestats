@@ -1,8 +1,10 @@
 #include "ui/MainWindow.h"
+#include "ui/Presets.h"
 #include "ui/Texts.h"
 
 #include <QApplication>
 #include <QIcon>
+#include <QSettings>
 #include <QStyleHints>
 #include <QTimer>
 #include <QTranslator>
@@ -18,6 +20,7 @@ int main(int argc, char *argv[])
     // The source texts are Russian, as in the original; "Language" (its preset key) picks a translation.
     // Without the key the system language decides. `--lang ru|en` overrides both.
     QStringList args = app.arguments();
+    Presets::importFromOriginal(); // the first start takes over the original's settings
     QString language = Texts::currentLanguage();
     if (const qsizetype i = args.indexOf(QStringLiteral("--lang")); i > 0 && i + 1 < args.size()) {
         language = args[i + 1] == QLatin1String("ru") ? QStringLiteral("Russian") : QStringLiteral("English");
@@ -37,6 +40,8 @@ int main(int argc, char *argv[])
 
     MainWindow w;
     w.show();
+    if (QSettings().value(QStringLiteral("AutoMinimize"), false).toBool())
+        w.showMinimized();
     w.startCapture();
     QString form;
     if (const qsizetype i = args.indexOf(QStringLiteral("--show")); i > 0 && i + 1 < args.size()) {

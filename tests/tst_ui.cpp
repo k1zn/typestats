@@ -9,6 +9,8 @@
 #include "ui/HistogramWindow.h"
 #include "ui/KlavogramWidget.h"
 #include "ui/MainWindow.h"
+#include "ui/Presets.h"
+#include "ui/TextInputWindow.h"
 #include "ui/SettingsDialog.h"
 #include "ui/TextView.h"
 
@@ -383,6 +385,58 @@ private slots:
         const FingerZones before = d.zones();
         QTest::mouseClick(keyboard, Qt::LeftButton, {}, QPoint(3, 3));
         QVERIFY(d.zones() == before);
+    }
+
+    void presets()
+    {
+        {
+            MainWindow w;
+            QCOMPARE(w.m_presets->count(), 0);
+            w.m_pause->setValue(700);
+            w.saveSettings();
+            Presets::store(QStringLiteral("Быстрый"));
+            w.m_pause->setValue(3000);
+            w.saveSettings();
+            Presets::store(QStringLiteral("Медленный"));
+            Presets::setCurrent(QStringLiteral("Медленный"));
+        }
+        MainWindow w;
+        QCOMPARE(w.m_presets->count(), 2);
+        QCOMPARE(w.m_presets->currentText(), QStringLiteral("Медленный"));
+        QCOMPARE(w.m_pause->value(), 3000);
+        w.m_pause->setValue(3500); // changes go to the preset that is current
+        w.selectPreset(QStringLiteral("Быстрый"));
+        QCOMPARE(w.m_pause->value(), 700);
+        QCOMPARE(Presets::current(), QStringLiteral("Быстрый"));
+        w.selectPreset(QStringLiteral("Медленный"));
+        QCOMPARE(w.m_pause->value(), 3500);
+        // The window geometry and the language are not part of a preset.
+        QSettings s;
+        s.beginGroup(QStringLiteral("Presets/Быстрый"));
+        QVERIFY(s.contains(QStringLiteral("Pause")));
+        QVERIFY(!s.contains(QStringLiteral("WindowGeometry")));
+        s.endGroup();
+        Presets::remove(QStringLiteral("Быстрый"));
+        QCOMPARE(Presets::names(), QStringList{QStringLiteral("Медленный")});
+        QSettings().clear();
+    }
+
+    void captureOffReleasesKeys()
+    {
+        MainWindow w;
+        HookEvent e;
+        e.timeUs = 1000;
+        e.flags = quint32(0x41) << 16 | 0x1E | KeyRecord::HasChar;
+        e.ch = u'a';
+        e.chars = 1;
+        if (QApplication::activeWindow())
+            QSKIP("the test window got the focus");
+        w.keyEvent(e);
+        QCOMPARE(w.m_doc.records.size(), 1);
+        w.m_capture->setChecked(false);
+        QCOMPARE(w.m_doc.records.size(), 2);
+        QVERIFY(w.m_doc.records.last().isUp());
+        QCOMPARE(w.m_model.text, QStringLiteral("a"));
     }
 
 private:

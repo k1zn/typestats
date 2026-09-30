@@ -23,8 +23,10 @@ class QMenu;
 class QScrollBar;
 class QSpinBox;
 class QSplitter;
+class QSystemTrayIcon;
 class QTableWidget;
 class QToolButton;
+class TextInputWindow;
 class TextView;
 
 // The main window (Form1); geometry from re/forms_geometry.txt.
@@ -38,13 +40,14 @@ public:
     bool openFile(const QString &path);
     // Installs the keyboard hook: from now on what is typed elsewhere is recorded.
     void startCapture();
-    // Opens a form by name (`--show NAME`, for screenshots): settings, extra, hist, hist-fingers, hist-extra, kbd.
+    // Opens a form by name (`--show NAME`, for screenshots): settings, extra, hist, hist-fingers, hist-extra, kbd, about, input.
     void showForm(const QString &name);
 
 protected:
     void closeEvent(QCloseEvent *e) override;
     void resizeEvent(QResizeEvent *e) override;
     void showEvent(QShowEvent *e) override;
+    void changeEvent(QEvent *e) override;
     bool eventFilter(QObject *o, QEvent *e) override;
 
 private:
@@ -65,6 +68,13 @@ private:
     void showExtraStats();
     void updateHistograms();
     void showHistograms();
+    void captureToggled(bool on);
+    void showTextInput();
+    void showHelpMenu();
+    void selectPreset(const QString &name);
+    void createPreset();
+    void deletePreset();
+    void restoreFromTray();
     void zonesChanged();
     void editFingerZones();
     void createFingerZones();
@@ -138,6 +148,8 @@ private:
     QToolButton *m_deleteButton = nullptr;
     QToolButton *m_blockButton = nullptr;
     QToolButton *m_newZonesButton = nullptr;
+    QToolButton *m_newPresetButton = nullptr;
+    QToolButton *m_helpButton = nullptr;
 
     KeyboardHook m_hook;
     Recorder m_recorder;
@@ -145,6 +157,8 @@ private:
     LiveStatsWindow *m_live = nullptr;
     ExtraStatsWindow *m_extra = nullptr;
     HistogramWindow *m_hist = nullptr;
+    TextInputWindow *m_input = nullptr;
+    QSystemTrayIcon *m_tray = nullptr;
     bool m_needRecalc = false;   // keys were recorded since the text was built
     QElapsedTimer m_lastKey;
     bool m_livePending = false;  // the running statistics changed since they were shown

@@ -1,5 +1,8 @@
 #include "MainWindow.h"
 
+#include "AboutDialog.h"
+#include "Presets.h"
+#include "TextInputWindow.h"
 #include "GraphPanels.h"
 #include "GraphWidget.h"
 #include "HistogramWindow.h"
@@ -37,6 +40,9 @@
 #include <QShortcut>
 #include <QSpinBox>
 #include <QSplitter>
+#include <QSystemTrayIcon>
+#include <QDesktopServices>
+#include <QUrl>
 #include <QToolButton>
 #include <QToolTip>
 #include <QTableWidget>
@@ -200,6 +206,23 @@ MainWindow::MainWindow(QWidget *parent)
     m_extra = new ExtraStatsWindow(this);
     connect(m_extra, &ExtraStatsWindow::shown, this, &MainWindow::updateExtraStats);
     connect(m_extra, &ExtraStatsWindow::elementSelected, this, &MainWindow::scrollKlavogramToElement);
+    m_input = new TextInputWindow(this);
+    connect(new QShortcut(QKeySequence(Qt::Key_F4), this), &QShortcut::activated, this, &MainWindow::showTextInput);
+    m_tray = new QSystemTrayIcon(QApplication::windowIcon(), this);
+    auto *trayMenu = new QMenu(this);
+    QAction *captureAction = trayMenu->addAction(tr("Вкл"));
+    captureAction->setCheckable(true);
+    captureAction->setChecked(true);
+    connect(captureAction, &QAction::toggled, m_capture, &QCheckBox::setChecked);
+    connect(m_capture, &QCheckBox::toggled, captureAction, &QAction::setChecked);
+    trayMenu->addAction(tr("Оперативная статистика"), this, &MainWindow::showLiveStats);
+    trayMenu->addAction(tr("Выход"), this, &QWidget::close);
+    m_tray->setContextMenu(trayMenu);
+    m_tray->setToolTip(QStringLiteral("Ts: ON"));
+    connect(m_tray, &QSystemTrayIcon::activated, this, [this](QSystemTrayIcon::ActivationReason reason) {
+        if (reason == QSystemTrayIcon::Trigger)
+            restoreFromTray();
+    });
     m_hist = new HistogramWindow(this);
     connect(m_hist, &HistogramWindow::shown, this, &MainWindow::updateHistograms);
     connect(m_hist, &HistogramWindow::elementSelected, this, &MainWindow::scrollKlavogramToElement);
@@ -257,7 +280,7 @@ QWidget *MainWindow::createToolBar()
     action(20, 198, 4, 23, tr("Видео"), nullptr);
     action(22, 222, 4, 23, tr("Настройки..."), &MainWindow::showSettings);
     action(4, 246, 4, 23, tr("Оперативная статистика"), &MainWindow::showLiveStats);
-    action(3, 270, 4, 23, tr("Справка"), nullptr);
+    m_helpButton = action(3, 270, 4, 23, tr("Справка"), &MainWindow::showHelpMenu);
     bevel(bar, 3, 29, 294, 2, QFrame::HLine);
     // Lower row.
     m_deleteButton = action(10, 6, 32, 22, tr("Удалить (Del)"), &MainWindow::deleteSelection);
@@ -270,7 +293,7 @@ QWidget *MainWindow::createToolBar()
     action(21, 150, 32, 22, tr("Свойства видео"), nullptr);
     action(16, 174, 32, 22, tr("Настройка оси Y графиков"), &MainWindow::toggleAxisPanel);
     action(17, 198, 32, 22, tr("Легенда"), &MainWindow::toggleLegend);
-    action(23, 222, 32, 22, tr("Ввод текста (F4)"), nullptr);
+    action(23, 222, 32, 22, tr("Ввод текста (F4)"), &MainWindow::showTextInput);
     action(25, 246, 32, 22, tr("Преобразовать в текущую раскладку"), nullptr);
     QToolButton *quit = toolButton(bar, 24, 270, 32, 22, tr("Выход"));
     quit->setEnabled(true);
@@ -315,7 +338,13 @@ QWidget *MainWindow::createToolBar()
     m_fingers->setGeometry(592, 28, 152, 21);
     m_fingers->addItems(m_schemes.names());
     connect(m_fingers, &QComboBox::currentTextChanged, this, &MainWindow::zonesChanged);
-    toolButton(bar, 8, 744, 3, 23, tr("Создать пресет (Правой кнопкой - удалить)"));
+    m_newPresetButton = toolButton(bar, 8, 744, 3, 23, tr("Создать пресет (Правой кнопкой - удалить)"));
+    m_newPresetButton->setEnabled(true);
+    m_newPresetButton->installEventFilter(this);
+    connect(m_newPresetButton, &QToolButton::clicked, this, &MainWindow::createPreset);
+    m_presets->addItems(Presets::names());
+    m_presets->setCurrentIndex(m_presets->findText(Presets::current()));
+    connect(m_presets, &QComboBox::textActivated, this, &MainWindow::selectPreset);
     m_newZonesButton = toolButton(bar, 9, 744, 27, 23, tr("Создать расстановку (Правой кнопкой - удалить)"));
     m_newZonesButton->setEnabled(true);
     m_newZonesButton->installEventFilter(this);
@@ -324,6 +353,7 @@ QWidget *MainWindow::createToolBar()
     editZones->setEnabled(true);
     connect(editZones, &QToolButton::clicked, this, &MainWindow::editFingerZones);
 
+    connect(m_capture, &QCheckBox::toggled, this, &MainWindow::captureToggled);
     connect(m_onlyText, &QCheckBox::toggled, this, &MainWindow::recalculate);
     connect(m_byPauses, &QCheckBox::toggled, this, &MainWindow::recalculate);
     connect(m_pause, &QSpinBox::valueChanged, this, &MainWindow::recalculate);
@@ -339,8 +369,14 @@ void MainWindow::loadSettings()
     m_onlyText->setChecked(s.value(QStringLiteral("TextOnly"), true).toBool());
     m_byPauses->setChecked(s.value(QStringLiteral("SplitOnEnter"), false).toBool());
     const QByteArray geometry = s.value(QStringLiteral("WindowGeometry")).toByteArray();
-    if (!geometry.isEmpty())
+    if (!geometry.isEmpty()) {
         restoreGeometry(geometry);
+    } else if (s.contains(QStringLiteral("MainWinWidth"))) {
+        // Taken over from the original.
+        resize(s.value(QStringLiteral("MainWinWidth")).toInt(), s.value(QStringLiteral("MainWinHeight"), height()).toInt());
+        if (s.contains(QStringLiteral("MainWinLeft")))
+            move(s.value(QStringLiteral("MainWinLeft")).toInt(), s.value(QStringLiteral("MainWinTop")).toInt());
+    }
     // Heights of the text and the klavogram, width of the right panel; the graph takes the rest.
     const int total = m_leftSplit->sizes().value(0) + m_leftSplit->sizes().value(1) + m_leftSplit->sizes().value(2);
     const int textHeight = s.value(QStringLiteral("TextWinHeight"), 120).toInt();
@@ -354,6 +390,7 @@ void MainWindow::loadSettings()
 
     m_live->loadSettings();
     m_extra->loadSettings();
+    m_input->loadSettings();
 
     static const bool shownByDefault[GraphWidget::SeriesCount] = {false, true, false, false, false, true, true, false};
     for (int i = 0; i < GraphWidget::SeriesCount; ++i)
@@ -389,6 +426,7 @@ void MainWindow::saveSettings() const
     s.setValue(QStringLiteral("WindowGeometry"), saveGeometry());
     m_live->saveSettings();
     m_extra->saveSettings();
+    m_input->saveSettings();
     s.setValue(QStringLiteral("TextWinHeight"), m_leftSplit->sizes().value(0));
     s.setValue(QStringLiteral("KlavWinHeight"), m_leftSplit->sizes().value(2));
     s.setValue(QStringLiteral("RightPanelWidth"), m_mainSplit->sizes().value(1));
@@ -427,7 +465,10 @@ void MainWindow::applySettings()
 {
     // FUN_00429bbc; the rows of the statistics list follow MainOption* in updateStats().
     const QSettings s;
-    m_text->setFontSize(std::clamp(s.value(QStringLiteral("TextFontSize"), 12).toInt(), 8, 24));
+    const int textFont = std::clamp(s.value(QStringLiteral("TextFontSize"), 12).toInt(), 8, 24);
+    m_text->setFontSize(textFont);
+    m_input->setFontSize(textFont);
+    m_tray->setVisible(s.value(QStringLiteral("MinimizeToTray"), false).toBool() && QSystemTrayIcon::isSystemTrayAvailable());
     m_klav->setFontSize(std::clamp(s.value(QStringLiteral("KlavogrFontSize"), 9).toInt(), 8, 24));
     m_keyDigits = std::clamp(s.value(QStringLiteral("DlitDigits"), 3).toInt(), 0, 3);
     m_live->setSpeedRange(s.value(QStringLiteral("opLoSpeed"), 200).toInt(), s.value(QStringLiteral("opHiSpeed"), 500).toInt());
@@ -440,6 +481,10 @@ void MainWindow::showForm(const QString &name)
         showSettings();
     else if (name == QLatin1String("extra"))
         showExtraStats();
+    else if (name == QLatin1String("about"))
+        AboutDialog(this).exec();
+    else if (name == QLatin1String("input"))
+        showTextInput();
     else if (name == QLatin1String("kbd"))
         editFingerZones();
     else if (name.startsWith(QLatin1String("hist"))) {
@@ -456,7 +501,100 @@ void MainWindow::showForm(const QString &name)
 void MainWindow::closeEvent(QCloseEvent *e)
 {
     saveSettings();
+    Presets::store(Presets::current()); // the preset follows what was changed while it was current
     e->accept();
+    m_tray->hide();
+    QApplication::quit(); // the tool windows do not keep the program running
+}
+
+void MainWindow::changeEvent(QEvent *e)
+{
+    QWidget::changeEvent(e);
+    // Minimized with the tray icon on: the window leaves the task bar.
+    if (e->type() == QEvent::WindowStateChange && isMinimized() && m_tray && m_tray->isVisible())
+        QTimer::singleShot(0, this, &QWidget::hide);
+}
+
+void MainWindow::restoreFromTray()
+{
+    showNormal();
+    raise();
+    activateWindow();
+}
+
+void MainWindow::captureToggled(bool on)
+{
+    m_tray->setToolTip(on ? QStringLiteral("Ts: ON") : QStringLiteral("Ts: OFF"));
+    const QIcon icon = QApplication::windowIcon();
+    m_tray->setIcon(on ? icon : QIcon(icon.pixmap(32, 32, QIcon::Disabled)));
+    // Switched off: the keys still held get their releases.
+    if (!on && Recorder::appendReleases(m_doc.records) > 0)
+        recalculate();
+    m_text->setFocus();
+}
+
+void MainWindow::showTextInput()
+{
+    m_input->show();
+    m_input->raise();
+    m_input->activateWindow();
+}
+
+void MainWindow::showHelpMenu()
+{
+    QMenu menu(this);
+    menu.addAction(tr("О программе..."), this, [this] { AboutDialog(this).exec(); });
+    menu.addAction(tr("Справка"), this, [] { QDesktopServices::openUrl(QUrl(QStringLiteral("http://fil.urikor.net"))); });
+    menu.exec(m_helpButton->mapToGlobal(QPoint(0, m_helpButton->height())));
+}
+
+void MainWindow::selectPreset(const QString &name)
+{
+    // ComboBox1Select: the settings in use go to the preset they belong to, then the chosen one is read.
+    saveSettings();
+    Presets::store(Presets::current());
+    Presets::load(name);
+    Presets::setCurrent(name);
+    loadSettings();
+    applySettings();
+}
+
+void MainWindow::createPreset()
+{
+    // SpeedButton8Click: the settings in use under a new name.
+    bool ok = false;
+    const QString name = QInputDialog::getText(this, tr("Создание нового пресета настроек"), tr("Название пресета"),
+                                               QLineEdit::Normal, QString(), &ok);
+    if (!ok || name.isEmpty())
+        return;
+    saveSettings();
+    Presets::store(name);
+    Presets::setCurrent(name);
+    if (m_presets->findText(name) < 0)
+        m_presets->addItem(name);
+    m_presets->setCurrentText(name);
+}
+
+void MainWindow::deletePreset()
+{
+    const QString name = Presets::current();
+    if (name.isEmpty())
+        return;
+    if (QMessageBox::question(this, tr("Удаление пресета"), tr("Вы действительно хотите удалить пресет?")) != QMessageBox::Yes)
+        return;
+    Presets::remove(name);
+    m_presets->removeItem(m_presets->findText(name));
+    if (m_presets->count() == 0) {
+        Presets::setCurrent(QString());
+        m_presets->setCurrentIndex(-1);
+        return;
+    }
+    // The first of those left becomes current.
+    m_presets->setCurrentIndex(0);
+    Presets::setCurrent(m_presets->currentText());
+    Presets::load(m_presets->currentText());
+    loadSettings();
+    applySettings();
 }
 
 void MainWindow::startCapture()
@@ -638,7 +776,11 @@ void MainWindow::keyEvent(const HookEvent &e)
     s.byPauses = m_byPauses->isChecked();
     s.liveVisible = m_live->isVisible();
     Recorder::Context c;
-    c.ownWindow = QApplication::activeWindow() != nullptr;
+    // Typing into the program's own windows is not recorded - except the text input window, which is
+    // there to be typed into (its Esc and F2 are commands, though).
+    const QWidget *active = QApplication::activeWindow();
+    const quint32 vk = (e.flags >> 16) & 0xFF;
+    c.ownWindow = active != nullptr && (active != m_input || vk == 0x1B || vk == 0x71);
     c.foregroundWindow = KeyboardHook::foregroundWindow();
     c.comment = [] {
         // Date and time as the system writes them, then the title of the window typed into.
@@ -670,7 +812,7 @@ void MainWindow::keyEvent(const HookEvent &e)
 void MainWindow::tick()
 {
     // The text is rebuilt when the user comes back to the window (Timer1Timer).
-    if (m_needRecalc && isActiveWindow()) {
+    if (m_needRecalc && (isActiveWindow() || (m_input->isActiveWindow() && m_lastKey.elapsed() > 800))) {
         m_needRecalc = false;
         recalculate();
         m_text->moveCursor(QTextCursor::End);
@@ -714,6 +856,11 @@ bool MainWindow::eventFilter(QObject *o, QEvent *e)
         const int delta = static_cast<QWheelEvent *>(e)->angleDelta().y();
         if (delta)
             m_graphScroll->setValue(m_graphScroll->value() + (delta > 0 ? -1 : 1) * m_graphScroll->singleStep());
+        return true;
+    }
+    if (o == m_newPresetButton && e->type() == QEvent::MouseButtonPress
+        && static_cast<QMouseEvent *>(e)->button() == Qt::RightButton) {
+        deletePreset();
         return true;
     }
     // The right button on "create a layout" deletes the current one.
@@ -1052,7 +1199,7 @@ void MainWindow::saveDocument(bool block)
     const bool fresh = !m_loaded || block;
     FilePropertiesDialog properties(this);
     if (fresh)
-        properties.setProperties(settings.value(QStringLiteral("autor")).toString(), nowString(), QString(), false);
+        properties.setProperties(settings.value(QStringLiteral("UserName")).toString(), nowString(), QString(), false);
     else
         properties.setProperties(m_doc.author, m_doc.date, m_doc.comment, true);
     if (properties.exec() != QDialog::Accepted)
@@ -1067,8 +1214,8 @@ void MainWindow::saveDocument(bool block)
     doc.author = properties.author();
     doc.date = properties.date();
     doc.comment = properties.description();
-    if (!m_loaded && doc.author != settings.value(QStringLiteral("autor")).toString())
-        settings.setValue(QStringLiteral("autor"), doc.author);
+    if (!m_loaded && doc.author != settings.value(QStringLiteral("UserName")).toString())
+        settings.setValue(QStringLiteral("UserName"), doc.author);
     if (block) {
         // The records of the selection; nothing selected - all of them.
         const auto [from, to] = Editing::recordRange(m_model, m_text->selectionStart(), m_text->selectionLength());
@@ -1105,5 +1252,6 @@ void MainWindow::clear()
     m_undo.clear();
     m_needRecalc = false;
     m_capture->setChecked(true);
+    m_input->clear();
     setDocument({}, {}, false);
 }

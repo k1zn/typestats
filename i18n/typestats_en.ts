@@ -2,6 +2,91 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="en_US" sourcelanguage="ru_RU">
 <context>
+    <name>AboutDialog</name>
+    <message>
+        <source>О программе</source>
+        <translation>About</translation>
+    </message>
+    <message>
+        <source>Анализатор статистики</source>
+        <translation>Analyser of the statistics</translation>
+    </message>
+    <message>
+        <source>клавиатурного набора</source>
+        <translation>of keyboard typing</translation>
+    </message>
+    <message>
+        <source>Первая версия вышла 27 ноября 2008 года</source>
+        <translation>The first version came out on November 27, 2008</translation>
+    </message>
+    <message>
+        <source>Игорь В. Филимонов</source>
+        <translation>Igor V. Filimonov</translation>
+    </message>
+    <message>
+        <source>Заходите к нам на</source>
+        <translation>Visit our</translation>
+    </message>
+    <message>
+        <source>сайт</source>
+        <translation>site</translation>
+    </message>
+    <message>
+        <source>Заглядывайте на</source>
+        <translation>Drop in at the</translation>
+    </message>
+    <message>
+        <source>форум</source>
+        <translation>forum</translation>
+    </message>
+    <message>
+        <source>Пишите</source>
+        <translation>Write</translation>
+    </message>
+    <message>
+        <source>письма</source>
+        <translation>letters</translation>
+    </message>
+    <message>
+        <source>Набирайте</source>
+        <translation>Type</translation>
+    </message>
+    <message>
+        <source>вслепую</source>
+        <translation>by touch</translation>
+    </message>
+    <message>
+        <source>Надеюсь, Typing statistics Вам в этом поможет</source>
+        <translation>I hope Typing statistics will help you with that</translation>
+    </message>
+    <message>
+        <source>Набирайте вслепую</source>
+        <translation>Type by touch</translation>
+    </message>
+    <message>
+        <source>Будьте</source>
+        <translation>Be</translation>
+    </message>
+    <message>
+        <source>счастливы</source>
+        <translation>happy</translation>
+    </message>
+    <message>
+        <source>Счастье складывается из мелочей...</source>
+        <translation>Happiness is made of small things...</translation>
+    </message>
+    <message>
+        <source>Будьте счастливы!</source>
+        <translation>Be happy!</translation>
+    </message>
+    <message>
+        <source>Эта программа была придумана и реализована в результате дебатов на форуме urikor.net. Так что всем участвовавшим (и участвующим по сию пору) форумчанам - Спасибо! Без вас этой программы не было бы.
+Отдельное спасибо - Юрикору (за отличный сайт и предоставленный хостинг), Автандилине, Dron'у, Nestor'у, Валерию Марусяку за поддержку и советы.</source>
+        <translation>This program was conceived and made as a result of the debates on the urikor.net forum. So thanks to everyone who took part (and still does)! Without you there would be no such program.
+Special thanks to Urikor (for the great site and the hosting), Avtandilina, Dron, Nestor and Valery Marusyak for their support and advice.</translation>
+    </message>
+</context>
+<context>
     <name>AxisPanel</name>
     <message>
         <source>Настройка оси Y</source>
@@ -669,6 +754,26 @@
         <source>Вы действительно хотите удалить расстановку?</source>
         <translation>Do you really want to delete the layout?</translation>
     </message>
+    <message>
+        <source>О программе...</source>
+        <translation>About...</translation>
+    </message>
+    <message>
+        <source>Создание нового пресета настроек</source>
+        <translation>New preset of settings</translation>
+    </message>
+    <message>
+        <source>Название пресета</source>
+        <translation>Name of the preset</translation>
+    </message>
+    <message>
+        <source>Удаление пресета</source>
+        <translation>Deleting a preset</translation>
+    </message>
+    <message>
+        <source>Вы действительно хотите удалить пресет?</source>
+        <translation>Do you really want to delete the preset?</translation>
+    </message>
 </context>
 <context>
     <name>SettingsDialog</name>
@@ -763,6 +868,13 @@
     <message>
         <source>Отмена</source>
         <translation>Cancel</translation>
+    </message>
+</context>
+<context>
+    <name>TextInputWindow</name>
+    <message>
+        <source>Ввод текста</source>
+        <translation>Text input</translation>
     </message>
 </context>
 <context>
