@@ -86,6 +86,13 @@
     </message>
 </context>
 <context>
+    <name>LiveStatsWindow</name>
+    <message>
+        <source>Оперативная статистика</source>
+        <translation>Live statistics</translation>
+    </message>
+</context>
+<context>
     <name>MainWindow</name>
     <message>
         <source>Параметр</source>

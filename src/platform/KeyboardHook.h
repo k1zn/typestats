@@ -1,21 +1,20 @@
 #pragma once
 
+#include "core/Recorder.h"
+
 #include <QObject>
+
+#include <optional>
 #include <thread>
 
-// Raw keyboard event captured system-wide.
-struct HookKey
-{
-    quint16 vk = 0;         // Windows virtual-key code (translated on non-Windows platforms)
-    quint16 scan = 0;       // hardware scan code (set 1), 0 if unknown
-    enum Kind : quint8 { Press, Release, Typed } kind = Press;
-    qint64 timeUs = 0;      // monotonic timestamp, microseconds
-    char16_t ch = 0;        // Typed only: character produced by the preceding Press
-};
-Q_DECLARE_METATYPE(HookKey)
+Q_DECLARE_METATYPE(HookEvent)
 
-// Global keyboard hook built on libuiohook. Runs the hook loop in a worker thread
-// and delivers events to the GUI thread through a queued signal.
+// The system-wide keyboard hook. Events come with the record flags the original's hook builds
+// (re/recording.md) and are delivered in the GUI thread.
+//
+// Windows: a low-level keyboard hook of its own in the GUI thread, the characters from ToUnicodeEx
+// with the layout of the focused window. Elsewhere: libuiohook in a worker thread; modifiers are
+// tracked by the keys seen, the character comes with the "typed" event.
 class KeyboardHook : public QObject
 {
     Q_OBJECT
@@ -25,12 +24,25 @@ public:
 
     bool start();
     void stop();
-    bool isRunning() const { return m_thread.joinable(); }
+    bool isRunning() const { return m_running; }
+
+    // The active window of the system: a value that changes with it, and the title of its top-level window.
+    static quint64 foregroundWindow();
+    static QString foregroundTitle();
+
+    // Used by the platform callbacks.
+    void deliver(const HookEvent &e) { emit key(e); }
+    void uiohookEvent(int kind, quint16 vk, quint16 scan, char16_t ch, qint64 timeUs);
 
 signals:
-    void key(const HookKey &k);
+    void key(const HookEvent &e);
     void failed(const QString &reason);
 
 private:
-    std::thread m_thread;
+    void flushPending();
+
+    bool m_running = false;
+    std::thread m_thread;                // libuiohook loop
+    std::optional<HookEvent> m_pending;  // a press waiting for its character
+    quint8 m_held[32] = {};              // pressed keys by VK
 };

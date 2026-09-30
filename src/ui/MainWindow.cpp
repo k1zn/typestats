@@ -3,6 +3,7 @@
 #include "GraphPanels.h"
 #include "GraphWidget.h"
 #include "KlavogramWidget.h"
+#include "LiveStatsWindow.h"
 #include "TextView.h"
 #include "Texts.h"
 #include "core/Journal.h"
@@ -12,6 +13,7 @@
 #include <QApplication>
 #include <QCheckBox>
 #include <QCloseEvent>
+#include <QDateTime>
 #include <QComboBox>
 #include <QDir>
 #include <QFileDialog>
@@ -27,6 +29,7 @@
 #include <QSplitter>
 #include <QToolButton>
 #include <QTableWidget>
+#include <QTimer>
 #include <QVBoxLayout>
 #include <QWheelEvent>
 
@@ -83,7 +86,8 @@ QFrame *bevel(QWidget *parent, int x, int y, int w, int h, QFrame::Shape shape)
 } // namespace
 
 MainWindow::MainWindow(QWidget *parent)
-    : QWidget(parent), m_schemes(QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("FingerZones.ini")))
+    : QWidget(parent), m_schemes(QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("FingerZones.ini"))),
+      m_journal(QCoreApplication::applicationDirPath())
 {
     setWindowTitle(appTitle());
     setMinimumWidth(220);
@@ -171,6 +175,13 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_klav, &KlavogramWidget::viewChanged, this, &MainWindow::klavogramMoved);
     createGraphPanels();
 
+    m_live = new LiveStatsWindow(this);
+    connect(&m_hook, &KeyboardHook::key, this, &MainWindow::keyEvent);
+    auto *timer = new QTimer(this);
+    connect(timer, &QTimer::timeout, this, &MainWindow::tick);
+    timer->start(100);
+    m_hook.start();
+
     resize(876, 579);
     loadSettings();
     recalculate();
@@ -213,7 +224,7 @@ QWidget *MainWindow::createToolBar()
     action(19, 174, 4, 23, tr("Статистические гистограммы"), nullptr);
     action(20, 198, 4, 23, tr("Видео"), nullptr);
     action(22, 222, 4, 23, tr("Настройки..."), nullptr);
-    action(4, 246, 4, 23, tr("Оперативная статистика"), nullptr);
+    action(4, 246, 4, 23, tr("Оперативная статистика"), &MainWindow::showLiveStats);
     action(3, 270, 4, 23, tr("Справка"), nullptr);
     bevel(bar, 3, 29, 294, 2, QFrame::HLine);
     // Lower row.
@@ -304,6 +315,8 @@ void MainWindow::loadSettings()
     m_keys->horizontalHeader()->resizeSection(1, s.value(QStringLiteral("DlitCol2Width"), 80).toInt());
     m_fingers->setCurrentIndex(std::max(0, m_fingers->findText(s.value(QStringLiteral("FingerZonesName")).toString())));
 
+    m_live->loadSettings();
+
     static const bool shownByDefault[GraphWidget::SeriesCount] = {false, true, false, false, false, true, true, false};
     for (int i = 0; i < GraphWidget::SeriesCount; ++i)
         if (i != GraphWidget::Pause)
@@ -336,6 +349,7 @@ void MainWindow::saveSettings() const
     s.setValue(QStringLiteral("TextOnly"), m_onlyText->isChecked());
     s.setValue(QStringLiteral("SplitOnEnter"), m_byPauses->isChecked());
     s.setValue(QStringLiteral("WindowGeometry"), saveGeometry());
+    m_live->saveSettings();
     s.setValue(QStringLiteral("TextWinHeight"), m_leftSplit->sizes().value(0));
     s.setValue(QStringLiteral("KlavWinHeight"), m_leftSplit->sizes().value(2));
     s.setValue(QStringLiteral("RightPanelWidth"), m_mainSplit->sizes().value(1));
@@ -363,6 +377,68 @@ void MainWindow::closeEvent(QCloseEvent *e)
 {
     saveSettings();
     e->accept();
+}
+
+void MainWindow::keyEvent(const HookEvent &e)
+{
+    const QSettings settings;
+    RecorderSettings s;
+    s.capture = m_capture->isChecked();
+    s.globalOnOff = settings.value(QStringLiteral("GlobalOnOff"), true).toBool();
+    s.globalClear = settings.value(QStringLiteral("GlobalClear"), true).toBool();
+    s.autoComments = settings.value(QStringLiteral("AutoComments"), false).toBool();
+    s.splitMs = m_pause->value();
+    s.byPauses = m_byPauses->isChecked();
+    s.liveVisible = m_live->isVisible();
+    Recorder::Context c;
+    c.ownWindow = QApplication::activeWindow() != nullptr;
+    c.foregroundWindow = KeyboardHook::foregroundWindow();
+    c.comment = [] {
+        // Date and time as the system writes them, then the title of the window typed into.
+        const QLocale system = QLocale::system();
+        const QDateTime now = QDateTime::currentDateTime();
+        return system.toString(now.date(), QLocale::ShortFormat) + QLatin1Char(' ')
+               + now.time().toString(QStringLiteral("H:mm:ss")) + QLatin1Char(' ') + KeyboardHook::foregroundTitle();
+    };
+
+    const Recorder::Outcome out = m_recorder.handle(e, s, c, m_doc.records);
+    if (out.setCapture)
+        m_capture->setChecked(*out.setCapture);
+    if (out.clear)
+        QTimer::singleShot(0, this, &MainWindow::clear); // not inside the hook
+    if (out.toggleLive)
+        m_live->setVisible(!m_live->isVisible());
+    if (out.liveChanged)
+        m_livePending = true;
+    if (out.liveReset)
+        m_liveTicks = 10; // shown at the next tick
+    if (out.recorded) {
+        if (settings.value(QStringLiteral("JournalOn"), false).toBool())
+            m_journal.append(m_doc.records.last());
+        m_needRecalc = true;
+        m_lastKey.start();
+    }
+}
+
+void MainWindow::tick()
+{
+    // The text is rebuilt when the user comes back to the window (Timer1Timer).
+    if (m_needRecalc && isActiveWindow()) {
+        m_needRecalc = false;
+        recalculate();
+        m_text->moveCursor(QTextCursor::End);
+    }
+    // The running statistics are shown at most twice a second.
+    if (m_livePending && ++m_liveTicks >= 5) {
+        m_livePending = false;
+        m_liveTicks = 0;
+        m_live->setStats(m_recorder.live());
+    }
+}
+
+void MainWindow::showLiveStats()
+{
+    m_live->setVisible(!m_live->isVisible());
 }
 
 void MainWindow::resizeEvent(QResizeEvent *e)
@@ -565,11 +641,13 @@ bool MainWindow::openFile(const QString &path)
     const QString name = QFileInfo(path).fileName();
     if (Journal::isJournal(path)) {
         TsfDocument doc;
+        m_journal.close(); // the journal being written may be the one to read
         if (!Journal::read(path, doc.records)) {
             QMessageBox::warning(this, appTitle(), tr("Не удалось открыть файл %1").arg(path));
             return false;
         }
         m_path.clear(); // a journal is saved as a new .tsf
+        m_clean = true;
         setDocument(doc, tr("Журнал %1").arg(name), false);
         return true;
     }
@@ -582,6 +660,7 @@ bool MainWindow::openFile(const QString &path)
     if (err == Tsf::ReadError::NewerVersion)
         QMessageBox::warning(this, appTitle(), tr("Этот файл создан в более поздней версии программы."));
     m_path = path;
+    m_clean = doc.signed_ && doc.signatureValid;
     if (!doc.fingerZonesName.isEmpty()) {
         // The finger layout of the file: an equal one that is already known, or a new one (LoadTsf).
         const QString scheme = m_schemes.adopt(doc.fingerZonesName, FingerZones::fromStrings(doc.fingers));
@@ -626,8 +705,8 @@ void MainWindow::save()
         m_doc.fingerZonesName = m_fingers->currentText();
         m_doc.fingers = m_schemes.zones(m_fingers->currentText()).toStrings();
     }
-    // Only a recording that came with a valid signature keeps one; nothing here edits the records yet.
-    if (!Tsf::write(path, m_doc, m_doc.signed_ && m_doc.signatureValid)) {
+    // A recording made here or loaded with a valid signature is signed (g_fileClean).
+    if (!Tsf::write(path, m_doc, m_clean)) {
         QMessageBox::warning(this, appTitle(), tr("Не удалось сохранить файл %1").arg(path));
         return;
     }
@@ -638,5 +717,8 @@ void MainWindow::save()
 void MainWindow::clear()
 {
     m_path.clear();
+    m_clean = true;
+    m_needRecalc = false;
+    m_capture->setChecked(true);
     setDocument({}, {}, false);
 }

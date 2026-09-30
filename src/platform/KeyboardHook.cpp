@@ -1,12 +1,10 @@
 #include "KeyboardHook.h"
 
-#include <uiohook.h>
-
 #include <QMetaObject>
 #include <QPointer>
+#include <QTimer>
+
 #include <chrono>
-#include <cstdarg>
-#include <unordered_map>
 
 namespace {
 
@@ -18,9 +16,178 @@ qint64 nowUs()
     return duration_cast<microseconds>(steady_clock::now().time_since_epoch()).count();
 }
 
-#ifndef _WIN32
-// libuiohook VC_* codes are set-1 scan codes; map them to Windows VK codes so that
-// the rest of the program (and .tsf files) work with one key namespace.
+} // namespace
+
+KeyboardHook::KeyboardHook(QObject *parent) : QObject(parent)
+{
+    qRegisterMetaType<HookEvent>();
+}
+
+KeyboardHook::~KeyboardHook()
+{
+    stop();
+}
+
+#ifdef Q_OS_WIN
+
+#include <qt_windows.h>
+
+namespace {
+
+HHOOK g_handle = nullptr;
+
+// A dead key taken out of the input queue by ToUnicodeEx, to be put back for the hooked application.
+struct DeadKey
+{
+    bool pending = false;
+    UINT vk = 0, scan = 0;
+    bool shift = false, alt = false, ctrl = false;
+} g_dead;
+
+bool asyncDown(int vk)
+{
+    return GetAsyncKeyState(vk) & 0x8000;
+}
+
+// KeyboardHookProc (0x404598).
+HookEvent eventOf(WPARAM message, const KBDLLHOOKSTRUCT &k)
+{
+    HookEvent e;
+    e.timeUs = nowUs();
+    const bool down = message == WM_KEYDOWN || message == WM_SYSKEYDOWN;
+    quint32 flags = 0;
+    if (k.flags & LLKHF_EXTENDED)
+        flags |= KeyRecord::Extended;
+    if (k.flags & LLKHF_INJECTED)
+        flags |= KeyRecord::Injected;
+    if (!down)
+        flags |= KeyRecord::KeyUp;
+    if (k.vkCode == VK_PACKET) { // Unicode input: the character travels in the scan code
+        e.flags = flags | KeyRecord::Packet;
+        e.ch = char16_t(k.scanCode);
+        return e;
+    }
+    flags |= k.scanCode & 0xFF;
+
+    // The layout of the window that has the keyboard focus.
+    HWND window = GetForegroundWindow();
+    if (const DWORD thread = GetWindowThreadProcessId(window, nullptr)) {
+        GUITHREADINFO info = {};
+        info.cbSize = sizeof(info);
+        GetGUIThreadInfo(thread, &info);
+        window = info.hwndFocus;
+    }
+    const HKL layout = GetKeyboardLayout(GetWindowThreadProcessId(window, nullptr));
+
+    BYTE state[256];
+    GetKeyboardState(state);
+    auto modifier = [&](int vk, quint32 flag) {
+        const bool held = asyncDown(vk);
+        state[vk] = held ? 0x80 : 0;
+        if (held)
+            flags |= flag;
+    };
+    modifier(VK_SHIFT, KeyRecord::Shift);
+    modifier(VK_CONTROL, KeyRecord::Ctrl);
+    modifier(VK_MENU, KeyRecord::Alt);
+    state[VK_CAPITAL] = BYTE(GetKeyState(VK_CAPITAL) & 1);
+    state[VK_LWIN] = state[VK_RWIN] = 0;
+
+    int chars = 0;
+    if (down) {
+        WCHAR buffer[2] = {};
+        chars = ToUnicodeEx(k.vkCode, k.scanCode, state, buffer, 2, 0, layout);
+        if (chars != 0) {
+            chars = std::min(chars, 2);
+            flags |= KeyRecord::HasChar;
+            e.ch = buffer[chars < 1 ? 0 : chars - 1];
+            e.firstCh = buffer[0];
+        }
+        WORD unused[2];
+        if (chars > 0 && g_dead.pending) {
+            // ToUnicodeEx has eaten the dead key: put it back so that the application gets the composed character.
+            BYTE deadState[256] = {};
+            deadState[VK_SHIFT] = g_dead.shift ? 0x80 : 0;
+            deadState[VK_MENU] = g_dead.alt ? 0x80 : 0;
+            deadState[VK_CONTROL] = g_dead.ctrl ? 0x80 : 0;
+            ToAsciiEx(g_dead.vk, g_dead.scan, deadState, unused, 0, layout);
+            g_dead.pending = false;
+        }
+        if (chars < 0) {
+            ToAsciiEx(k.vkCode, k.scanCode, state, unused, 0, layout);
+            g_dead = {true, k.vkCode, k.scanCode, bool(flags & KeyRecord::Shift), bool(flags & KeyRecord::Alt),
+                      bool(flags & KeyRecord::Ctrl)};
+            flags |= KeyRecord::DeadKey;
+        }
+    }
+    if (chars == 0)
+        flags |= KeyRecord::NoChar;
+    if (asyncDown(VK_LWIN) || asyncDown(VK_RWIN))
+        flags |= KeyRecord::Win;
+    e.flags = flags | (k.vkCode & 0xFF) << 16;
+    e.chars = chars;
+    return e;
+}
+
+LRESULT CALLBACK hookProc(int code, WPARAM message, LPARAM data)
+{
+    if (code == HC_ACTION && (message == WM_KEYDOWN || message == WM_KEYUP || message == WM_SYSKEYDOWN || message == WM_SYSKEYUP))
+        if (KeyboardHook *hook = g_hook.data())
+            hook->deliver(eventOf(message, *reinterpret_cast<const KBDLLHOOKSTRUCT *>(data)));
+    return CallNextHookEx(g_handle, code, message, data);
+}
+
+} // namespace
+
+bool KeyboardHook::start()
+{
+    if (m_running)
+        return true;
+    g_hook = this;
+    g_handle = SetWindowsHookExW(WH_KEYBOARD_LL, hookProc, GetModuleHandleW(nullptr), 0);
+    m_running = g_handle != nullptr;
+    if (!m_running)
+        emit failed(QStringLiteral("SetWindowsHookEx error %1").arg(GetLastError()));
+    return m_running;
+}
+
+void KeyboardHook::stop()
+{
+    if (!m_running)
+        return;
+    UnhookWindowsHookEx(g_handle);
+    g_handle = nullptr;
+    m_running = false;
+}
+
+quint64 KeyboardHook::foregroundWindow()
+{
+    return quint64(quintptr(GetForegroundWindow()));
+}
+
+QString KeyboardHook::foregroundTitle()
+{
+    HWND window = GetForegroundWindow();
+    while (HWND parent = GetParent(window))
+        window = parent;
+    WCHAR title[80] = {};
+    const int length = GetWindowTextW(window, title, 80);
+    return QString::fromWCharArray(title, length);
+}
+
+void KeyboardHook::uiohookEvent(int, quint16, quint16, char16_t, qint64) {}
+void KeyboardHook::flushPending() {}
+
+#else // libuiohook
+
+#include <uiohook.h>
+
+#include <unordered_map>
+
+namespace {
+
+// libuiohook VC_* codes are set-1 scan codes; they are mapped to Windows VK codes so that the
+// rest of the program (and .tsf files) work with one key namespace.
 quint16 vcToVk(quint16 vc)
 {
     static const std::unordered_map<quint16, quint16> map = {
@@ -54,64 +221,115 @@ quint16 vcToVk(quint16 vc)
     auto it = map.find(vc);
     return it == map.end() ? 0 : it->second;
 }
-#endif
 
 void dispatch(uiohook_event *const e)
 {
-    HookKey k;
+    int kind = 0;
+    char16_t ch = 0;
     switch (e->type) {
-    case EVENT_KEY_PRESSED: k.kind = HookKey::Press; break;
-    case EVENT_KEY_RELEASED: k.kind = HookKey::Release; break;
-    case EVENT_KEY_TYPED: k.kind = HookKey::Typed; k.ch = e->data.keyboard.keychar; break;
+    case EVENT_KEY_PRESSED: kind = 0; break;
+    case EVENT_KEY_RELEASED: kind = 1; break;
+    case EVENT_KEY_TYPED: kind = 2; ch = e->data.keyboard.keychar; break;
     default: return;
     }
-    k.timeUs = nowUs();
-#ifdef _WIN32
-    k.vk = e->data.keyboard.rawcode;
-#else
-    k.vk = vcToVk(e->data.keyboard.keycode);
-#endif
-    k.scan = e->data.keyboard.keycode;
+    const qint64 time = nowUs();
+    const quint16 vk = vcToVk(e->data.keyboard.keycode), scan = e->data.keyboard.keycode;
     if (KeyboardHook *h = g_hook.data())
-        QMetaObject::invokeMethod(h, [h, k] { emit h->key(k); }, Qt::QueuedConnection);
+        QMetaObject::invokeMethod(h, [h, kind, vk, scan, ch, time] { h->uiohookEvent(kind, vk, scan, ch, time); },
+                                  Qt::QueuedConnection);
 }
 
 bool quietLogger(unsigned int, const char *, ...) { return true; }
 
 } // namespace
 
-KeyboardHook::KeyboardHook(QObject *parent)
-    : QObject(parent)
+void KeyboardHook::flushPending()
 {
-    qRegisterMetaType<HookKey>();
+    if (!m_pending)
+        return;
+    const HookEvent e = *m_pending;
+    m_pending.reset();
+    emit key(e);
 }
 
-KeyboardHook::~KeyboardHook()
+void KeyboardHook::uiohookEvent(int kind, quint16 vk, quint16 scan, char16_t ch, qint64 timeUs)
 {
-    stop();
+    if (kind == 2) { // the character of the press that is waiting
+        if (m_pending && ch) {
+            m_pending->ch = ch;
+            m_pending->chars = 1;
+            m_pending->flags = (m_pending->flags & ~quint32(KeyRecord::NoChar)) | KeyRecord::HasChar;
+        }
+        flushPending();
+        return;
+    }
+    flushPending();
+    const bool down = kind == 0;
+    auto held = [this](quint8 key) { return bool(m_held[key >> 3] & (1 << (key & 7))); };
+    if (down)
+        m_held[(vk & 0xFF) >> 3] |= quint8(1 << (vk & 7));
+    else
+        m_held[(vk & 0xFF) >> 3] &= quint8(~(1 << (vk & 7)));
+
+    HookEvent e;
+    e.timeUs = timeUs;
+    e.flags = (scan & 0xFF) | quint32(vk & 0xFF) << 16 | KeyRecord::NoChar;
+    if (scan & 0xFF00)
+        e.flags |= KeyRecord::Extended;
+    if (!down)
+        e.flags |= KeyRecord::KeyUp;
+    if (held(Vk::LShift) || held(Vk::RShift))
+        e.flags |= KeyRecord::Shift;
+    if (held(Vk::LControl) || held(Vk::RControl))
+        e.flags |= KeyRecord::Ctrl;
+    if (held(Vk::LMenu) || held(Vk::RMenu))
+        e.flags |= KeyRecord::Alt;
+    if (held(Vk::LWin) || held(Vk::RWin))
+        e.flags |= KeyRecord::Win;
+    if (!down) {
+        emit key(e);
+        return;
+    }
+    // The "typed" event, if any, is already queued behind this one.
+    m_pending = e;
+    QTimer::singleShot(0, this, &KeyboardHook::flushPending);
 }
 
 bool KeyboardHook::start()
 {
-    if (isRunning())
+    if (m_running)
         return true;
     g_hook = this;
     hook_set_logger_proc(&quietLogger);
     hook_set_dispatch_proc(&dispatch);
     m_thread = std::thread([this] {
-        int status = hook_run();
+        const int status = hook_run();
         if (status != UIOHOOK_SUCCESS) {
-            QString reason = QStringLiteral("libuiohook error %1").arg(status);
+            const QString reason = QStringLiteral("libuiohook error %1").arg(status);
             QMetaObject::invokeMethod(this, [this, reason] { emit failed(reason); }, Qt::QueuedConnection);
         }
     });
+    m_running = true;
     return true;
 }
 
 void KeyboardHook::stop()
 {
-    if (!isRunning())
+    if (!m_running)
         return;
     hook_stop();
     m_thread.join();
+    m_running = false;
 }
+
+quint64 KeyboardHook::foregroundWindow()
+{
+    return 0;
+}
+
+QString KeyboardHook::foregroundTitle()
+{
+    return {};
+}
+
+#endif

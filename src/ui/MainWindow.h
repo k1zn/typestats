@@ -1,15 +1,19 @@
 #pragma once
 
 #include "core/FingerZones.h"
+#include "core/Journal.h"
 #include "core/Recalc.h"
 #include "core/TsfFile.h"
+#include "platform/KeyboardHook.h"
 
+#include <QElapsedTimer>
 #include <QWidget>
 
 class AxisPanel;
 class GraphWidget;
 class KlavogramWidget;
 class LegendPanel;
+class LiveStatsWindow;
 class QCheckBox;
 class QComboBox;
 class QLabel;
@@ -57,12 +61,18 @@ private:
     void showAxisMenu(const QPoint &globalPos);
     void setDocument(const TsfDocument &doc, const QString &title, bool damaged);
 
+    // Recording.
+    void keyEvent(const HookEvent &e);
+    void tick();
+    void showLiveStats();
+
     void open();
     void openJournal();
     void save();
     void clear();
 
     TsfDocument m_doc;
+    bool m_clean = true; // the recording is genuine: it is signed when saved (g_fileClean)
     QString m_path; // empty: not saved yet
     TextModel m_model;
     FingerZoneSchemes m_schemes;
@@ -87,4 +97,13 @@ private:
     QComboBox *m_presets = nullptr;
     QComboBox *m_fingers = nullptr;
     QToolButton *m_saveButton = nullptr;
+
+    KeyboardHook m_hook;
+    Recorder m_recorder;
+    JournalWriter m_journal;
+    LiveStatsWindow *m_live = nullptr;
+    bool m_needRecalc = false;   // keys were recorded since the text was built
+    QElapsedTimer m_lastKey;
+    bool m_livePending = false;  // the running statistics changed since they were shown
+    int m_liveTicks = 0;
 };
