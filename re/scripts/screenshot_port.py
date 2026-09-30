@@ -8,7 +8,7 @@ from pathlib import Path
 
 warnings.filterwarnings("ignore")
 from pywinauto import Desktop  # noqa: E402
-from PIL import ImageGrab  # noqa: E402
+from PIL import Image  # noqa: E402
 import ctypes  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -27,10 +27,19 @@ try:
         time.sleep(0.3)
     assert win, "no window"
     time.sleep(1.0)
-    ctypes.windll.user32.SetForegroundWindow(win.handle)
-    time.sleep(0.7)
+    # PrintWindow: the window is captured wherever it is in the Z order and the focus stays with the user.
     r = win.rectangle()
-    ImageGrab.grab((r.left, r.top, r.right, r.bottom)).save(sys.argv[2])
-    print(win.window_text(), r.width(), r.height())
+    user32, gdi32 = ctypes.windll.user32, ctypes.windll.gdi32
+    user32.GetWindowDC.restype = gdi32.CreateCompatibleDC.restype = gdi32.CreateCompatibleBitmap.restype = ctypes.c_void_p
+    gdi32.SelectObject.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+    wdc = user32.GetWindowDC(win.handle)
+    mdc = gdi32.CreateCompatibleDC(ctypes.c_void_p(wdc))
+    bmp = gdi32.CreateCompatibleBitmap(ctypes.c_void_p(wdc), r.width(), r.height())
+    gdi32.SelectObject(mdc, bmp)
+    user32.PrintWindow(win.handle, ctypes.c_void_p(mdc), 2)  # PW_RENDERFULLCONTENT
+    buf = ctypes.create_string_buffer(r.width() * r.height() * 4)
+    gdi32.GetBitmapBits(ctypes.c_void_p(bmp), len(buf), buf)
+    Image.frombuffer("RGBA", (r.width(), r.height()), buf, "raw", "BGRA", 0, 1).convert("RGB").save(sys.argv[2])
+    print(r.width(), r.height())
 finally:
     proc.kill()

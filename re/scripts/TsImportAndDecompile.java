@@ -234,8 +234,13 @@ public class TsImportAndDecompile extends GhidraScript {
             o1.setMaxInstructions(200000);
             d1.setOptions(o1);
             d1.openProgram(currentProgram);
-            for (String a : mode.substring(4).split(",")) {
+            for (String a : mode.substring(4).split("[,+]")) {
+                // cmd.exe splits arguments on commas: separate addresses with '+'
                 Function f = getFunctionAt(toAddr(Long.decode(a)));
+                if (f == null) {   // reached only through a vtable: not a function yet
+                    disassemble(toAddr(Long.decode(a)));
+                    f = createFunction(toAddr(Long.decode(a)), null);
+                }
                 DecompileResults r = d1.decompileFunction(f, 1800, monitor);
                 String c = (r != null && r.decompileCompleted()) ? r.getDecompiledFunction().getC() : "// failed: " + (r == null ? "" : r.getErrorMessage());
                 Files.writeString(Path.of(root, "re", "decomp", "one_" + a + ".c"),

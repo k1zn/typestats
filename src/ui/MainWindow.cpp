@@ -1,5 +1,7 @@
 #include "MainWindow.h"
 
+#include "GraphPanels.h"
+#include "GraphWidget.h"
 #include "KlavogramWidget.h"
 #include "TextView.h"
 #include "core/Journal.h"
@@ -16,6 +18,7 @@
 #include <QFrame>
 #include <QHeaderView>
 #include <QLabel>
+#include <QMenu>
 #include <QMessageBox>
 #include <QScrollBar>
 #include <QSettings>
@@ -24,6 +27,7 @@
 #include <QToolButton>
 #include <QTableWidget>
 #include <QVBoxLayout>
+#include <QWheelEvent>
 
 namespace {
 
@@ -63,6 +67,10 @@ void setRows(QTableWidget *list, const QVector<QStringList> &rows)
         }
 }
 
+// Preset keys of the series' visibility, in the order of the legend.
+const char *const kSeriesKeys[] = {"VgrCurSpeed", "VgrMedSpeed", "VgrClassicSpeed", "VgrPrivSpeed",
+                                   "VgrCurRythm", "VgrMedRythm", "VhsPeriodMed",    "VhsPeriod"};
+
 QFrame *bevel(QWidget *parent, int x, int y, int w, int h, QFrame::Shape shape)
 {
     auto *f = new QFrame(parent);
@@ -90,13 +98,9 @@ MainWindow::MainWindow(QWidget *parent)
     auto *graphLayout = new QVBoxLayout(graphPane);
     graphLayout->setContentsMargins(0, 0, 0, 0);
     graphLayout->setSpacing(0);
-    m_graph = new QWidget;
-    m_graph->setAutoFillBackground(true);
-    QPalette graphPalette = m_graph->palette();
-    graphPalette.setColor(QPalette::Window, QColor(255, 255, 200));
-    m_graph->setPalette(graphPalette);
+    m_graph = new GraphWidget;
+    m_graph->installEventFilter(this);
     m_graphScroll = new QScrollBar(Qt::Horizontal);
-    m_graphScroll->setPageStep(100);
     graphLayout->addWidget(m_graph, 1);
     graphLayout->addWidget(m_graphScroll);
     m_klav = new KlavogramWidget;
@@ -162,6 +166,7 @@ MainWindow::MainWindow(QWidget *parent)
         klavogramMoved();
     });
     connect(m_klav, &KlavogramWidget::viewChanged, this, &MainWindow::klavogramMoved);
+    createGraphPanels();
 
     resize(876, 579);
     loadSettings();
@@ -216,8 +221,8 @@ QWidget *MainWindow::createToolBar()
     action(18, 102, 32, 22, tr("Удалить нетекстовые клавиши"), nullptr);
     action(15, 126, 32, 22, tr("Пометить (Ins)"), nullptr);
     action(21, 150, 32, 22, tr("Свойства видео"), nullptr);
-    action(16, 174, 32, 22, tr("Настройка оси Y графиков"), nullptr);
-    action(17, 198, 32, 22, tr("Легенда"), nullptr);
+    action(16, 174, 32, 22, tr("Настройка оси Y графиков"), &MainWindow::toggleAxisPanel);
+    action(17, 198, 32, 22, tr("Легенда"), &MainWindow::toggleLegend);
     action(23, 222, 32, 22, tr("Ввод текста (F4)"), nullptr);
     action(25, 246, 32, 22, tr("Преобразовать в текущую раскладку"), nullptr);
     QToolButton *quit = toolButton(bar, 24, 270, 32, 22, tr("Выход"));
@@ -285,6 +290,30 @@ void MainWindow::loadSettings()
     const QByteArray geometry = s.value(QStringLiteral("WindowGeometry")).toByteArray();
     if (!geometry.isEmpty())
         restoreGeometry(geometry);
+
+    static const bool shownByDefault[GraphWidget::SeriesCount] = {false, true, false, false, false, true, true, false};
+    for (int i = 0; i < GraphWidget::SeriesCount; ++i)
+        if (i != GraphWidget::Pause)
+            m_graph->setSeriesVisible(i, s.value(QLatin1String(kSeriesKeys[i]), shownByDefault[i]).toBool());
+    if (s.value(QLatin1String(kSeriesKeys[GraphWidget::Pause]), false).toBool())
+        m_graph->setSeriesVisible(GraphWidget::Pause, true);
+    GraphWidget::AxisSettings axis;
+    axis.speedMin = s.value(QStringLiteral("SpeedYmin"), 0).toInt();
+    axis.speedMax = s.value(QStringLiteral("SpeedYmax"), -1).toInt();
+    axis.rhythmMin = s.value(QStringLiteral("RythmYmin"), 0).toInt();
+    axis.rhythmMax = s.value(QStringLiteral("RythmYmax"), 100).toInt();
+    axis.autoRound = s.value(QStringLiteral("AutoRound"), true).toBool();
+    m_axisPanel->setSettings(axis);
+    m_graph->setAxisSettings(axis);
+    m_axisPanel->setLockY(s.value(QStringLiteral("FixedY"), false).toBool());
+    const int mode = s.value(QStringLiteral("PrimaryGraph"), 0).toInt();
+    m_graph->setMode(mode >= 0 && mode <= 2 ? GraphWidget::Mode(mode) : GraphWidget::SpeedMode);
+    m_legend->setMinimized(s.value(QStringLiteral("LegendMinimized"), false).toBool());
+    m_legend->setVisible(s.value(QStringLiteral("LegendVisible"), true).toBool());
+    if (s.contains(QStringLiteral("LegendWinLeft"))) {
+        m_legend->move(s.value(QStringLiteral("LegendWinLeft")).toInt(), s.value(QStringLiteral("LegendWinTop")).toInt());
+        m_legendPlaced = true;
+    }
 }
 
 void MainWindow::saveSettings() const
@@ -294,6 +323,21 @@ void MainWindow::saveSettings() const
     s.setValue(QStringLiteral("TextOnly"), m_onlyText->isChecked());
     s.setValue(QStringLiteral("SplitOnEnter"), m_byPauses->isChecked());
     s.setValue(QStringLiteral("WindowGeometry"), saveGeometry());
+
+    for (int i = 0; i < GraphWidget::SeriesCount; ++i)
+        s.setValue(QLatin1String(kSeriesKeys[i]), m_graph->seriesVisible(i));
+    const GraphWidget::AxisSettings &axis = m_graph->axisSettings();
+    s.setValue(QStringLiteral("SpeedYmin"), axis.speedMin);
+    s.setValue(QStringLiteral("SpeedYmax"), axis.speedMax);
+    s.setValue(QStringLiteral("RythmYmin"), axis.rhythmMin);
+    s.setValue(QStringLiteral("RythmYmax"), axis.rhythmMax);
+    s.setValue(QStringLiteral("AutoRound"), axis.autoRound);
+    s.setValue(QStringLiteral("FixedY"), m_graph->lockY());
+    s.setValue(QStringLiteral("PrimaryGraph"), int(m_graph->mode()));
+    s.setValue(QStringLiteral("LegendMinimized"), m_legend->minimized());
+    s.setValue(QStringLiteral("LegendVisible"), m_legend->isVisibleTo(this));
+    s.setValue(QStringLiteral("LegendWinLeft"), m_legend->x());
+    s.setValue(QStringLiteral("LegendWinTop"), m_legend->y());
 }
 
 void MainWindow::closeEvent(QCloseEvent *e)
@@ -306,14 +350,129 @@ void MainWindow::resizeEvent(QResizeEvent *e)
 {
     QWidget::resizeEvent(e);
     updateKeyList(); // the list holds another number of rows
+    m_legend->keepInside();
+    m_axisPanel->keepInside();
+}
+
+void MainWindow::showEvent(QShowEvent *e)
+{
+    QWidget::showEvent(e);
+    if (!m_legendPlaced) {
+        // Over the top left corner of the graph, next to the axis.
+        m_legendPlaced = true;
+        m_legend->move(32, m_graph->mapTo(this, QPoint(0, 0)).y());
+    }
+    m_legend->keepInside();
+}
+
+bool MainWindow::eventFilter(QObject *o, QEvent *e)
+{
+    // The wheel over the graph moves its scroll bar by a small step.
+    if (o == m_graph && e->type() == QEvent::Wheel) {
+        const int delta = static_cast<QWheelEvent *>(e)->angleDelta().y();
+        if (delta)
+            m_graphScroll->setValue(m_graphScroll->value() + (delta > 0 ? -1 : 1) * m_graphScroll->singleStep());
+        return true;
+    }
+    return QWidget::eventFilter(o, e);
+}
+
+void MainWindow::createGraphPanels()
+{
+    m_legend = new LegendPanel(m_graph, this);
+    m_axisPanel = new AxisPanel(this);
+    m_axisPanel->move(121, 121);
+
+    connect(m_graph, &GraphWidget::viewChanged, this, &MainWindow::graphMoved);
+    connect(m_graph, &GraphWidget::axisMenuRequested, this, &MainWindow::showAxisMenu);
+    connect(m_graph, &GraphWidget::autoLimitsChanged, this, [this] { m_axisPanel->setAutoLimits(m_graph->autoLimits()); });
+    connect(m_graph, &GraphWidget::elementClicked, this, [this](int element) {
+        // The klavogram starts at the clicked element.
+        m_klav->setScrollMs(float(0.001L * (drawTimeOfElement(element) - 100)));
+        klavogramMoved();
+    });
+    connect(m_graph, &GraphWidget::klavogramSpanRequested, this, [this](int element) {
+        // The klavogram is zoomed to span from its first element to the one under the mouse.
+        const float from = float(0.001L * drawTimeOfElement(m_graph->klavogramFrom()));
+        const float span = float(0.001L * (drawTimeOfElement(element) - 100)) - from;
+        m_klav->setZoom(span > 0.01f ? float(m_klav->width()) / span : 300.0f);
+        klavogramMoved();
+    });
+    connect(m_graphScroll, &QScrollBar::valueChanged, this, [this](int value) {
+        m_graph->setScrollValue(value);
+        graphMoved();
+    });
+    connect(m_axisPanel, &AxisPanel::settingsChanged, this, [this] {
+        m_graph->setAxisSettings(m_axisPanel->settings());
+        klavogramMoved();
+    });
+    connect(m_axisPanel, &AxisPanel::lockYChanged, m_graph, &GraphWidget::setLockY);
+}
+
+void MainWindow::toggleAxisPanel()
+{
+    m_axisPanel->setVisible(!m_axisPanel->isVisible());
+    m_axisPanel->raise();
+    m_axisPanel->keepInside();
+}
+
+void MainWindow::toggleLegend()
+{
+    m_legend->setVisible(!m_legend->isVisible());
+    m_legend->raise();
+    m_legend->keepInside();
+}
+
+void MainWindow::showAxisMenu(const QPoint &globalPos)
+{
+    QMenu menu(this);
+    menu.addAction(tr("Настройка оси Y"), this, &MainWindow::toggleAxisPanel);
+    if (!m_legend->isVisible())
+        menu.addAction(tr("Показать легенду"), this, &MainWindow::toggleLegend);
+    menu.addSeparator();
+    const QString modes[] = {tr("Скорость"), tr("Ритмичность"), tr("Гистограмма")};
+    for (int i = 0; i < 3; ++i) {
+        QAction *a = menu.addAction(modes[i], this, [this, i] { m_graph->setMode(GraphWidget::Mode(i)); });
+        a->setCheckable(true);
+        a->setChecked(m_graph->mode() == i);
+    }
+    menu.exec(globalPos);
+}
+
+qint64 MainWindow::drawTimeOfElement(int element) const
+{
+    if (m_model.klav.isEmpty())
+        return 0;
+    const int k = m_model.klavOfElement(element);
+    return k < m_model.klav.size() ? m_model.klav[k].tDraw : m_model.klav.last().tDraw;
+}
+
+void MainWindow::syncGraphScrollBar()
+{
+    const GraphWidget::ScrollParams s = m_graph->scrollParams();
+    const QSignalBlocker blocker(m_graphScroll);
+    m_graphScroll->setRange(s.min, std::max(s.min, s.max));
+    m_graphScroll->setSingleStep(s.singleStep);
+    m_graphScroll->setPageStep(s.pageStep);
+    m_graphScroll->setValue(s.value);
+}
+
+void MainWindow::graphMoved()
+{
+    // The part shown on the klavogram is kept in sight: the klavogram follows the graph.
+    if (m_graph->pullKlavogramRange())
+        m_klav->setScrollMs(float(0.001L * drawTimeOfElement(m_graph->klavogramFrom())));
+    klavogramMoved();
 }
 
 void MainWindow::klavogramMoved()
 {
-    // The part of the text that is on the klavogram is highlighted (FUN_00424e64).
+    // The part of the text that is on the klavogram is highlighted there and on the graph (FUN_00424e64).
     const auto [first, last] = m_klav->visibleRecords();
-    m_text->setVisibleRange(m_model.positionOfElement(m_model.elementOfKlav(first)),
-                            m_model.positionOfElement(m_model.elementOfKlav(last)));
+    const int from = m_model.elementOfKlav(first), to = m_model.elementOfKlav(last);
+    m_text->setVisibleRange(m_model.positionOfElement(from), m_model.positionOfElement(to));
+    m_graph->setKlavogramRange(from, to);
+    syncGraphScrollBar();
     updateKeyList();
 }
 
@@ -331,6 +490,7 @@ void MainWindow::recalculate()
     m_model = Recalc::run(m_doc.records, options());
     m_text->setModel(m_model);
     m_klav->setModel(&m_model);
+    m_graph->setModel(&m_model);
     m_saveButton->setEnabled(!m_doc.records.isEmpty());
     updateStats();
     klavogramMoved();

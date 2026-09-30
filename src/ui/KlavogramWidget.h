@@ -17,6 +17,9 @@ public:
     void setZones(const FingerZones &zones);
     // Puts the element at a text position to the left edge (FUN_00414500).
     void scrollToPosition(int textPos);
+    // Set by the graph; viewChanged() is not emitted.
+    void setScrollMs(float ms);
+    void setZoom(float pxPerMs);
 
     // Drawing time visible on the widget, µs. The original computes it in single precision
     // (FUN_00437d98): [scroll − 10 µs, scroll − 10 µs + width / zoom]; the key list shows the presses in it.

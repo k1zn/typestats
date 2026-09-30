@@ -6,10 +6,14 @@
 
 #include <QWidget>
 
+class AxisPanel;
+class GraphWidget;
 class KlavogramWidget;
+class LegendPanel;
 class QCheckBox;
 class QComboBox;
 class QLabel;
+class QMenu;
 class QScrollBar;
 class QSpinBox;
 class QTableWidget;
@@ -29,6 +33,8 @@ public:
 protected:
     void closeEvent(QCloseEvent *e) override;
     void resizeEvent(QResizeEvent *e) override;
+    void showEvent(QShowEvent *e) override;
+    bool eventFilter(QObject *o, QEvent *e) override;
 
 private:
     QWidget *createToolBar();
@@ -41,6 +47,13 @@ private:
     void updateStats();
     void updateKeyList();
     void klavogramMoved();
+    void graphMoved();
+    void syncGraphScrollBar();
+    qint64 drawTimeOfElement(int element) const;
+    void createGraphPanels();
+    void toggleAxisPanel();
+    void toggleLegend();
+    void showAxisMenu(const QPoint &globalPos);
     void setDocument(const TsfDocument &doc, const QString &title, bool damaged);
 
     void open();
@@ -54,7 +67,10 @@ private:
     FingerZoneSchemes m_schemes;
 
     TextView *m_text = nullptr;
-    QWidget *m_graph = nullptr;
+    GraphWidget *m_graph = nullptr;
+    LegendPanel *m_legend = nullptr;
+    AxisPanel *m_axisPanel = nullptr;
+    bool m_legendPlaced = false;
     QScrollBar *m_graphScroll = nullptr;
     KlavogramWidget *m_klav = nullptr;
     QTableWidget *m_stats = nullptr;

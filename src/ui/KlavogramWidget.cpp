@@ -88,6 +88,18 @@ void KlavogramWidget::scrollToPosition(int textPos)
     update();
 }
 
+void KlavogramWidget::setScrollMs(float ms)
+{
+    m_scrollMs = ms;
+    update();
+}
+
+void KlavogramWidget::setZoom(float pxPerMs)
+{
+    m_zoom = std::clamp(pxPerMs, 0.04f, 300.0f);
+    update();
+}
+
 std::pair<double, double> KlavogramWidget::visibleSpanUs() const
 {
     const float start = m_scrollMs * 1000.0f - 10.0f;
