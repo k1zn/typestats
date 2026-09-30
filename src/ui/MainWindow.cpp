@@ -300,8 +300,8 @@ QWidget *MainWindow::createToolBar()
     action(18, 102, 32, 22, tr("Удалить нетекстовые клавиши"), &MainWindow::removeNonText);
     action(15, 126, 32, 22, tr("Пометить (Ins)"), &MainWindow::mark);
     action(21, 150, 32, 22, tr("Свойства видео"), &MainWindow::videoProperties);
-    action(16, 174, 32, 22, tr("Настройка оси Y графиков"), &MainWindow::toggleAxisPanel);
-    action(17, 198, 32, 22, tr("Легенда"), &MainWindow::toggleLegend);
+    m_axisButton = action(16, 174, 32, 22, tr("Настройка оси Y графиков"), &MainWindow::showAxisPanel);
+    m_legendButton = action(17, 198, 32, 22, tr("Легенда"), &MainWindow::showLegend);
     action(23, 222, 32, 22, tr("Ввод текста (F4)"), &MainWindow::showTextInput);
     action(25, 246, 32, 22, tr("Преобразовать в текущую раскладку"), &MainWindow::convertLayout);
     QToolButton *quit = toolButton(bar, 24, 270, 32, 22, tr("Выход"));
@@ -420,7 +420,9 @@ void MainWindow::loadSettings()
     const int mode = s.value(QStringLiteral("PrimaryGraph"), 0).toInt();
     m_graph->setMode(mode >= 0 && mode <= 2 ? GraphWidget::Mode(mode) : GraphWidget::SpeedMode);
     m_legend->setMinimized(s.value(QStringLiteral("LegendMinimized"), false).toBool());
-    m_legend->setVisible(s.value(QStringLiteral("LegendVisible"), true).toBool());
+    m_legendOpen = s.value(QStringLiteral("LegendVisible"), true).toBool();
+    m_legend->setVisible(m_legendOpen && !m_graphFolded);
+    updatePanelButtons();
     if (s.contains(QStringLiteral("LegendWinLeft"))) {
         m_legend->move(s.value(QStringLiteral("LegendWinLeft")).toInt(), s.value(QStringLiteral("LegendWinTop")).toInt());
         m_legendPlaced = true;
@@ -455,7 +457,7 @@ void MainWindow::saveSettings() const
     s.setValue(QStringLiteral("FixedY"), m_graph->lockY());
     s.setValue(QStringLiteral("PrimaryGraph"), int(m_graph->mode()));
     s.setValue(QStringLiteral("LegendMinimized"), m_legend->minimized());
-    s.setValue(QStringLiteral("LegendVisible"), m_legend->isVisibleTo(this));
+    s.setValue(QStringLiteral("LegendVisible"), m_legendOpen);
     s.setValue(QStringLiteral("LegendWinLeft"), m_legend->x());
     s.setValue(QStringLiteral("LegendWinTop"), m_legend->y());
 }
@@ -904,7 +906,9 @@ void MainWindow::tick()
 
 void MainWindow::showLiveStats()
 {
-    m_live->setVisible(!m_live->isVisible());
+    // ShowOpStat: shows the window (the Ctrl+Alt+O hotkey toggles it).
+    m_live->show();
+    m_live->raise();
 }
 
 void MainWindow::resizeEvent(QResizeEvent *e)
@@ -1054,6 +1058,11 @@ void MainWindow::createGraphPanels()
     m_legend = new LegendPanel(m_graph, this);
     m_axisPanel = new AxisPanel(this);
     m_axisPanel->move(121, 121);
+    connect(m_legend, &FloatingPanel::closed, this, [this] {
+        m_legendOpen = false;
+        updatePanelButtons();
+    });
+    connect(m_axisPanel, &FloatingPanel::closed, this, &MainWindow::updatePanelButtons);
 
     connect(m_graph, &GraphWidget::viewChanged, this, &MainWindow::graphMoved);
     connect(m_graph, &GraphWidget::axisMenuRequested, this, &MainWindow::showAxisMenu);
@@ -1089,28 +1098,38 @@ void MainWindow::scrollKlavogramToElement(int element)
     klavogramMoved();
 }
 
-void MainWindow::toggleAxisPanel()
+void MainWindow::showAxisPanel()
 {
-    m_axisPanel->setVisible(!m_axisPanel->isVisible());
+    m_axisPanel->show();
     m_axisPanel->raise();
     m_axisPanel->keepInside();
+    updatePanelButtons();
 }
 
-void MainWindow::toggleLegend()
+void MainWindow::showLegend()
 {
-    if (m_graphFolded)
-        return;
-    m_legend->setVisible(!m_legend->isVisible());
-    m_legend->raise();
-    m_legend->keepInside();
+    m_legendOpen = true;
+    if (!m_graphFolded) { // the folded graph shows it once it is unfolded
+        m_legend->show();
+        m_legend->raise();
+        m_legend->keepInside();
+    }
+    updatePanelButtons();
+}
+
+void MainWindow::updatePanelButtons()
+{
+    m_axisButton->setEnabled(!m_axisPanel->isVisibleTo(this));
+    m_legendButton->setEnabled(!m_legendOpen);
 }
 
 void MainWindow::showAxisMenu(const QPoint &globalPos)
 {
     QMenu menu(this);
-    menu.addAction(tr("Настройка оси Y"), this, &MainWindow::toggleAxisPanel);
-    if (!m_legend->isVisible())
-        menu.addAction(tr("Показать легенду"), this, &MainWindow::toggleLegend);
+    if (!m_axisPanel->isVisibleTo(this))
+        menu.addAction(tr("Настройка оси Y"), this, &MainWindow::showAxisPanel);
+    if (!m_legendOpen)
+        menu.addAction(tr("Показать легенду"), this, &MainWindow::showLegend);
     menu.addSeparator();
     const QString modes[] = {tr("Скорость"), tr("Ритмичность"), tr("Гистограмма")};
     for (int i = 0; i < 3; ++i) {
@@ -1140,14 +1159,14 @@ void MainWindow::graphPaneResized()
             m_graph->hide();
             m_legend->hide();
             m_axisPanel->hide();
+            updatePanelButtons();
         }
         if (pane != bar) // only the scroll bar is left; the klavogram takes the rest
             m_leftSplit->setSizes({sizes.value(0), bar, sizes.value(2) + pane - bar});
     } else if (m_graphFolded) {
         m_graphFolded = false;
         m_graph->show();
-        QSettings s;
-        m_legend->setVisible(s.value(QStringLiteral("LegendVisible"), true).toBool());
+        m_legend->setVisible(m_legendOpen);
     }
     klavogramMoved();
 }

@@ -100,8 +100,11 @@ private:
     void graphPaneResized();
     qint64 drawTimeOfElement(int element) const;
     void createGraphPanels();
-    void toggleAxisPanel();
-    void toggleLegend();
+    // N7Click / N8Click: the panels are only opened here (their red buttons close them); while one
+    // is open its button is off and its menu item is not shown.
+    void showAxisPanel();
+    void showLegend();
+    void updatePanelButtons();
     void showAxisMenu(const QPoint &globalPos);
     void setDocument(const TsfDocument &doc, const QString &title, bool damaged);
 
@@ -147,6 +150,9 @@ private:
     LegendPanel *m_legend = nullptr;
     AxisPanel *m_axisPanel = nullptr;
     bool m_legendPlaced = false;
+    bool m_legendOpen = true; // the legend is not closed; the folded graph hides it all the same
+    QToolButton *m_axisButton = nullptr;
+    QToolButton *m_legendButton = nullptr;
     bool m_graphFolded = false;
     QWidget *m_graphPane = nullptr;
     QScrollBar *m_graphScroll = nullptr;

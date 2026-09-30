@@ -8,6 +8,7 @@
 #include "ui/GraphWidget.h"
 #include "ui/HistogramWindow.h"
 #include "ui/KlavogramWidget.h"
+#include "ui/LiveStatsWindow.h"
 #include "ui/MainWindow.h"
 #include "ui/Presets.h"
 #include "ui/TextInputWindow.h"
@@ -236,6 +237,37 @@ private slots:
         w.clear();
         QVERIFY(!w.m_videoAttached);
         QVERIFY(!w.m_video->isVisible());
+    }
+
+    void panelButtons()
+    {
+        // The buttons of the floating panels only open them and are off while they are open.
+        MainWindow w;
+        w.show();
+        QVERIFY(w.m_legend->isVisible());
+        QVERIFY(!w.m_legendButton->isEnabled());
+        QVERIFY(!w.m_axisPanel->isVisible());
+        QVERIFY(w.m_axisButton->isEnabled());
+
+        emit w.m_legend->closed(); // the red button
+        w.m_legend->hide();
+        QVERIFY(w.m_legendButton->isEnabled());
+        w.showLegend();
+        QVERIFY(w.m_legend->isVisible());
+        QVERIFY(!w.m_legendButton->isEnabled());
+
+        w.showAxisPanel();
+        QVERIFY(w.m_axisPanel->isVisible());
+        QVERIFY(!w.m_axisButton->isEnabled());
+        w.showAxisPanel(); // not a toggle
+        QVERIFY(w.m_axisPanel->isVisible());
+        w.m_axisPanel->hide();
+        emit w.m_axisPanel->closed();
+        QVERIFY(w.m_axisButton->isEnabled());
+
+        w.showLiveStats();
+        w.showLiveStats(); // shows, does not toggle
+        QVERIFY(w.m_live->isVisible());
     }
 
     void labels()
