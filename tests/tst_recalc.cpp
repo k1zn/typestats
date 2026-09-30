@@ -191,7 +191,13 @@ private slots:
         const TextModel m = Recalc::run(d.records, {});
         QVERIFY(m.size() > 10);
         QCOMPARE(m.pauses.size(), m.size());
-        QVERIFY(std::is_sorted(m.mapPos.begin(), m.mapPos.end()));
+        for (int TextAnchor::*field : {&TextAnchor::pos, &TextAnchor::elem, &TextAnchor::klav, &TextAnchor::rec})
+            QVERIFY(std::is_sorted(m.anchors.begin(), m.anchors.end(),
+                                   [field](const TextAnchor &a, const TextAnchor &b) { return a.*field < b.*field; }));
+        QCOMPARE(m.elementAt(0), 0);
+        QCOMPARE(m.elementAt(m.text.size() + 10), m.size());
+        for (int i = 0; i < m.size(); ++i)
+            QCOMPARE(m.elementOfRecord(m.recIndex[i]), i);
         const MainStats s = Stats::compute(m, 0, m.size(), 500, false);
         QVERIFY(s.chars > 0);
         QVERIFY(s.gross > 0);

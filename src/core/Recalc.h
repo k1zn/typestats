@@ -4,6 +4,9 @@
 
 #include <QVector>
 
+#include <algorithm>
+#include <utility>
+
 // Port of Recalculate (0x40ce40), see re/text_reconstruction.md.
 
 struct RecalcOptions
@@ -38,6 +41,14 @@ struct KlavRecord
     bool fragmentStart = false; // the first press after a split pause
 };
 
+struct TextAnchor
+{
+    int pos = 0;  // position in the text
+    int elem = 0; // text element
+    int klav = 0; // klavogram record
+    int rec = 0;  // record
+};
+
 struct TextModel
 {
     // The records the model is built from: the document's without leading releases and auto-repeated
@@ -65,10 +76,20 @@ struct TextModel
     QString text;
     QVector<TextRun> runs;
 
-    // Parallel maps sorted by text position: position -> element / klavogram record / raw record.
-    QVector<int> mapPos, mapElem, mapKlav, mapRec;
-
     QVector<KlavRecord> klav;
+
+    // Points where a text position, an element, a klavogram record and a record line up; every
+    // field is non-decreasing. The lookups take the first anchor at or after the argument and give
+    // the end (one past the last anchor) when there is none.
+    QVector<TextAnchor> anchors;
+    int elementAt(int pos) const { return std::min(lookup(&TextAnchor::pos, pos, &TextAnchor::elem), size()); }
+    int klavAt(int pos) const { return lookup(&TextAnchor::pos, pos, &TextAnchor::klav); }
+    int klavOfElement(int elem) const { return lookup(&TextAnchor::elem, elem, &TextAnchor::klav); }
+    int recordOfElement(int elem) const { return lookup(&TextAnchor::elem, elem, &TextAnchor::rec); }
+    int elementOfRecord(int rec) const { return std::min(lookup(&TextAnchor::rec, rec, &TextAnchor::elem), size()); }
+
+private:
+    int lookup(int TextAnchor::*key, int x, int TextAnchor::*value) const;
 };
 
 namespace Recalc {
@@ -80,9 +101,4 @@ TextModel run(const KeyRecords &document, const RecalcOptions &opt);
 KeyRecords normalized(const KeyRecords &recs);
 // Marks the characters removed by BackSpace / Ctrl+BackSpace (one flag per record).
 QVector<bool> erasedRecords(const KeyRecords &recs);
-
-// FUN_0040382c: index of the first element >= x.
-int lowerBound(const QVector<int> &v, int x);
-// FUN_0040373c: v[i], or last+1 past the end, 0 for an empty vector.
-int at(const QVector<int> &v, int i);
 }

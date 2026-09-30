@@ -22,12 +22,11 @@ namespace Stats {
 
 std::pair<int, int> range(const TextModel &m, int selStart, int selLen, bool byPauses)
 {
-    auto elemAt = [&](int pos) { return Recalc::at(m.mapElem, Recalc::lowerBound(m.mapPos, pos)); };
     if (selLen != 0)
-        return {elemAt(selStart), elemAt(selStart + selLen)};
+        return {m.elementAt(selStart), m.elementAt(selStart + selLen)};
     if (!byPauses)
         return {0, m.size()};
-    return m.fragmentAt(elemAt(selStart));
+    return m.fragmentAt(m.elementAt(selStart));
 }
 
 void speedAndHold(const QVector<KlavRecord> &klav, int rb, int re, quint32 splitUs,
@@ -176,8 +175,8 @@ MainStats compute(const TextModel &m, int b, int e, int splitMs, bool byPauses)
     s.maxPause = maxP;
 
     // Klavogram records of the range.
-    const int rb = Recalc::at(m.mapKlav, Recalc::lowerBound(m.mapElem, b));
-    const int re = Recalc::at(m.mapKlav, Recalc::lowerBound(m.mapElem, e));
+    const int rb = m.klavOfElement(b);
+    const int re = m.klavOfElement(e);
     int presses = 0;
     quint64 T = 0;
     speedAndHold(m.klav, rb, re, byPauses ? 0u : quint32(splitMs) * 1000u, &presses, &s.holdAvgUs, &T);

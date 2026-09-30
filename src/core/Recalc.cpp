@@ -94,6 +94,15 @@ std::pair<int, int> TextModel::fragmentAt(int i) const
     return {next == fragmentStarts.begin() ? 0 : *(next - 1), next == fragmentStarts.end() ? size() : *next};
 }
 
+int TextModel::lookup(int TextAnchor::*key, int x, int TextAnchor::*value) const
+{
+    const auto it = std::lower_bound(anchors.begin(), anchors.end(), x,
+                                     [key](const TextAnchor &a, int v) { return a.*key < v; });
+    if (it != anchors.end())
+        return (*it).*value;
+    return anchors.isEmpty() ? 0 : anchors.last().*value + 1;
+}
+
 namespace Recalc {
 
 KeyRecords normalized(const KeyRecords &recs)
@@ -211,15 +220,10 @@ TextModel run(const KeyRecords &document, const RecalcOptions &opt)
     bool haveComment = false;
     QString comment;
 
-    auto pushMap = [&](int ri) {
-        m.mapPos.append(pos);
-        m.mapElem.append(elem);
-        m.mapKlav.append(klavIdx);
-        m.mapRec.append(ri);
-    };
+    auto pushMap = [&](int ri) { m.anchors.append({pos, elem, klavIdx, ri}); };
     auto fixPositions = [&](int from) {
-        for (int k = from; k < m.mapPos.size(); ++k)
-            m.mapPos[k] = pos;
+        for (int k = from; k < m.anchors.size(); ++k)
+            m.anchors[k].pos = pos;
     };
 
     for (int ri = 0; ri < recs.size(); ++ri) {
@@ -251,7 +255,7 @@ TextModel run(const KeyRecords &document, const RecalcOptions &opt)
         } else {
             klav.addFragmentStart(r, absT, erased);
             pendingSplit = true;
-            splitMapIdx = m.mapPos.size() - 1;
+            splitMapIdx = m.anchors.size() - 1;
         }
         sinceKlav = 0;
 
@@ -304,7 +308,7 @@ TextModel run(const KeyRecords &document, const RecalcOptions &opt)
             } else {
                 pos = flushParagraph(m, segs);
             }
-            lastElemMapIdx = m.mapPos.size();
+            lastElemMapIdx = m.anchors.size();
             if (startsFragment)
                 m.fragmentStarts.append(elem);
             m.pauses.append(float(0.001L * acc));
@@ -318,18 +322,6 @@ TextModel run(const KeyRecords &document, const RecalcOptions &opt)
     }
     flushParagraph(m, segs);
     return m;
-}
-
-int lowerBound(const QVector<int> &v, int x)
-{
-    return int(std::lower_bound(v.begin(), v.end(), x) - v.begin());
-}
-
-int at(const QVector<int> &v, int i)
-{
-    if (v.isEmpty())
-        return 0;
-    return i < v.size() ? v[i] : v.last() + 1;
 }
 
 } // namespace Recalc

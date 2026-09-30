@@ -88,11 +88,10 @@ Page build(const Source &src, const Node &node);
 // The list of the extra statistics window as bars, in list order.
 Page fromExtra(const QVector<ExtraStats::Row> &rows, const Names &names = {});
 
-// The page a double click on bar `index` opens; nothing for pages of single presses
-// (there the click scrolls to elementOf(bar.rec)) and for Node::Extra (selects the row of the list).
+// The page a double click on bar `index` opens; nothing for pages of single presses (there the
+// click scrolls to TextModel::elementOfRecord(bar.rec), 0x44d0dc) and for Node::Extra (selects the
+// row of the list).
 std::optional<Node> drill(const Node &node, const Page &page, int index);
-// 0x44d0dc: text element of a record.
-int elementOf(const TextModel &m, int rec);
 
 // Hint of a bar: "12,345 (7) label".
 QString hint(const Bar &bar, const QLocale &loc);

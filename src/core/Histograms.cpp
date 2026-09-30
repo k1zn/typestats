@@ -139,13 +139,7 @@ KeyLabel labelsFromRecords(const KeyRecords &recs)
 
 std::pair<int, int> recordRange(const TextModel &m, int b, int e)
 {
-    return {Recalc::at(m.mapRec, Recalc::lowerBound(m.mapElem, b)),
-            Recalc::at(m.mapRec, Recalc::lowerBound(m.mapElem, e))};
-}
-
-int elementOf(const TextModel &m, int rec)
-{
-    return Recalc::at(m.mapElem, Recalc::lowerBound(m.mapRec, rec));
+    return {m.recordOfElement(b), m.recordOfElement(e)};
 }
 
 Page build(const Source &src, const Node &node)

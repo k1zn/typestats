@@ -9,29 +9,24 @@ float scrollForPosition(const TextModel &m, int selStart)
 {
     if (m.klav.isEmpty())
         return 0.0f;
-    const int k = Recalc::at(m.mapKlav, Recalc::lowerBound(m.mapPos, selStart));
+    const int k = m.klavAt(selStart);
     // The original checks size < k only, and reads one record past the end for k == size.
     const qint64 t = k < m.klav.size() ? m.klav[k].tDraw : m.klav.last().tDraw;
     return float(0.001L * (t - 100));
 }
 
-QVector<KeyListRow> rows(const QVector<KlavRecord> &klav, float scrollMs, int widthPx, float zoom, int maxRows,
-                         const QLocale &loc)
+QVector<KeyListRow> rows(const QVector<KlavRecord> &klav, const QLocale &loc, double fromUs, double toUs, int limit)
 {
-    const float start = scrollMs * 1000.0f - 10.0f;
-    const float end = float(double(float(widthPx * 1000)) / double(zoom) + double(start));
-
     QVector<KeyListRow> out;
     int pressRow[256];
     qint64 pressT[256] = {};
     std::fill(std::begin(pressRow), std::end(pressRow), -1);
     qint64 prev = 0;
-    const bool windowed = maxRows < 0x7fffffff; // the original ignores the window for "all rows"
     for (const KlavRecord &r : klav) {
         const double t = double(r.tDraw);
-        if (windowed && t < double(start))
+        if (t < fromUs)
             continue;
-        if (windowed && widthPx >= 0 && t > double(end))
+        if (t > toUs)
             break;
         const quint8 scan = r.flags & KeyRecord::ScanMask; // indexed by scan code, not VK
         if (!r.down) {
@@ -51,7 +46,7 @@ QVector<KeyListRow> rows(const QVector<KlavRecord> &klav, float scrollMs, int wi
         if (row.key == QLatin1String("\r"))
             row.key = QStringLiteral("[Enter]");
         out.append(row);
-        if (out.size() >= maxRows)
+        if (limit >= 0 && out.size() >= limit)
             break;
         prev = r.t;
     }
