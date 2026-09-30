@@ -1,7 +1,8 @@
 // The core against what the original TypeStats.exe showed for the golden files.
 // tests/golden/orig/<name>.json is written by re/scripts/diffstand.py (one entry per option set:
-// ListView2, text, character styles, and ListView2 for a number of selections).
+// ListView2, text, character styles, ListView2 for a number of selections, Form3 lists).
 
+#include "core/ExtraStats.h"
 #include "core/FingerZones.h"
 #include "core/Graphs.h"
 #include "core/KeyList.h"
@@ -190,6 +191,49 @@ private slots:
             for (quint8 f : fingerSeries(m, FingerZones::standard()))
                 finger << f;
             QCOMPARE(bits(finger), bits(series[QLatin1String("finger")].toArray()));
+        }
+        // Form3: the row vector from the original's memory (exact float bits) and the list as shown.
+        const QJsonArray extra = variant[QLatin1String("extra")].toArray();
+        for (qsizetype xi = 0; xi < extra.size(); ++xi) {
+            const QJsonObject x = extra[xi].toObject();
+            const auto kind = ExtraStats::Kind(x[QLatin1String("kind")].toInt());
+            const bool averages = x[QLatin1String("averages")].toBool();
+            const QJsonObject fo = x[QLatin1String("filter")].toObject();
+            ExtraStats::CharFilter filter;
+            filter.onlyOn = fo.contains(QLatin1String("only"));
+            filter.only = fo[QLatin1String("only")].toString();
+            filter.anyOn = fo.contains(QLatin1String("any"));
+            filter.any = fo[QLatin1String("any")].toString();
+            filter.excludeOn = fo.contains(QLatin1String("exclude"));
+            filter.exclude = fo[QLatin1String("exclude")].toString();
+            const QJsonArray sel = x[QLatin1String("sel")].toArray();
+            const auto [b, e] = Stats::range(m, sel[0].toInt(), sel[1].toInt(), opt.byPauses);
+            const auto occ = ExtraStats::collect(m, fingerSeries(m, FingerZones::standard()), b, e, kind,
+                                                 x[QLatin1String("pattern")].toString(), filter);
+            ExtraStats::Sort sort{x[QLatin1String("sort")].toInt(), x[QLatin1String("desc")].toBool()};
+            const QLocale ru(QLocale::Russian);
+            QStringList got, want, gotLv, wantLv;
+            for (const ExtraStats::Row &r : ExtraStats::rows(occ, averages, sort.mode)) {
+                got << bits(QVector<float>{r.speed})[0] + QLatin1Char('|') + QString::number(r.value) + QLatin1Char('|') + r.text;
+            }
+            for (const QJsonValue &v : x[QLatin1String("rows")].toArray())
+                want << v[0].toString() + QLatin1Char('|') + QString::number(v[1].toInt()) + QLatin1Char('|') + v[2].toString();
+            for (const ExtraStats::Row &r : ExtraStats::rows(occ, averages, sort.mode, sort.descending)) {
+                gotLv << ExtraStats::formatSpeed(r.speed, ru) + QLatin1Char('|') + r.text
+                             + (averages ? QLatin1Char('|') + QString::number(r.value) : QString());
+            }
+            if (got != want || gotLv != lv1Rows(x[QLatin1String("lv")].toArray()))
+                qWarning() << "extra" << xi << x[QLatin1String("kind")].toInt() << x[QLatin1String("pattern")].toString();
+            QCOMPARE(got, want);
+            QCOMPARE(gotLv, lv1Rows(x[QLatin1String("lv")].toArray()));
+            QCOMPARE(sort.headers(averages), bits(x[QLatin1String("headers")].toArray()));
+            if (x.contains(QLatin1String("occ"))) {
+                const QJsonObject o = x[QLatin1String("occ")].toObject();
+                QStringList lower;
+                for (const ExtraStats::Occurrence &oc : ExtraStats::occurrences(occ, o[QLatin1String("text")].toString()))
+                    lower << ExtraStats::formatSpeed(oc.speed, ru) + QLatin1Char('|') + oc.text;
+                QCOMPARE(lower, lv1Rows(o[QLatin1String("lv")].toArray()));
+            }
         }
         if (variant.contains(QLatin1String("styles")))
             QCOMPARE(portStyles(m), origStyles(variant[QLatin1String("styles")].toArray()));

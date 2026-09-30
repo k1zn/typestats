@@ -62,8 +62,12 @@ src/core/      только QtCore, тестируемо
                       серия сверена с оригиналом побитно (tst_orig, series.finger)
   KeyList.*           ListView1 «Пауза/Длительность/Клавиша» (0x437d98 + 0x404c44, scrollForPosition 0x414500) —
                       ГОТОВО, сверено
+  ExtraStats.*        Form3 «Дополнительная статистика» (0x43ff3c): parseTemplate, CharFilter, collect → вхождения,
+                      rows (средние, сортировки 0–3), occurrences, Sort (клики по столбцам, заголовки ▲▼),
+                      formatSpeed (FloatToStrF ffFixed 8,2), toText, TemplateList (ExStats.ini) — ГОТОВО, сверено побитно
 src/cli/tsstat.cpp  консольная утилита: `tsstat [--split MS] [--only-text] [--by-pauses] [--sel S L] [--text|--runs] f.tsf`
-                    печатает «Параметр\tЗначение» как ListView2 (для дифф-стенда)
+                    печатает «Параметр\tЗначение» как ListView2 (для дифф-стенда);
+                    `--extra KIND [--avg] [--sort N] [--desc] [--pattern P] [--only S] [--any S] [--exclude S]` — список Form3
 src/platform/KeyboardHook.*   обёртка libuiohook → сигнал HookKey{vk, scan, kind Press/Release/Typed, timeUs, ch}
 src/main.cpp        пока заглушка (QLabel)
 src/ui/, src/export/, i18n/   пусто
@@ -71,8 +75,9 @@ resources/icons/    оригинальные иконки кнопок (<Form>_<
 tests/tst_tsf.cpp   юнит-тесты + golden: подпись и побайтовый round-trip 4 реальных файлов
 tests/tst_recalc.cpp  KeyName, разметка BS/Ctrl+BS, нормализация, текст/фрагменты, статистика на синтетике, golden-прогон
 tests/tst_zones.cpp FingerZones, FingerZoneSchemes, IniFile
+tests/tst_extra.cpp ExtraStats на синтетике
 tests/tst_orig.cpp  ядро против записанного вывода оригинала (tests/golden/orig/*.json): ListView2, текст, стили,
-                    выделения, ListView1 — 4 файла × 5 наборов опций
+                    выделения, ListView1 — 4 файла × 5 наборов опций; серии графиков и Form3 (ключ `extra`) — 824
 tests/golden/       реальные .tsf пользователя с рабочего стола (801, 824, обыка, цифры13зн)
 tests/golden/orig/  что показывал оригинал (пишет re/scripts/diffstand.py)
 ```
@@ -86,6 +91,7 @@ tests/golden/orig/  что показывал оригинал (пишет re/sc
 ```bash
 python re/scripts/diffstand.py [файлы] [--variants] [--sel N] [--no-styles]   # запуск оригинала, ~1.5 мин/файл
 python re/scripts/diffstand.py [файлы] --offline                              # по записанным JSON, секунды
+python re/scripts/diffstand.py файл --extra                                   # только Form3, ~10 с, дописывает ключ extra
 ```
 - Запускает `TypeStats.exe <файл>`, читает ListView2/ListView1/текст/стили RichEdit, выделения и курсор.
   64-битный Python против 32-битного процесса: структуры LVITEM/CHARFORMAT собираются вручную
@@ -219,18 +225,11 @@ python re/scripts/diffstand.py [файлы] --offline                           
    оси/легенда/гистограммы) — на UI-этапе, современными средствами, но с тем же видом.
 4. Остальные модули ядра, каждый — сначала `re/*.md`, потом `src/core` + сверка стендом:
    - ~~зоны пальцев~~ — готово (`re/finger_zones.md`, `src/core/FingerZones`, серия сверена);
-   - **СЛЕДУЮЩЕЕ: Form3** — реверс ЗАВЕРШЁН, всё в `re/extra_stats.md`. Осталось:
-     a) `src/core/ExtraStats.{h,cpp}`: parseTemplate, CharFilter, collect(model, fingers, b, e, kind, pattern, filter)
-        → вхождения (speed, pos, text); rows(вхождения, averages, sortMode, descending); occurrences(text) для ListView2;
-        formatSpeed = FloatToStrF(ffFixed, 8, 2) с округлением Delphi (половина от нуля, разделитель локали, без групп);
-        список шаблонов ExStats.ini (UTF-16 LE BOM / UTF-8 / cp1251);
-     b) юнит-тесты на синтетике (tst_extra.cpp);
-     c) стенд: открыть Form3 кликом по SpeedButton12 (WM_LBUTTONDOWN/UP панели), для каждого типа RadioGroup1 (BM_CLICK)
-        и режима «Средние» прочитать вектор строк `DAT_005b1544..1548` из памяти + текст TntListView1
-        (LVM_GETITEMTEXTW) → `tests/golden/orig/<файл>.json` ключ `extra`; сверка в tst_orig. Запускать на одном файле
-        (824.tsf), в фоне; шаблоны проверить на синтетике и 1–2 шаблонах в стенде;
-     d) tsstat: режим `--extra KIND` для дифф-стенда.
-   - Form4 «Дополнительные гистограммы» (0x451b88; функции 0x44d124, 0x44da90, 0x44e57c, 0x44ed0c, 0x44f52c,
+   - ~~Form3 «Дополнительная статистика»~~ — готово (`re/extra_stats.md`, `src/core/ExtraStats`, `tsstat --extra`,
+     стенд `--extra`; там же грабли стенда: CN_NOTIFY вместо WM_NOTIFY, `id & 0xFFFF` в WM_COMMAND). Сверено на
+     824.tsf (цифры): слов с ошибками и предложений там мало — при случае прогнать `--extra` на текстовом файле
+     (обыка.tsf) и при «Только текст» = 0;
+   - **СЛЕДУЮЩЕЕ:** Form4 «Дополнительные гистограммы» (0x451b88; функции 0x44d124, 0x44da90, 0x44e57c, 0x44ed0c, 0x44f52c,
      0x44fe88 используют `DAT_005b1278`; строки «Длительности сочетаний», «Двойное нажатие на клавишу»,
      «Та же рука (другой палец)», «Другая рука», «Все клавиши», «Все пальцы» — 0x58ecbe…);
    - журнал `.tsj` (запись с `dt ^ 0x554973`, `FUN_0040b288`); оригинал создаёт пустой `<год>_<месяц>.tsj`

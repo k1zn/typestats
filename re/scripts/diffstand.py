@@ -12,6 +12,9 @@ HKCU\\Software\\TypingStatistics[\\<Profile>] exactly as the original reads them
 
     python re/scripts/diffstand.py [files...] [--sel N] [--seed S] [--no-styles] [--record]
 
+--extra runs the original only for Form3 "Дополнительная статистика" (a few seconds) and adds the
+key "extra" to the variant recorded earlier; see re/extra_stats.md.
+
 Without files all tests/golden/*.tsf are used. --record saves what the original shows to
 tests/golden/orig/<name>.json (used by the C++ tests, so they do not need the original).
 Exit code 1 if anything differs.
@@ -302,6 +305,99 @@ class Original:
             out[name] = [f"{v:08x}" for v in struct.unpack(f"<{len(raw) // 4}I", raw)]
         return out
 
+    # ---- Form3 "Дополнительная статистика" (re/extra_stats.md)
+
+    def rd(self, addr, fmt="<I"):
+        return struct.unpack(fmt, wr.read_process(self.proc.pid, addr, struct.calcsize(fmt)))[0]
+
+    def control_handle(self, form_global, field=None):
+        """HWND of a form (global PTR__FormN -> variable -> object) or of its field at the given offset."""
+        if getattr(self, "_handle_off", None) is None:
+            # TWinControl.FHandle: found once by looking for the main window's HWND in Form1.
+            form1 = self.rd(self.rd(0x5B09FC))
+            raw = wr.read_process(self.proc.pid, form1, 0x2C0)
+            self._handle_off = next(o for o in range(0x100, 0x2C0, 4)
+                                    if struct.unpack_from("<I", raw, o)[0] == self.main.handle)
+        obj = self.rd(self.rd(form_global))
+        if field is not None:
+            obj = self.rd(obj + field)
+        return self.rd(obj + self._handle_off)
+
+    def open_extra(self):
+        """Clicks SpeedButton12 (a TSpeedButton has no window: the click goes to its parent panel)."""
+        form1 = self.rd(self.rd(0x5B09FC))
+        btn = self.rd(form1 + 972)
+        left, top, width, height = struct.unpack("<4i", wr.read_process(self.proc.pid, btn + 0x40, 16))
+        assert 0 < width < 100 and 0 < height < 100, (left, top, width, height)
+        panel = self.rd(self.rd(btn + 0x30) + self._handle_offset())
+        lp = ((top + height // 2) << 16) | (left + width // 2)
+        wr.send(panel, 0x0201, 1, lp)  # WM_LBUTTONDOWN
+        wr.send(panel, 0x0202, 0, lp)  # WM_LBUTTONUP
+        F3 = 0x5B0A08
+        self.form3 = self.control_handle(F3)
+        deadline = time.time() + 5
+        while not wr.user32.IsWindowVisible(self.form3):
+            assert time.time() < deadline, "Form3 did not open"
+            time.sleep(0.1)
+        wr.user32.SetForegroundWindow(self.form3)
+        time.sleep(0.3)
+        h = lambda off: self.control_handle(F3, off)
+        self.x_list, self.x_avg = h(776), h(764)
+        self.x_filter = [(h(792), h(804)), (h(796), h(808)), (h(800), h(812))]  # (CheckBox3..5, TntEdit1..3)
+        self.x_combo = h(828)
+        group = h(752)
+        radios = {c.window_text(): c.handle for c in Desktop(backend="win32").window(handle=self.form3).descendants()
+                  if wr.user32.GetParent(c.handle) == group}
+        self.x_kind = [radios[t] for t in ("Двухсимвольные сочетания", "Трёхсимвольные сочетания",
+                                           "Четырёхсимвольные сочетания", "Слова", "Слова с ошибками",
+                                           "Предложения", "Шаблон")]
+
+    def _handle_offset(self):
+        self.control_handle(0x5B09FC)
+        return self._handle_off
+
+    def extra_kind(self, kind):
+        wr.send(self.x_kind[kind], 0x00F5)  # BM_CLICK
+        assert wr.send(self.x_kind[kind], 0x00F0) == 1, f"radio {kind} not checked"
+
+    @staticmethod
+    def set_check(hwnd, on):
+        if bool(wr.send(hwnd, 0x00F0)) != on:
+            wr.send(hwnd, 0x00F5)
+        assert bool(wr.send(hwnd, 0x00F0)) == on
+
+    def extra_pattern(self, text):
+        wr.set_text(self.x_combo, text)
+        # WM_COMMAND with CBN_EDITCHANGE; a VCL control's id is its HWND, only the low word fits.
+        ctrl_id = wr.user32.GetDlgCtrlID(self.x_combo) & 0xFFFF
+        wr.send(wr.user32.GetParent(self.x_combo), 0x0111, (5 << 16) | ctrl_id, self.x_combo)
+
+    def extra_filter(self, index, text):
+        """index 0 "Только эти", 1 "Один из", 2 "Исключить"; text None switches the filter off."""
+        box, edit = self.x_filter[index]
+        if text is not None:
+            wr.set_text(edit, text)
+        self.set_check(box, text is not None)
+
+    def extra_rows(self):
+        """The row vector DAT_005b1544..1548: {float speed; int value; WideString text} -> [bits, value, text]."""
+        begin, end = struct.unpack("<II", wr.read_process(self.proc.pid, 0x5B1544, 8))
+        raw = wr.read_process(self.proc.pid, begin, end - begin) if end > begin else b""
+        out = []
+        for speed, value, ptr in struct.iter_unpack("<IiI", raw):
+            text = ""
+            if ptr:
+                text = wr.read_process(self.proc.pid, ptr, self.rd(ptr - 4)).decode("utf-16-le")
+            out.append([f"{speed:08x}", value, text])
+        return out
+
+    def extra_snapshot(self, **what):
+        time.sleep(0.15)
+        return {**what, "averages": bool(wr.send(self.x_avg, 0x00F0)),
+                "sort": self.rd(0x59B764, "<B"), "desc": bool(self.rd(0x59B768, "<B")),
+                "rows": self.extra_rows(), "lv": wr.listview_rows(self.x_list),
+                "headers": wr.header_texts(self.x_list)}
+
     def close(self):
         self.proc.kill()
         self.proc.wait()
@@ -384,6 +480,85 @@ def collect_variant(orig, opts, args):
     return rec
 
 
+def collect_extra(orig):
+    """Form3 of the original: every kind with and without averages, sorting, templates, filters, a selection."""
+    orig.open_extra()
+    out = []
+
+    def snap(**what):
+        out.append(orig.extra_snapshot(**what))
+
+    for kind in range(6):
+        orig.extra_kind(kind)
+        for avg in (False, True):
+            orig.set_check(orig.x_avg, avg)
+            snap(kind=kind)
+    # Sorting by column clicks, on the pairs (they repeat, so the averages are not trivial).
+    orig.extra_kind(0)
+    for avg, clicks in ((False, (1, 1, 0, 0, 0)), (True, (1, 1, 2, 2, 2, 0, 0, 0))):
+        orig.set_check(orig.x_avg, avg)
+        for col in clicks:
+            wr.listview_column_click(orig.x_list, col)
+            snap(kind=0)
+    # The lower list: occurrences of the selected row (averages mode).
+    try:
+        wr.listview_select(orig.x_list, len(out[-1]["lv"]) - 1)
+        time.sleep(0.3)
+        lower = orig.control_handle(0x5B0A08, 780)
+        out.append({**orig.extra_snapshot(kind=0), "occ": {"text": out[-1]["lv"][-1][1],
+                                                           "lv": wr.listview_rows(lower)}})
+    except Exception as ex:  # optional
+        print("  (lower list not read:", ex, ")")
+    # Without averages a selected row moves the caret of the main window, and that narrows the range.
+    wr.listview_select(orig.x_list, None)
+    orig.set_check(orig.x_avg, False)
+    text = orig.text()
+    orig.select(text, 0, 0)
+    orig.extra_kind(6)
+    for pattern in ("/0/0/0", "1/*", "/(/)", "/)/)/)", "/1", "/4/*", "/е", "/0 /0", "/*/е", "/с/0", "9 "):
+        orig.extra_pattern(pattern)
+        snap(kind=6, pattern=pattern)
+    orig.set_check(orig.x_avg, True)
+    snap(kind=6, pattern=pattern)
+    orig.set_check(orig.x_avg, False)
+    orig.extra_kind(0)
+    orig.extra_filter(1, "12")
+    snap(kind=0, filter={"any": "12"})
+    orig.extra_filter(2, "0")
+    snap(kind=0, filter={"any": "12", "exclude": "0"})
+    orig.extra_filter(1, None)
+    snap(kind=0, filter={"exclude": "0"})
+    orig.extra_filter(2, None)
+    orig.extra_filter(0, "123456 ")
+    snap(kind=0, filter={"only": "123456 "})
+    orig.extra_kind(3)
+    snap(kind=3, filter={"only": "123456 "})
+    orig.extra_filter(0, None)
+    for s, n in ((40, 120), (7, 33), (0, 0)):
+        orig.select(text, s, n)
+        for kind in (3, 4, 5, 0, 2):
+            orig.extra_kind(kind)
+            snap(kind=kind, sel=[s, n])
+    return out
+
+
+def compare_extra(tsf, base, x, rep):
+    a = base + ["--extra", str(x["kind"]), "--sort", str(x["sort"])]
+    title = f"extra kind={x['kind']} sort={x['sort']}"
+    if x["averages"]:
+        a.append("--avg")
+    if x["desc"]:
+        a.append("--desc")
+    if x.get("pattern"):
+        a += ["--pattern", x["pattern"]]
+    for key in ("only", "any", "exclude"):
+        if key in x.get("filter", {}):
+            a += [f"--{key}", x["filter"][key]]
+    if "sel" in x:
+        a += ["--sel"] + [str(v) for v in x["sel"]]
+    rep.rows(" ".join(["[" + " ".join(a) + "]", title]), x["lv"], port_rows(tsstat(a + [str(tsf)])))
+
+
 def compare_variant(tsf, rec, rep):
     """Compares a recorded variant against tsstat."""
     opts = rec["options"]
@@ -400,6 +575,8 @@ def compare_variant(tsf, rec, rep):
         s, n = sel["start"], sel["length"]
         port = port_rows(tsstat(base + ["--sel", str(s), str(n), str(tsf)]))
         rep.rows(f"[{tag}] ListView2 sel {s}+{n}", sel["stats"], port)
+    for x in rec.get("extra", []):
+        compare_extra(tsf, base, x, rep)
 
 
 # (TextOnly, SplitOnEnter, Pause) tried by --variants in addition to the registry options.
@@ -416,6 +593,19 @@ def run_file(tsf, opts, args, rep):
     out = recorded_path(tsf)
     if args.offline:
         recs = json.loads(out.read_text(encoding="utf-8"))["variants"]
+    elif args.extra:
+        # Only Form3, merged into the variant recorded earlier with the current options.
+        recs = json.loads(out.read_text(encoding="utf-8"))["variants"]
+        rec = next(r for r in recs if r["options"] == opts)
+        snap = reg_snapshot()
+        orig = Original(tsf)
+        try:
+            assert orig.text() == rec["text"], "the recorded variant does not match the original's text"
+            rec["extra"] = collect_extra(orig)
+        finally:
+            orig.close()
+            reg_restore(snap)
+        out.write_text(json.dumps({"variants": recs}, ensure_ascii=False, indent=1), encoding="utf-8")
     else:
         recs = []
         snap = reg_snapshot()
@@ -481,6 +671,8 @@ def main():
     ap.add_argument("--variants", action="store_true",
                     help="also switch options in the original's window (it saves them to the registry at once; "
                          "the key is snapshotted and restored afterwards)")
+    ap.add_argument("--extra", action="store_true",
+                    help="run the original only for Form3 (extra statistics) and add it to the recorded JSON")
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
     files = [Path(f).resolve() for f in args.files] or sorted((ROOT / "tests" / "golden").glob("*.tsf"))

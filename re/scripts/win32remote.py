@@ -153,3 +153,45 @@ def read_process(pid, addr, size) -> bytes:
         return buf.raw[:n.value]
     finally:
         kernel32.CloseHandle(proc)
+
+
+def header_texts(listview):
+    """Column captions of a report-mode ListView."""
+    header = send(listview, LVM_GETHEADER)
+    out = []
+    with RemoteBuffer(header, 0x1000) as rb:
+        for i in range(send(header, HDM_GETITEMCOUNT)):
+            # HDITEMW, 32-bit: mask cxy pszText hbm cchTextMax fmt lParam iImage iOrder type pvFilter state
+            rb.write(0, struct.pack("<IiIIiiiiiIII", 2, 0, rb.addr + 0x100, 0, 0x200, 0, 0, 0, 0, 0, 0, 0))
+            rb.write(0x100, bytes(0x400))
+            send(header, 0x120B, i, rb.addr)  # HDM_GETITEMW
+            out.append(rb.read(0x100, 0x400).decode("utf-16-le").split(chr(0))[0])
+    return out
+
+
+def listview_column_click(listview, column):
+    """LVN_COLUMNCLICK for a VCL list view.
+
+    WM_NOTIFY is not delivered across processes, so the message VCL reflects to the control
+    (CN_NOTIFY = CN_BASE + WM_NOTIFY) is sent to the list itself.
+    """
+    with RemoteBuffer(listview, 0x100) as rb:
+        # NMLISTVIEW, 32-bit: hwndFrom idFrom code iItem iSubItem uNewState uOldState uChanged pt lParam
+        rb.write(0, struct.pack("<IIiiiIIIiii", listview, 0, -108, -1, column, 0, 0, 0, 0, 0, 0))
+        send(listview, 0xBC4E, 0, rb.addr)
+
+
+def listview_select(listview, index):
+    """Selects and focuses one row (LVM_SETITEMSTATE); None clears the selection."""
+    with RemoteBuffer(listview, 0x100) as rb:
+        clear = struct.pack("<IiiIIIiiiI", 8, 0, 0, 0, 3, 0, 0, 0, 0, 0)
+        rb.write(0, clear)
+        send(listview, 0x102B, (1 << 64) - 1, rb.addr)  # all rows
+        if index is not None:
+            rb.write(0, struct.pack("<IiiIIIiiiI", 8, index, 0, 3, 3, 0, 0, 0, 0, 0))
+            send(listview, 0x102B, index, rb.addr)
+
+
+def set_text(hwnd, text):
+    buf = ctypes.create_unicode_buffer(text)
+    send(hwnd, 0x000C, 0, ctypes.addressof(buf))  # WM_SETTEXT
