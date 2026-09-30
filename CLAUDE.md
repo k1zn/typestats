@@ -82,8 +82,17 @@ src/cli/tsstat.cpp  консольная утилита: `tsstat [--split MS] [-
                     `--extra KIND [--avg] [--sort N] [--desc] [--pattern P] [--only S] [--any S] [--exclude S]` — список Form3;
                     `--to-journal out.tsj f.tsf` — записи файла журналом
 src/platform/KeyboardHook.*   обёртка libuiohook → сигнал HookKey{vk, scan, kind Press/Release/Typed, timeUs, ch}
-src/main.cpp        пока заглушка (QLabel)
-src/ui/, src/export/, i18n/   пусто
+src/main.cpp        QApplication: светлая схема, стиль windowsvista и шрифт 8 pt на Windows (вид оригинала), MainWindow,
+                    файл из аргумента командной строки
+src/ui/             первая веха UI:
+  MainWindow.*        Form1: тулбар по координатам DFM (иконки оригинала; неподключённые кнопки выключены),
+                      сплиттеры, ListView2/ListView1 (QTableWidget с сеткой), «Файл повреждён», открытие .tsf/.tsj,
+                      сохранение, очистка, «Открыть журнал», опции пересчёта (QSettings: Pause/TextOnly/SplitOnEnter,
+                      MainOption<i>), выделение в тексте → статистика и список клавиш
+  TextView.*          Memo4: QTextEdit, Arial 16 px, стили TextRun (красный/синий/зелёный/подчёркивание)
+  KlavogramWidget.*   PaintBox3: пока только состояние (прокрутка, zoom) и `visibleSpanUs()` для списка клавиш;
+                      отрисовки нет. График (PaintBox1) — пустая панель
+src/export/, i18n/  пусто
 resources/icons/    оригинальные иконки кнопок (<Form>_<SpeedButtonN>.png) + app.ico/png; resources.qrc
 tests/tst_tsf.cpp   юнит-тесты + golden: подпись и побайтовый round-trip 4 реальных файлов
 tests/tst_recalc.cpp  KeyName, разметка BS/Ctrl+BS, нормализация, текст/фрагменты, статистика на синтетике, golden-прогон
@@ -147,7 +156,7 @@ python re/scripts/diffstand.py файл --journal                               
   - `re/scripts/str_at.py <va>...` — строки по адресам;
   - `re/scripts/func_map.py` → `re/func_map.txt`: карта функций (размер, строки, вызовы).
 - **Прочее в `re/`:**
-  - `forms_dfm.txt` — все 11 форм в тексте (UI 1:1);
+  - `forms_dfm.txt` — все 11 форм в тексте (UI 1:1); `forms_geometry.txt` — их координаты, шрифты, выравнивание;
   - `strings_data.txt` — строки из .data;
   - `vmt_methods.json` — адреса обработчиков событий форм;
   - `tsf_format.md` — **спецификация формата и хука**;
@@ -257,11 +266,29 @@ python re/scripts/diffstand.py файл --journal                               
    Для сверки новых модулей стенд дополняется: открыть форму оригинала (кнопка/меню через WM_COMMAND или
    BM_CLICK, TSpeedButton — кликом по родителю) и считать её ListView, либо читать структуры из памяти
    (`win32remote.read_process`).
-5. **СЛЕДУЮЩЕЕ:** UI по `re/forms_dfm.txt`. Раскладка главного окна:
+5. UI по `re/forms_dfm.txt` (свойства) + `re/forms_geometry.txt` (координаты всех контролов всех 11 форм, пишет
+   `re/scripts/dfm_geometry.py`). Эталон вида — `re/ui_reference/main_legend.png`; снимки:
+   `python re/scripts/screenshot_orig.py <tsf> <каталог> [SpeedButtonN…]` (оригинал) и
+   `python re/scripts/screenshot_port.py <tsf> <out.png>` (порт). Раскладка главного окна:
    - тулбар 57 px в две строки кнопок 23 px;
    - слева сверху вниз: RichEdit (текст, 120), PaintBox1 (график + скроллбар), PaintBox3 (клавограмма, 200);
    - справа панель 218 px: ListView2 (Параметр/Значение, высота 318) и ListView1 (Пауза/Длительность/Клавиша);
    - плавающие панели: «Настройка оси Y» (Panel9) и «Легенда» (Panel2).
+
+   Сделано: каркас главного окна (см. `src/ui/` в «Структуре»), числа на экране совпадают с оригиналом.
+   **СЛЕДУЮЩЕЕ**, по порядку:
+   - клавограмма: реверс `PaintBox3Paint` и отрисовки объекта `DAT_005b1348` в `re/klavogram.md` (строки клавиатуры,
+     цвета пальцев, шкала времени, прокрутка/масштаб мышью), затем `KlavogramWidget`; жёлтая подсветка в тексте
+     участка, видимого на клавограмме;
+   - график: реверс `PaintBox1Paint` → 0x43c6bc (оси, три режима «Скорость/Ритмичность/Гистограмма», текст под
+     графиком, выделение мышью, ScrollBar1), «Легенда» (Panel2/PaintBox2), «Настройка оси Y» (Panel9);
+   - запись: KeyboardHook → записи (порт 0x404598/0x40a7a4: флаги, мёртвые клавиши, хоткеи, автокомментарии,
+     JournalWriter), «Вкл», оперативная статистика (Form10);
+   - правка: удалить/пометить/метки/отмена, копирование (обычное, без ошибок, с тегами), «Сохранить блок»;
+     правило подписи при сохранении (`g_fileClean`) — сейчас подпись сохраняется только у непомеченного файла с
+     верной подписью;
+   - остальные формы: Form3, Form4, Tkbd, Form8 (настройки), Form2, Form9, Form7; пресеты; трей; импорт настроек
+     из реестра; экспорт xlsx/csv; i18n; видео.
 
 ## Технический долг: артефакты оригинала в ядре
 

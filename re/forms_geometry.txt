@@ -1,0 +1,232 @@
+===== TFORM1
+Form1: TForm1 [237 134 - -] Caption='Typing statistics v1.43c' ClientWidth=876 ClientHeight=579 Font.Height=-11 Font.Name='MS Sans Serif' Font.Style=[] Font.Color='clWindowText' Color='clBtnFace' Constraints.MinWidth=220
+  Panel18: TPanel [0 57 876 522] Align='alClient' TabOrder=2
+    Splitter3: TSplitter [653 1 4 520] Align='alRight' Cursor='crHSplit' MinSize=100 Beveled=True
+    Panel3: TPanel [657 1 218 520] Align='alRight' TabOrder=1
+      ListView1: TListView [1 319 216 200] Align='alClient' Columns=[{'Caption': 'Пауза', 'Width': 80}, {'Caption': 'Длительность', 'Width': 80}, {'AutoSize': True, 'Caption': 'Клавиша'}] Font.Height=-15 Font.Name='Courier New' Font.Style=[] Font.Color='clWindowText' TabOrder=0 ReadOnly=True
+      ListView2: TListView [1 1 216 318] Align='alTop' Columns=[{'AutoSize': True, 'Caption': 'Параметр'}, {'Caption': 'Значение', 'Width': 92}] TabOrder=1 ReadOnly=True
+    Panel6: TPanel [1 1 652 520] Align='alClient' BevelOuter='bvNone' Constraints.MinHeight=150 TabOrder=0
+      Splitter1: TSplitter [0 120 652 4] Align='alTop' Color='clBtnFace' Cursor='crVSplit' MinSize=20 Beveled=True
+      Splitter2: TSplitter [0 316 652 4] Align='alBottom' Cursor='crVSplit' MinSize=20 Beveled=True
+      Panel1: TPanel [0 124 652 192] Align='alClient' BevelOuter='bvNone' TabOrder=0
+        PaintBox1: TPaintBox [0 0 652 170] Align='alClient' Color='clBtnFace'
+        Panel4: TPanel [0 170 652 22] Align='alBottom' AutoSize=True TabOrder=0
+          ScrollBar1: TScrollBar [1 1 650 20] Align='alTop' TabOrder=0
+      Panel7: TPanel [0 0 652 120] Align='alTop' BevelOuter='bvNone' TabOrder=1
+        Memo4: TRichEdit [0 0 652 120] Align='alClient' Font.Height=-16 Font.Name='Arial' Font.Style=[] Font.Color='clWindowText' TabOrder=0 ScrollBars='ssVertical' ReadOnly=True
+      Panel8: TPanel [0 320 652 200] Align='alBottom' BevelOuter='bvNone' TabOrder=2
+        PaintBox3: TPaintBox [0 0 652 200] Align='alClient'
+  Panel19: TPanel [0 0 876 57] Align='alTop' TabOrder=3
+    SpeedButton3: TSpeedButton [270 4 23 23] Hint='Справка'
+    SpeedButton5: TSpeedButton [54 4 23 23] Hint='Сохранить'
+    SpeedButton6: TSpeedButton [30 4 23 23] Hint='Прочитать'
+    SpeedButton1: TSpeedButton [6 4 23 23] Hint='Очистить (LCtrl+LWin)'
+    SpeedButton7: TSpeedButton [126 4 23 23] Hint='Экспортировать в Excel'
+    SpeedButton4: TSpeedButton [246 4 23 23] Hint='Оперативная статистика'
+    SpeedButton12: TSpeedButton [150 4 23 23] Hint='Дополнительная статистика'
+    Label1: TLabel [403 18 88 13] Caption='Пауза разбиения'
+    Label2: TLabel [470 35 14 13] Caption='мс'
+    SpeedButton8: TSpeedButton [744 3 23 23] Hint='Создать пресет (Правой кнопкой - удалить)'
+    SpeedButton2: TSpeedButton [768 27 23 23] Hint='Редактировать расстановку'
+    Label3: TLabel [546 9 37 13] Caption='Пресет'
+    Bevel1: TBevel [297 2 2 53] Shape='bsLeftLine'
+    Bevel2: TBevel [396 2 2 53] Shape='bsLeftLine'
+    Bevel3: TBevel [537 2 2 53] Shape='bsLeftLine'
+    Label4: TLabel [546 33 40 13] Caption='Пальцы'
+    SpeedButton9: TSpeedButton [744 27 23 23] Hint='Создать расстановку (Правой кнопкой - удалить)'
+    SpeedButton10: TSpeedButton [6 32 23 22] Hint='Удалить (Del)' Enabled=False
+    SpeedButton11: TSpeedButton [30 32 23 22] Hint='Копировать (Ctrl+C)'
+    SpeedButton13: TSpeedButton [54 32 23 22] Hint='Копировать без ошибок'
+    SpeedButton14: TSpeedButton [78 32 23 22] Hint='Отменить (Ctrl+Z)'
+    SpeedButton15: TSpeedButton [126 32 23 22] Hint='Пометить (Ins)'
+    SpeedButton16: TSpeedButton [174 32 23 22] Hint=' Настройка оси Y графиков'
+    Bevel4: TBevel [3 29 294 2] Shape='bsTopLine'
+    SpeedButton17: TSpeedButton [198 32 23 22] Hint='Легенда'
+    SpeedButton18: TSpeedButton [102 32 23 22] Hint='Удалить нетекстовые клавиши'
+    SpeedButton19: TSpeedButton [174 4 23 23] Hint='Статистические гистограммы'
+    SpeedButton20: TSpeedButton [198 4 23 23] Hint='Видео'
+    SpeedButton21: TSpeedButton [150 32 23 22] Hint='Свойства видео'
+    SpeedButton22: TSpeedButton [222 4 23 23] Hint='Настройки...'
+    SpeedButton23: TSpeedButton [222 32 23 22] Hint='Ввод текста (F4)'
+    SpeedButton24: TSpeedButton [270 32 23 22] Hint='Выход'
+    SpeedButton25: TSpeedButton [246 32 23 22] Hint='Преобразовать в текущую раскладку'
+    SpeedButton26: TSpeedButton [102 4 23 23] Hint='Открыть журнал'
+    SpeedButton27: TSpeedButton [78 4 23 23] Hint='Сохранить блок' Enabled=False
+    CheckBox1: TCheckBox [304 2 41 13] Caption='Вкл' Hint='Управление перехватом (F8+F9)' Checked=True TabOrder=0 State='cbChecked'
+    CheckBox3: TCheckBox [402 2 134 14] Caption='Разбивать по паузам' Hint='Режим "Один текст"/"Много текстов"' TabOrder=1
+    CheckBox2: TCheckBox [304 18 89 13] Caption='Только текст' Hint='Режим отображения' Checked=True TabOrder=2 State='cbChecked'
+    UpDown1: TUpDown [449 32 16 21] Min=200 Max=10000 Position=500 Position=500 TabOrder=3 Increment=100
+    Edit1: TEdit [403 32 46 21] Hint='Превышение этого времени считается за паузу в наборе' Text='500' TabOrder=4
+    ComboBox1: TComboBox [592 4 152 21] Hint='Пресеты настроек' TabOrder=5 Style='csDropDownList' ItemHeight=13
+    ComboBox4: TComboBox [592 28 152 21] Hint='Начальная позиция пальцев и расстановка по зонам' TabOrder=6 Style='csDropDownList' ItemHeight=13
+    CheckBox6: TCheckBox [304 32 89 17] Caption='Только PCmo' Visible=False TabOrder=7
+  Panel9: TPanel [121 121 205 117] Visible=False TabOrder=1
+    Panel10: TPanel [1 1 203 17] Align='alTop' Caption=' Настройка оси Y' BevelOuter='bvSpace' Font.Height=-12 Font.Name='MS Sans Serif' Font.Style=['fsBold'] Font.Color='clWhite' Color='clActiveCaption' Alignment='taLeftJustify' TabOrder=0
+      Panel11: TPanel [188 1 14 15] Align='alRight' Caption='r' BevelOuter='bvSpace' Font.Height=-15 Font.Name='Webdings' Font.Style=[] Font.Color='clWhite' Color=208 TabOrder=0 Ctl3D=False
+    ComboBox2: TComboBox [43 58 81 21] Text='0' Items.Strings=['Авто', '0'] ItemIndex=1 TabOrder=2 ItemHeight=13
+    Panel13: TPanel [3 41 41 18] Caption=' Макс' Alignment='taLeftJustify' TabOrder=6
+    Panel12: TPanel [3 59 41 18] Caption=' Мин' Alignment='taLeftJustify' TabOrder=5
+    ComboBox3: TComboBox [123 58 81 21] Text='0' Items.Strings=['Авто', '0'] ItemIndex=1 TabOrder=4 ItemHeight=13
+    ComboBox5: TComboBox [43 39 81 21] Text='Авто' Items.Strings=['Авто', '100'] ItemIndex=0 TabOrder=1 ItemHeight=13
+    ComboBox6: TComboBox [123 39 81 21] Text='100' Items.Strings=['Авто', '100'] ItemIndex=1 TabOrder=3 ItemHeight=13
+    Panel15: TPanel [123 23 79 18] Caption=' Ритмичность' Alignment='taLeftJustify' TabOrder=8
+    Panel14: TPanel [43 23 80 18] Caption=' Скорость' Alignment='taLeftJustify' TabOrder=7
+    CheckBox4: TCheckBox [8 81 129 17] Caption='Авто с округлением' Checked=True TabOrder=9 State='cbChecked'
+    CheckBox5: TCheckBox [8 98 105 17] Caption='Зафиксировать' TabOrder=10
+  Panel2: TPanel [50 260 264 89] Visible=False BevelOuter='bvNone' BorderStyle='bsSingle' Color=13172735 TabOrder=0 Ctl3D=False
+    PaintBox2: TPaintBox [0 17 262 70] Align='alClient'
+    Panel16: TPanel [0 0 262 17] Align='alTop' Caption=' Легенда' BevelOuter='bvSpace' Font.Height=-12 Font.Name='MS Sans Serif' Font.Style=['fsBold'] Font.Color='clWhite' Color='clActiveCaption' Alignment='taLeftJustify' TabOrder=0
+      Panel17: TPanel [246 1 15 15] Align='alRight' Caption='r' BevelOuter='bvSpace' Font.Height=-15 Font.Name='Webdings' Font.Style=[] Font.Color='clWhite' Color=208 TabOrder=0 Ctl3D=False
+  Panel5: TPanel [128 224 409 49] Caption='Внимание! Файл повреждён!' Visible=False Font.Height=-24 Font.Name='MS Sans Serif' Font.Style=['fsBold'] Font.Color='clRed' Color='clMoneyGreen' TabOrder=4
+  Timer1: TTimer [136 80 - -] 
+  OpenDialog1: TOpenDialog [176 80 - -] 
+  SaveDialog1: TSaveDialog [216 80 - -] 
+  PopupMenu1: TPopupMenu [56 80 - -] 
+    N4: TMenuItem [- - - -] Caption='Удалить' Visible=False
+    N1: TMenuItem [- - - -] Caption='Пометить' Visible=False
+    N2: TMenuItem [- - - -] Caption='Редактировать метку' Visible=False
+    N3: TMenuItem [- - - -] Caption='Удалить метку' Visible=False
+    N5: TMenuItem [- - - -] Caption='Копировать'
+    N6: TMenuItem [- - - -] Caption='Копировать без ошибок'
+    N15: TMenuItem [- - - -] Caption='Копировать с тегами'
+  ApplicationEvents1: TApplicationEvents [96 80 - -] 
+  PopupMenu2: TPopupMenu [56 224 - -] 
+    N7: TMenuItem [- - - -] Caption='Настройка оси Y' GroupIndex=1
+    N8: TMenuItem [- - - -] Caption='Показать легенду' Visible=False GroupIndex=1
+    N12: TMenuItem [- - - -] Caption='-' GroupIndex=1
+    N9: TMenuItem [- - - -] Caption='Скорость' GroupIndex=1 Checked=True
+    N10: TMenuItem [- - - -] Caption='Ритмичность' GroupIndex=1
+    N11: TMenuItem [- - - -] Caption='Гистограмма' GroupIndex=1
+  PopupMenu3: TPopupMenu [480 24 - -] 
+    N13: TMenuItem [- - - -] Caption='О программе...'
+    N14: TMenuItem [- - - -] Caption='Справка'
+  TrayIcon1: TTrayIcon [256 80 - -] 
+  PopupMenu4: TPopupMenu [296 80 - -] 
+    N16: TMenuItem [- - - -] Caption='Вкл' Checked=True
+    N17: TMenuItem [- - - -] Caption='Оперативная статистика'
+    N18: TMenuItem [- - - -] Caption='Выход'
+  ImageList1: TImageList [336 80 - -] 
+===== TFORM10
+Form10: TForm10 [568 210 168 157] Caption='Оперативная статистика' BorderStyle='bsSizeToolWin' Font.Height=-37 Font.Name='Arial' Font.Style=['fsBold'] Font.Color='clWindowText' Color='clWhite' FormStyle='fsStayOnTop'
+  Label1: TLabel [0 0 160 58] Align='alClient' Caption='0' Color='clSilver' Alignment='taCenter' AutoSize=False
+  Label2: TLabel [0 62 160 42] Align='alBottom' Caption='0,00%' Alignment='taCenter' AutoSize=False
+  Splitter1: TSplitter [0 58 160 4] Align='alBottom' Cursor='crVSplit' MinSize=15 Beveled=True
+  StatusBar1: TStatusBar [0 104 160 19] SimplePanel=True
+===== TFORM2
+Form2: TForm2 [369 147 - -] Caption='Свойства файла' BorderStyle='bsSingle' ClientWidth=259 ClientHeight=198 Font.Height=-11 Font.Name='MS Sans Serif' Font.Style=[] Font.Color='clWindowText' Color='clBtnFace' Position='poMainFormCenter' BorderIcons=[] Position='poMainFormCenter'
+  Label1: TLabel [8 0 30 13] Caption='Автор'
+  Label3: TLabel [152 0 26 13] Caption='Дата'
+  Label4: TLabel [8 40 50 13] Caption='Описание'
+  Edit1: TEdit [0 16 137 21] TabOrder=1
+  Edit3: TEdit [144 16 113 21] TabOrder=4 ReadOnly=True
+  Memo1: TMemo [0 56 257 105] TabOrder=0
+  BitBtn1: TBitBtn [44 168 75 25] Kind='bkOK' TabOrder=2
+  BitBtn2: TBitBtn [144 168 75 25] Caption='Отмена' Kind='bkCancel' TabOrder=3
+===== TFORM3
+Form3: TForm3 [641 96 314 634] Caption='Дополнительная статистика' Font.Height=-11 Font.Name='MS Sans Serif' Font.Style=[] Font.Color='clWindowText' Color='clBtnFace' BorderIcons=['biSystemMenu'] Constraints.MinWidth=230 Constraints.MinHeight=450
+  Splitter1: TSplitter [0 440 300 3] Align='alBottom' Visible=False Cursor='crVSplit' MinSize=100
+  RadioGroup1: TRadioGroup [0 36 300 121] Align='alTop' Caption='Тип статистики' Items.Strings=['Двухсимвольные сочетания', 'Трёхсимвольные сочетания', 'Четырёхсимвольные сочетания', 'Слова', 'Слова с ошибками', 'Предложения', 'Шаблон'] ItemIndex=3 TabOrder=0
+  Panel1: TPanel [0 0 300 36] Align='alTop' TabOrder=1
+    SpeedButton1: TSpeedButton [4 6 23 22] Hint='Копировать'
+    SpeedButton7: TSpeedButton [26 6 23 22] Hint='Экспортировать в Excel'
+    SpeedButton4: TSpeedButton [277 6 23 22] Hint='Поверх всех окон' GroupIndex=1 AllowAllUp=True
+    SpeedButton2: TSpeedButton [50 6 23 22] Hint='Сохранить'
+    CheckBox2: TCheckBox [80 1 123 17] Caption='Средние значения' TabOrder=1
+    CheckBox1: TCheckBox [80 17 113 17] Caption='Заблокировать' TabOrder=0
+  TntListView1: TTntListView [0 248 300 192] Align='alClient' Columns=[{'Caption': '▲Скорость', 'Width': 92, 'Caption_UTF7': '+JbIEIQQ6BD4EQAQ+BEEEQgRM'}, {'AutoSize': True, 'Caption': 'Текст', 'Tag': 1, 'Caption_UTF7': '+BCIENQQ6BEEEQg'}] Font.Height=-15 Font.Name='Arial' Font.Style=[] Font.Color='clWindowText' TabOrder=2 ReadOnly=True
+  ListView2: TTntListView [0 443 300 134] Align='alBottom' Visible=False Columns=[{'Caption': 'Скорость', 'Width': 92, 'Caption_UTF7': '+BCEEOgQ+BEAEPgRBBEIETA'}, {'AutoSize': True, 'Caption': 'Текст', 'Caption_UTF7': '+BCIENQQ6BEEEQg'}] Font.Height=-15 Font.Name='Arial' Font.Style=[] Font.Color='clWindowText' TabOrder=3 ReadOnly=True
+  StatusBar1: TStatusBar [0 577 300 19] SimplePanel=True
+  GroupBox1: TGroupBox [0 157 300 91] Align='alTop' Caption='Фильтр по символам' TabOrder=5
+    CheckBox3: TCheckBox [8 18 81 17] Caption='Только эти' TabOrder=0
+    CheckBox4: TCheckBox [8 42 97 17] Caption='Один из' TabOrder=1
+    CheckBox5: TCheckBox [8 66 97 17] Caption='Исключить' TabOrder=2
+    TntEdit1: TTntEdit [88 16 209 23] Font.Height=-12 Font.Name='Arial' Font.Style=[] Font.Color='clWindowText' TabOrder=3
+    TntEdit2: TTntEdit [88 40 209 23] Font.Height=-12 Font.Name='Arial' Font.Style=[] Font.Color='clWindowText' TabOrder=4
+    TntEdit3: TTntEdit [88 64 209 23] Font.Height=-12 Font.Name='Arial' Font.Style=[] Font.Color='clWindowText' TabOrder=5
+  Panel2: TPanel [108 124 192 25] TabOrder=6
+    TntComboBox1: TTntComboBox [1 1 167 23] Align='alClient' Font.Height=-12 Font.Name='Arial' Font.Style=[] Font.Color='clWindowText' TabOrder=0 ItemHeight=15
+    Panel3: TPanel [168 1 23 23] Align='alRight' BevelOuter='bvNone' TabOrder=1
+      SpeedButton8: TSpeedButton [0 0 23 23] Hint='Записать шаблон (Правой кнопкой - удалить)'
+  SaveDialog1: TSaveDialog [216 80 - -] 
+===== TFORM4
+Form4: TForm4 [331 51 644 507] Caption='Статистические гистограммы' Font.Height=-11 Font.Name='MS Sans Serif' Font.Style=[] Font.Color='clWindowText' Color='clBtnFace'
+  PaintBox1: TPaintBox [0 27 636 446] Align='alClient'
+  Panel1: TPanel [0 0 636 27] Align='alTop' TabOrder=0
+    TntLabel1: TTntLabel [104 8 48 13] Caption='TntLabel1'
+    SpeedButton1: TSpeedButton [5 3 23 22] Hint='Назад' Font.Height=-21 Font.Name='MS Sans Serif' Font.Style=[] Font.Color='clWindowText'
+    SpeedButton2: TSpeedButton [28 3 23 22] Hint='Клавиши'
+    SpeedButton3: TSpeedButton [51 3 23 22] Hint='Пальцы'
+    SpeedButton12: TSpeedButton [74 2 23 23] Hint='Дополнительная статистика'
+    SpeedButton4: TSpeedButton [610 3 23 22] Hint='Поверх всех окон' GroupIndex=1 AllowAllUp=True
+===== TFORM5
+Form5: TForm5 [380 0 - -] Caption='Видео' BorderStyle='bsToolWindow' ClientWidth=534 ClientHeight=334 Font.Height=-11 Font.Name='MS Sans Serif' Font.Style=[] Font.Color='clWindowText' Color='clBtnFace' BorderIcons=['biSystemMenu', 'biMinimize'] FormStyle='fsStayOnTop'
+  PaintBox1: TPaintBox [0 0 534 334] Align='alClient'
+===== TFORM6
+Form6: TForm6 [461 189 - -] Caption='Свойства видео' BorderStyle='bsSingle' ClientWidth=140 ClientHeight=142 Font.Height=-11 Font.Name='MS Sans Serif' Font.Style=[] Font.Color='clWindowText' Color='clBtnFace' BorderIcons=[]
+  CheckBox1: TCheckBox [8 8 121 17] Caption='Прикрепить видео' TabOrder=0
+  LabeledEdit1: TLabeledEdit [8 48 121 21] TabOrder=1
+  LabeledEdit2: TLabeledEdit [8 88 121 21] TabOrder=2
+  BitBtn1: TBitBtn [32 112 75 25] Kind='bkOK' TabOrder=3
+===== TFORM7
+Form7: TForm7 [320 202 - -] Caption='О программе' BorderStyle='bsDialog' ClientWidth=508 ClientHeight=252 Font.Height=-11 Font.Name='MS Sans Serif' Font.Style=[] Font.Color='clWindowText' Color='clBtnFace' Position='poMainFormCenter' BorderIcons=['biSystemMenu'] Position='poMainFormCenter'
+  TntLabel1: TTntLabel [8 128 130 21] Caption='Заходите к нам на' Font.Height=-13 Font.Name='MS Sans Serif' Font.Style=[] Font.Color='clWindowText' Alignment='taRightJustify' AutoSize=False
+  TntLabel2: TTntLabel [8 152 130 21] Caption='Заглядывайте на' Font.Height=-13 Font.Name='MS Sans Serif' Font.Style=[] Font.Color='clWindowText' Alignment='taRightJustify' AutoSize=False
+  TntLabel3: TTntLabel [8 176 130 21] Caption='Пишите' Font.Height=-13 Font.Name='MS Sans Serif' Font.Style=[] Font.Color='clWindowText' Alignment='taRightJustify' AutoSize=False
+  TntLabel4: TTntLabel [8 200 130 21] Caption='Набирайте' Font.Height=-13 Font.Name='MS Sans Serif' Font.Style=[] Font.Color='clWindowText' Alignment='taRightJustify' AutoSize=False
+  TntLabel5: TTntLabel [8 224 130 21] Caption='Будьте' Font.Height=-13 Font.Name='MS Sans Serif' Font.Style=[] Font.Color='clWindowText' Alignment='taRightJustify' AutoSize=False
+  TntLabel6: TTntLabel [144 128 30 16] Caption='сайт' Font.Height=-13 Font.Name='MS Sans Serif' Font.Style=['fsUnderline'] Font.Color='clBlue' Cursor='crHandPoint'
+  TntLabel7: TTntLabel [144 152 44 16] Caption='форум' Font.Height=-13 Font.Name='MS Sans Serif' Font.Style=['fsUnderline'] Font.Color='clBlue' Cursor='crHandPoint'
+  TntLabel8: TTntLabel [144 176 47 16] Caption='письма' Font.Height=-13 Font.Name='MS Sans Serif' Font.Style=['fsUnderline'] Font.Color='clBlue' Cursor='crHandPoint'
+  TntLabel9: TTntLabel [144 200 57 16] Caption='вслепую' Font.Height=-13 Font.Name='MS Sans Serif' Font.Style=['fsUnderline'] Font.Color='clBlue' Cursor='crHandPoint'
+  TntLabel10: TTntLabel [144 224 70 16] Caption='счастливы' Font.Height=-13 Font.Name='MS Sans Serif' Font.Style=['fsUnderline'] Font.Color='clBlue' Cursor='crHandPoint'
+  Panel2: TPanel [0 0 508 121] Align='alTop' Color=10539263 TabOrder=0
+    Label2: TLabel [32 -16 73 136] Caption='T' Font.Height=-120 Font.Name='Times New Roman' Font.Style=[] Font.Color='clRed' Transparent=True
+    Label6: TLabel [104 35 44 90] Caption='S' Font.Height=-80 Font.Name='Times New Roman' Font.Style=[] Font.Color=4227327 Transparent=True
+    Label10: TLabel [176 32 204 23] Caption='Анализатор статистики' Font.Height=-21 Font.Name='Times New Roman' Font.Style=[] Font.Color=3170474
+    Label11: TLabel [296 104 204 13] Caption='Игорь В. Филимонов' Font.Height=-11 Font.Name='MS Sans Serif' Font.Style=[] Font.Color=3170474 Alignment='taRightJustify' AutoSize=False
+    Label9: TLabel [256 56 189 22] Caption='клавиатурного набора' Font.Height=-20 Font.Name='Times New Roman' Font.Style=[] Font.Color=3170474
+    Label12: TLabel [208 3 297 13] Caption='Первая версия вышла 27 ноября 2008 года' Font.Height=-11 Font.Name='MS Sans Serif' Font.Style=[] Font.Color=3170474 Color=10539263 Alignment='taRightJustify' AutoSize=False
+  TntStaticText1: TTntStaticText [224 128 281 121] Font.Height=-11 Font.Name='MS Sans Serif' Font.Style=[] Font.Color='clWindowText' AutoSize=False TabOrder=1
+===== TFORM8
+Form8: TForm8 [309 186 - -] Caption='Настройки' BorderStyle='bsDialog' ClientWidth=589 ClientHeight=317 Font.Height=-11 Font.Name='MS Sans Serif' Font.Style=[] Font.Color='clWindowText' Color='clBtnFace' Position='poMainFormCenter' BorderIcons=['biSystemMenu'] Position='poMainFormCenter'
+  Label3: TLabel [304 249 221 13] Caption='Точность времени в списке длительностей'
+  Label6: TLabel [304 0 110 13] Caption='Основная статистика'
+  Label7: TLabel [304 264 28 13] Caption='Язык'
+  GroupBox1: TGroupBox [0 64 297 57] Caption='Глобальные горячие клавиши' TabOrder=1
+    CheckBox1: TCheckBox [8 16 137 17] Caption='LCtrl+LWin (Очистить)' Checked=True TabOrder=0 State='cbChecked'
+    CheckBox2: TCheckBox [8 32 188 17] Caption='F8+F9 (Управление перехватом)' Checked=True TabOrder=1 State='cbChecked'
+  GroupBox2: TGroupBox [0 0 129 65] Caption='Размер шрифта' TabOrder=2
+    Label1: TLabel [8 17 30 13] Caption='Текст'
+    Label2: TLabel [8 41 70 13] Caption='Клавограмма'
+    UpDown1: TUpDown [105 16 16 17] Min=8 Max=24 Position=12 Position=12 TabOrder=0
+    UpDown2: TUpDown [105 40 16 17] Min=8 Max=24 Position=9 Position=9 TabOrder=1
+    StaticText1: TStaticText [80 16 25 17] Caption='12' Font.Height=-11 Font.Name='MS Sans Serif' Font.Style=[] Font.Color='clWindowText' Color='clWhite' Alignment='taCenter' AutoSize=False TabOrder=2
+    StaticText2: TStaticText [80 40 25 17] Caption='9' Font.Height=-11 Font.Name='MS Sans Serif' Font.Style=[] Font.Color='clWindowText' Color='clWhite' Alignment='taCenter' AutoSize=False TabOrder=3
+  Button1: TButton [8 288 81 25] Caption='Ok' TabOrder=3
+  Button2: TButton [96 288 83 25] Caption='Отмена' TabOrder=4
+  UpDown3: TUpDown [553 248 16 17] Min=0 Max=3 Position=3 Position=3 TabOrder=5
+  StaticText3: TStaticText [528 248 25 17] Caption='3' Font.Height=-11 Font.Name='MS Sans Serif' Font.Style=[] Font.Color='clWindowText' Color='clWhite' Alignment='taCenter' AutoSize=False TabOrder=6
+  GroupBox3: TGroupBox [136 0 161 65] Caption='Оперативная статистика' TabOrder=7
+    Label4: TLabel [8 16 93 13] Caption='Нижняя скорость '
+    Label5: TLabel [8 40 95 13] Caption='Верхняя скорость '
+    Edit1: TEdit [108 14 45 21] Text='200' TabOrder=0
+    Edit2: TEdit [108 38 45 21] Text='600' TabOrder=1
+  CheckListBox1: TCheckListBox [304 16 281 225] Items.Strings=['Символов', 'Общее время', 'min пауза', 'max пауза', 'Средняя пауза', 'Среднее время удержания', 'Скорость spm', 'Скорость wpm', 'Скорость нетто', 'Скорость брутто', 'Скорость брутто+', 'Скорость брутто*', 'Потери от исправлений', 'Аритмия', 'Исправлений', 'Серий исправлений', 'max без исправлений'] TabOrder=8 ItemHeight=13
+  GroupBox4: TGroupBox [0 120 297 73] Caption='Копирование текста с тегами (для вставки в блог)' TabOrder=9
+    CheckBox3: TCheckBox [8 16 185 17] Caption='Выделять исправления цветом' Checked=True TabOrder=0 State='cbChecked'
+    CheckBox4: TCheckBox [8 32 233 17] Caption='Выделять исправления зачёркиванием' Checked=True TabOrder=1 State='cbChecked'
+    CheckBox5: TCheckBox [8 48 241 17] Caption='Выделять цветом следующий символ' Checked=True TabOrder=2 State='cbChecked'
+  ComboBox1: TComboBox [304 280 281 21] TabOrder=0 Style='csDropDownList' ItemHeight=13
+  CheckBox6: TCheckBox [8 200 177 17] Caption='Запускать Ts на одном ядре' Checked=True TabOrder=10 State='cbChecked'
+  CheckBox7: TCheckBox [8 232 97 17] Caption='Вести журнал' TabOrder=11
+  CheckBox8: TCheckBox [8 248 121 17] Caption='Автокомментарии' TabOrder=12
+  CheckBox9: TCheckBox [8 216 137 17] Caption='Сворачивать в трей' TabOrder=13
+  CheckBox10: TCheckBox [8 264 177 17] Caption='Сворачивать при старте' TabOrder=14
+===== TFORM9
+Form9: TForm9 [437 273 459 108] Caption='Ввод текста' BorderStyle='bsSizeToolWin' Font.Height=-11 Font.Name='MS Sans Serif' Font.Style=[] Font.Color='clWindowText' Color='clBtnFace' FormStyle='fsStayOnTop'
+  RichEdit1: TRichEdit [0 0 451 74] Align='alClient' Font.Height=-11 Font.Name='Arial' Font.Style=[] Font.Color='clWindowText' TabOrder=0 ScrollBars='ssVertical'
+===== TKBD
+kbd: Tkbd [95 183 - -] Caption='Клавиатура' BorderStyle='bsDialog' ClientWidth=802 ClientHeight=181 Font.Height=-11 Font.Name='MS Sans Serif' Font.Style=[] Font.Color='clWindowText' Color='clBtnFace' Position='poMainFormCenter' BorderIcons=['biSystemMenu'] Position='poMainFormCenter'
+  Panel2: TPanel [0 0 802 181] Align='alClient' TabOrder=0
+    PaintBox1: TPaintBox [1 1 635 179] Align='alClient'
+    PaintBox2: TPaintBox [636 1 165 179] Align='alRight'

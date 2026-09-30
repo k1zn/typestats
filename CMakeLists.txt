@@ -29,6 +29,8 @@ file(GLOB APP_SOURCES CONFIGURE_DEPENDS
     src/ui/*.cpp src/ui/*.h
     src/export/*.cpp src/export/*.h)
 qt_add_executable(TypingStatistics WIN32 MACOSX_BUNDLE src/main.cpp ${APP_SOURCES} resources/resources.qrc)
+target_include_directories(TypingStatistics PRIVATE src)
+target_compile_definitions(TypingStatistics PRIVATE TS_VERSION="${PROJECT_VERSION}")
 target_link_libraries(TypingStatistics PRIVATE tscore Qt6::Widgets uiohook QXlsx::QXlsx)
 
 file(GLOB TS_FILES CONFIGURE_DEPENDS i18n/*.ts)
