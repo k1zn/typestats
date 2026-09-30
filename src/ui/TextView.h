@@ -20,4 +20,18 @@ public:
 
     // Highlights the part of the text shown on the klavogram.
     void setVisibleRange(int from, int to);
+
+signals:
+    // Del, Ins and Ctrl+C / Ctrl+Ins (with a selection) in the text.
+    void deleteRequested();
+    void markRequested();
+    void copyRequested();
+    void menuRequested(const QPoint &globalPos);
+    // The mouse is over the character at textPos (-1: over none).
+    void hovered(int textPos, const QPoint &globalPos);
+
+protected:
+    void keyPressEvent(QKeyEvent *e) override;
+    void contextMenuEvent(QContextMenuEvent *e) override;
+    void mouseMoveEvent(QMouseEvent *e) override;
 };

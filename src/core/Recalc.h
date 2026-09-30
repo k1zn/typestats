@@ -84,6 +84,7 @@ struct TextModel
     QVector<TextAnchor> anchors;
     int elementAt(int pos) const { return std::min(lookup(&TextAnchor::pos, pos, &TextAnchor::elem), size()); }
     int klavAt(int pos) const { return lookup(&TextAnchor::pos, pos, &TextAnchor::klav); }
+    int recordAt(int pos) const { return lookup(&TextAnchor::pos, pos, &TextAnchor::rec); }
     int klavOfElement(int elem) const { return lookup(&TextAnchor::elem, elem, &TextAnchor::klav); }
     int recordOfElement(int elem) const { return lookup(&TextAnchor::elem, elem, &TextAnchor::rec); }
     int elementOfRecord(int rec) const { return std::min(lookup(&TextAnchor::rec, rec, &TextAnchor::elem), size()); }

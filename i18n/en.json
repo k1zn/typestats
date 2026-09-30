@@ -88,5 +88,19 @@
   "Аритмия": "Arrhythmia",
   "Исправлений": "Corrections",
   "Серий исправлений": "Correction runs",
-  "max без исправлений": "max without corrections"
+  "max без исправлений": "max without corrections",
+  "Свойства файла": "File properties",
+  "Автор": "Author",
+  "Дата": "Date",
+  "Описание": "Description",
+  "OK": "OK",
+  "Отмена": "Cancel",
+  "Текстовая метка": "Text label",
+  "Текст метки": "Label text",
+  "Удалить": "Delete",
+  "Пометить": "Mark",
+  "Редактировать метку": "Edit label",
+  "Удалить метку": "Remove label",
+  "Копировать": "Copy",
+  "Копировать с тегами": "Copy with tags"
 }

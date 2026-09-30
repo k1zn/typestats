@@ -79,6 +79,8 @@ src/core/      только QtCore, тестируемо
                       → Outcome {recorded, setCapture, clear, toggleLive, liveReset, liveChanged}; хоткеи, автокомментарии,
                       фильтр отпусканий, мёртвые клавиши, таймер с отменой круга, оперативная статистика `live()` — ГОТОВО,
                       тесты на синтетике (руками на живом вводе НЕ проверялось)
+  Editing.*           правка и копирование (`re/editing.md`): recordRange (FUN_004254b4), deleteRange, removeNonText,
+                      labelStart/markRange/removeLabel, copyText, copyTagged — ГОТОВО, тесты на синтетике
   NumberFormat.*      formatFixed(v, decimals, loc): округление половинок от нуля, как FloatToStrF оригинала
                       (QLocale округляет к чётному) — используется всеми списками
 src/cli/tsstat.cpp  консольная утилита: `tsstat [--split MS] [--only-text] [--by-pauses] [--sel S L] [--text|--runs] f.tsf`
@@ -96,7 +98,10 @@ src/ui/
                       сплиттеры, ListView2 (высота по числу строк + 1, как FUN_00429bbc) / ListView1, «Файл повреждён»,
                       открытие .tsf/.tsj, сохранение (подпись по `m_clean` = g_fileClean; расстановка пальцев в файл и из
                       файла), очистка, «Открыть журнал», опции пересчёта, выделение в тексте → статистика и список клавиш.
-                      Запись: `keyEvent` (Recorder + JournalWriter при `JournalOn`), `tick` 100 мс (пересчёт, когда окно
+                      Правка: удалить / удалить нетекстовые / отменить (один уровень, `m_undo`) / пометить и метки
+                      (подсказка и меню по записи под мышью) / копировать (обычно, без ошибок, с тегами) / сохранить блок;
+                      перед правкой записи документа заменяются нормализованными (`normalizeRecords`).
+                      Запись: `startCapture()` (из main) ставит хук; `keyEvent` (Recorder + JournalWriter при `JournalOn`), `tick` 100 мс (пересчёт, когда окно
                       активно; показ оперативной статистики раз в 5 тиков). Связка графика с клавограммой:
                       `klavogramMoved` / `graphMoved` / `syncGraphScrollBar`, меню оси `showAxisMenu`.
                       Ключи QSettings = ключи пресета оригинала (Vgr*, Vhs*, SpeedYmin…, Legend*, TextWinHeight,
@@ -109,6 +114,8 @@ src/ui/
                       мышь руками не проверялась. «Свёрнутый» режим (высота < 100: ScrollBar1 управляет клавограммой)
                       не сделан
   GraphPanels.*       FloatingPanel (заголовок-перетаскивание, красная кнопка), LegendPanel (Panel2), AxisPanel (Panel9)
+  TextView.*          + клавиши Del/Ins/Ctrl+C, контекстное меню, `hovered(pos)` для подсказок
+  FilePropertiesDialog.*  Form2 «Свойства файла» (автор, дата, описание) — перед сохранением
   LiveStatsWindow.*   Form10 «Оперативная статистика»: скорость (цвет — радуга FUN_0042a17c), % ошибок, строка состояния
   Texts.*             переводимые подписи для ядра (StatsUnits, названия строк ListView2); сюда же — Histograms::Names и
                       заголовки Form3, когда появятся эти формы
@@ -129,6 +136,11 @@ tests/tst_zones.cpp FingerZones, FingerZoneSchemes, IniFile
 tests/tst_extra.cpp ExtraStats на синтетике
 tests/tst_hist.cpp  Histograms и formatFixed на синтетике
 tests/tst_journal.cpp  Journal: формат записи, битый хвост, JournalWriter, golden-записи через журнал
+tests/tst_editing.cpp  Editing на синтетике
+tests/tst_ui.cpp    главное окно без экрана (ctest ставит QT_QPA_PLATFORM=offscreen; настройки — во временный INI):
+                    открытие и отрисовка, удалить/отменить/копировать, метки, связка графика с клавограммой и мышь на
+                    графике, запись через `keyEvent`. Тест — друг MainWindow (`friend class TstUi`). Окна собраны в
+                    библиотеку `tsui` (src/ui + src/platform), ресурсы — в самих exe
 tests/tst_recorder.cpp Recorder: записи и dt, игнорируемые события, хоткеи, автокомментарии, мёртвые клавиши, оперативная
                     статистика
 tests/tst_orig.cpp  ядро против записанного вывода оригинала (tests/golden/orig/*.json): ListView2, текст, стили,
@@ -185,7 +197,8 @@ python re/scripts/diffstand.py файл --journal                               
   и убирает exception-счётчики. Читать удобнее очищенную версию. Recalculate там — `range_400000.c`, ~стр. 5470–7015.
 - **Хелперы:**
   - `re/scripts/disasm.py <va> <va|+len>` — capstone-дизасм с именами;
-  - `re/scripts/str_at.py <va>...` — строки по адресам;
+  - `re/scripts/str_at.py <va>...` — строки по адресам (ANSI); `re/scripts/wstr_at.py <va>...` — UTF-16-литералы
+    (`FUN_005643b4`); `wstr_at.py -f <начало> <конец>` — все литералы `mov edx, imm` диапазона по порядку;
   - `re/scripts/func_map.py` → `re/func_map.txt`: карта функций (размер, строки, вызовы).
 - **Прочее в `re/`:**
   - `forms_dfm.txt` — все 11 форм в тексте (UI 1:1); `forms_geometry.txt` — их координаты, шрифты, выравнивание;
@@ -197,6 +210,8 @@ python re/scripts/diffstand.py файл --journal                               
   - `klavogram.md` — **клавограмма**: состояние объекта, алгоритм отрисовки, цвета, шкала, мышь;
   - `graph_paint.md` — **график PaintBox1**: панели (ось, строка текста, график, легенда) и их vtable, серии и масштабы,
     алгоритм отрисовки, мышь, ScrollBar1 и синхронизация с клавограммой, легенда, «Настройка оси Y»;
+  - `editing.md` — **правка и копирование**: диапазон записей выделения, удаление, нетекстовые клавиши, отмена, метки,
+    копирование с тегами, свойства файла при сохранении;
   - `recording.md` — **запись**: хук 0x404598, OnKeyEvent 0x40a7a4 по шагам, таймер, оперативная статистика (Form10);
   - `journal.md` — **журнал `.tsj`**: формат записи, имя файла, чтение/запись, отличия порта, стенд;
   - `metrics.md` — **формулы основной статистики** (0x4255a8, 0x438304), форматы строк, разметка стёртых;
@@ -323,8 +338,8 @@ python re/scripts/diffstand.py файл --journal                               
    Ключа zoom клавограммы в пресете оригинала НЕТ (`FUN_0040687c` — это параметры ScrollBar1), сохранять нечего.
    **Не проверено руками** (нужен живой ввод/мышь, стенд этого не покрывает): запись в чужих окнах (флаги хука,
    мёртвые клавиши, хоткеи), мышь на графике, перетаскивание панелей. Попросить пользователя попробовать.
+   Правка, копирование, «Сохранить блок», «Свойства файла» — сделаны (`re/editing.md`).
    **СЛЕДУЮЩЕЕ**, по порядку:
-   - правка: удалить/пометить/метки/отмена, копирование (обычное, без ошибок, с тегами), «Сохранить блок»;
    - остальные формы: Form3, Form4 (движок панелей 0x43c6bc тот же, что у графика: группа `DAT_005b1688`, ось
      `DAT_005b16b0`, подписи `DAT_005b16b4`), Tkbd, Form8 (настройки: GlobalOnOff, GlobalClear, AutoComments,
      JournalOn, MainOption*, Language, шрифты — сейчас читаются из QSettings без UI), Form2, Form9, Form7;
@@ -370,6 +385,8 @@ python re/scripts/diffstand.py файл --journal                               
   (секунды); оригинал запускать редко, на одном файле (самом проблемном), в фоне.
 - Декомпиляция Ghidra врёт в x87 (пороги, аргументы fabs/FloatToStrF): любые формулы с плавающей точкой
   подтверждать `disasm.py` и константами из exe. Точность оригинала воспроизводится `long double` (MinGW = 80 бит).
+- Поведение окон проверять `tests/tst_ui.cpp` (offscreen, без экрана и без кликов по рабочему столу пользователя);
+  новые обработчики — туда же.
 - UI проверять снимками: `screenshot_port.py <tsf> <out.png> [--lang en]` после сборки (снимает окно через
   PrintWindow — фокус у пользователя не отбирается) и сравнение с `re/ui_reference/` (или свежим `screenshot_orig.py`).
   Синтетический ввод (SendInput) для проверки хука НЕ слать: он попадёт в окно, где работает пользователь. Для временных файлов стенда с подписью: файл без строки `signature=` оригинал показывает

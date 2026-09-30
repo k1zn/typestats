@@ -38,6 +38,7 @@ int main(int argc, char *argv[])
 
     MainWindow w;
     w.show();
+    w.startCapture();
     if (args.size() > 1)
         w.openFile(args[1]);
     return app.exec();

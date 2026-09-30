@@ -1,5 +1,8 @@
 #include "TextView.h"
 
+#include <QAbstractTextDocumentLayout>
+#include <QContextMenuEvent>
+#include <QScrollBar>
 #include <QTextCursor>
 
 namespace {
@@ -29,6 +32,37 @@ TextView::TextView(QWidget *parent) : QTextEdit(parent)
     QFont f(QStringLiteral("Arial"));
     f.setPixelSize(16);
     setFont(f);
+    viewport()->setMouseTracking(true);
+}
+
+void TextView::keyPressEvent(QKeyEvent *e)
+{
+    // Memo4KeyDown.
+    const Qt::KeyboardModifiers mods = e->modifiers() & (Qt::ShiftModifier | Qt::ControlModifier | Qt::AltModifier);
+    if (mods == Qt::NoModifier && e->key() == Qt::Key_Delete) {
+        emit deleteRequested();
+    } else if (mods == Qt::NoModifier && e->key() == Qt::Key_Insert) {
+        emit markRequested();
+    } else if (mods == Qt::ControlModifier && (e->key() == Qt::Key_Insert || e->key() == Qt::Key_C)) {
+        if (textCursor().hasSelection())
+            emit copyRequested();
+    } else {
+        QTextEdit::keyPressEvent(e);
+        return;
+    }
+    e->accept();
+}
+
+void TextView::contextMenuEvent(QContextMenuEvent *e)
+{
+    emit menuRequested(e->globalPos());
+}
+
+void TextView::mouseMoveEvent(QMouseEvent *e)
+{
+    QTextEdit::mouseMoveEvent(e);
+    const QPointF point = e->position() + QPointF(horizontalScrollBar()->value(), verticalScrollBar()->value());
+    emit hovered(document()->documentLayout()->hitTest(point, Qt::ExactHit), e->globalPosition().toPoint());
 }
 
 void TextView::setModel(const TextModel &m)

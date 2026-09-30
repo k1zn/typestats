@@ -34,6 +34,8 @@ public:
 
     // Opens a .tsf file or a .tsj journal.
     bool openFile(const QString &path);
+    // Installs the keyboard hook: from now on what is typed elsewhere is recorded.
+    void startCapture();
 
 protected:
     void closeEvent(QCloseEvent *e) override;
@@ -42,6 +44,8 @@ protected:
     bool eventFilter(QObject *o, QEvent *e) override;
 
 private:
+    friend class TstUi;
+
     QWidget *createToolBar();
     QToolButton *toolButton(QWidget *panel, int n, int x, int y, int h, const QString &hint);
     void loadSettings();
@@ -66,6 +70,21 @@ private:
     void tick();
     void showLiveStats();
 
+    // Editing and copying, see re/editing.md.
+    void normalizeRecords();
+    void selectionChanged();
+    void deleteSelection();
+    void removeNonText();
+    void undo();
+    void mark();
+    void editLabel(int record);
+    void askLabel(int record);
+    void removeLabel(int record);
+    void copy(int kind);
+    void textHovered(int textPos, const QPoint &globalPos);
+    void showTextMenu(const QPoint &globalPos);
+    void saveDocument(bool block);
+
     void open();
     void openJournal();
     void save();
@@ -73,6 +92,9 @@ private:
 
     TsfDocument m_doc;
     bool m_clean = true; // the recording is genuine: it is signed when saved (g_fileClean)
+    bool m_loaded = false; // the recording came from a .tsf: its author and date are kept (g_fileLoaded)
+    KeyRecords m_undo;     // the records before the last deletion
+    int m_labelRecord = -1; // the record whose label is under the mouse
     QString m_path; // empty: not saved yet
     TextModel m_model;
     FingerZoneSchemes m_schemes;
@@ -97,6 +119,8 @@ private:
     QComboBox *m_presets = nullptr;
     QComboBox *m_fingers = nullptr;
     QToolButton *m_saveButton = nullptr;
+    QToolButton *m_deleteButton = nullptr;
+    QToolButton *m_blockButton = nullptr;
 
     KeyboardHook m_hook;
     Recorder m_recorder;

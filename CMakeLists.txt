@@ -24,14 +24,18 @@ add_executable(tsstat src/cli/tsstat.cpp)
 target_link_libraries(tsstat PRIVATE tscore)
 
 # --- application ---
-file(GLOB APP_SOURCES CONFIGURE_DEPENDS
+# The windows are a library so that tests can drive them (tests/tst_ui*.cpp, offscreen).
+file(GLOB UI_SOURCES CONFIGURE_DEPENDS
     src/platform/*.cpp src/platform/*.h
     src/ui/*.cpp src/ui/*.h
     src/export/*.cpp src/export/*.h)
-qt_add_executable(TypingStatistics WIN32 MACOSX_BUNDLE src/main.cpp ${APP_SOURCES} resources/resources.qrc)
-target_include_directories(TypingStatistics PRIVATE src)
+add_library(tsui STATIC ${UI_SOURCES})
+target_include_directories(tsui PUBLIC src)
+target_link_libraries(tsui PUBLIC tscore Qt6::Widgets uiohook QXlsx::QXlsx)
+
+qt_add_executable(TypingStatistics WIN32 MACOSX_BUNDLE src/main.cpp resources/resources.qrc)
 target_compile_definitions(TypingStatistics PRIVATE TS_VERSION="${PROJECT_VERSION}")
-target_link_libraries(TypingStatistics PRIVATE tscore Qt6::Widgets uiohook QXlsx::QXlsx)
+target_link_libraries(TypingStatistics PRIVATE tsui)
 
 file(GLOB TS_FILES CONFIGURE_DEPENDS i18n/*.ts)
 if(TS_FILES)
@@ -45,6 +49,13 @@ foreach(src ${TEST_SOURCES})
     get_filename_component(name ${src} NAME_WE)
     add_executable(${name} ${src})
     target_link_libraries(${name} PRIVATE tscore Qt6::Test)
+    if(name MATCHES "^tst_ui")
+        target_link_libraries(${name} PRIVATE tsui)
+        target_sources(${name} PRIVATE resources/resources.qrc)
+    endif()
     target_compile_definitions(${name} PRIVATE TS_GOLDEN_DIR="${CMAKE_SOURCE_DIR}/tests/golden")
     add_test(NAME ${name} COMMAND ${name})
+    if(name MATCHES "^tst_ui")
+        set_tests_properties(${name} PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+    endif()
 endforeach()

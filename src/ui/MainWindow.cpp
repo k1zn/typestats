@@ -6,12 +6,16 @@
 #include "LiveStatsWindow.h"
 #include "TextView.h"
 #include "Texts.h"
+#include "FilePropertiesDialog.h"
+#include "core/Editing.h"
 #include "core/Journal.h"
 #include "core/KeyList.h"
 #include "core/MainStats.h"
+#include "core/NumberFormat.h"
 
 #include <QApplication>
 #include <QCheckBox>
+#include <QClipboard>
 #include <QCloseEvent>
 #include <QDateTime>
 #include <QComboBox>
@@ -20,14 +24,17 @@
 #include <QFileInfo>
 #include <QFrame>
 #include <QHeaderView>
+#include <QInputDialog>
 #include <QLabel>
 #include <QMenu>
 #include <QMessageBox>
 #include <QScrollBar>
 #include <QSettings>
+#include <QShortcut>
 #include <QSpinBox>
 #include <QSplitter>
 #include <QToolButton>
+#include <QToolTip>
 #include <QTableWidget>
 #include <QTimer>
 #include <QVBoxLayout>
@@ -74,6 +81,14 @@ void setRows(QTableWidget *list, const QVector<QStringList> &rows)
 // Preset keys of the series' visibility, in the order of the legend.
 const char *const kSeriesKeys[] = {"VgrCurSpeed", "VgrMedSpeed", "VgrClassicSpeed", "VgrPrivSpeed",
                                    "VgrCurRythm", "VgrMedRythm", "VhsPeriodMed",    "VhsPeriod"};
+
+// The date and time as DateTimeToStr(Now) writes them: the system's short date and long time.
+QString nowString()
+{
+    const QDateTime now = QDateTime::currentDateTime();
+    return QLocale::system().toString(now.date(), QLocale::ShortFormat) + QLatin1Char(' ')
+           + now.time().toString(QStringLiteral("H:mm:ss"));
+}
 
 QFrame *bevel(QWidget *parent, int x, int y, int w, int h, QFrame::Shape shape)
 {
@@ -167,11 +182,13 @@ MainWindow::MainWindow(QWidget *parent)
     m_damaged->setGeometry(128, 224, 409, 49);
     m_damaged->hide();
 
-    connect(m_text, &QTextEdit::selectionChanged, this, [this] {
-        m_klav->scrollToPosition(m_text->selectionStart());
-        updateStats();
-        klavogramMoved();
-    });
+    connect(m_text, &QTextEdit::selectionChanged, this, &MainWindow::selectionChanged);
+    connect(m_text, &TextView::deleteRequested, this, &MainWindow::deleteSelection);
+    connect(m_text, &TextView::markRequested, this, &MainWindow::mark);
+    connect(m_text, &TextView::copyRequested, this, [this] { copy(0); });
+    connect(m_text, &TextView::hovered, this, &MainWindow::textHovered);
+    connect(m_text, &TextView::menuRequested, this, &MainWindow::showTextMenu);
+    connect(new QShortcut(QKeySequence::Undo, this), &QShortcut::activated, this, &MainWindow::undo);
     connect(m_klav, &KlavogramWidget::viewChanged, this, &MainWindow::klavogramMoved);
     createGraphPanels();
 
@@ -180,7 +197,6 @@ MainWindow::MainWindow(QWidget *parent)
     auto *timer = new QTimer(this);
     connect(timer, &QTimer::timeout, this, &MainWindow::tick);
     timer->start(100);
-    m_hook.start();
 
     resize(876, 579);
     loadSettings();
@@ -205,19 +221,22 @@ QWidget *MainWindow::createToolBar()
     bar->setFrameStyle(int(QFrame::Panel) | int(QFrame::Raised));
     bar->setFixedHeight(57);
 
-    auto action = [&](int n, int x, int y, int h, const QString &hint, void (MainWindow::*slot)()) {
+    auto action = [&](int n, int x, int y, int h, const QString &hint, void (MainWindow::*slot)(), bool enabled = false) {
         QToolButton *b = toolButton(bar, n, x, y, h, hint);
         if (slot) {
             b->setEnabled(true);
             connect(b, &QToolButton::clicked, this, slot);
         }
+        if (enabled)
+            b->setEnabled(true);
         return b;
     };
     // Upper row.
     action(1, 6, 4, 23, tr("Очистить (LCtrl+LWin)"), &MainWindow::clear);
     action(6, 30, 4, 23, tr("Прочитать"), &MainWindow::open);
     m_saveButton = action(5, 54, 4, 23, tr("Сохранить"), &MainWindow::save);
-    action(27, 78, 4, 23, tr("Сохранить блок"), nullptr);
+    m_blockButton = action(27, 78, 4, 23, tr("Сохранить блок"), nullptr);
+    connect(m_blockButton, &QToolButton::clicked, this, [this] { saveDocument(true); });
     action(26, 102, 4, 23, tr("Открыть журнал"), &MainWindow::openJournal);
     action(7, 126, 4, 23, tr("Экспортировать в Excel"), nullptr);
     action(12, 150, 4, 23, tr("Дополнительная статистика"), nullptr);
@@ -228,12 +247,13 @@ QWidget *MainWindow::createToolBar()
     action(3, 270, 4, 23, tr("Справка"), nullptr);
     bevel(bar, 3, 29, 294, 2, QFrame::HLine);
     // Lower row.
-    action(10, 6, 32, 22, tr("Удалить (Del)"), nullptr);
-    action(11, 30, 32, 22, tr("Копировать (Ctrl+C)"), nullptr);
-    action(13, 54, 32, 22, tr("Копировать без ошибок"), nullptr);
-    action(14, 78, 32, 22, tr("Отменить (Ctrl+Z)"), nullptr);
-    action(18, 102, 32, 22, tr("Удалить нетекстовые клавиши"), nullptr);
-    action(15, 126, 32, 22, tr("Пометить (Ins)"), nullptr);
+    m_deleteButton = action(10, 6, 32, 22, tr("Удалить (Del)"), &MainWindow::deleteSelection);
+    m_deleteButton->setEnabled(false);
+    connect(action(11, 30, 32, 22, tr("Копировать (Ctrl+C)"), nullptr, true), &QToolButton::clicked, this, [this] { copy(0); });
+    connect(action(13, 54, 32, 22, tr("Копировать без ошибок"), nullptr, true), &QToolButton::clicked, this, [this] { copy(1); });
+    action(14, 78, 32, 22, tr("Отменить (Ctrl+Z)"), &MainWindow::undo);
+    action(18, 102, 32, 22, tr("Удалить нетекстовые клавиши"), &MainWindow::removeNonText);
+    action(15, 126, 32, 22, tr("Пометить (Ins)"), &MainWindow::mark);
     action(21, 150, 32, 22, tr("Свойства видео"), nullptr);
     action(16, 174, 32, 22, tr("Настройка оси Y графиков"), &MainWindow::toggleAxisPanel);
     action(17, 198, 32, 22, tr("Легенда"), &MainWindow::toggleLegend);
@@ -377,6 +397,173 @@ void MainWindow::closeEvent(QCloseEvent *e)
 {
     saveSettings();
     e->accept();
+}
+
+void MainWindow::startCapture()
+{
+    m_hook.start();
+}
+
+void MainWindow::normalizeRecords()
+{
+    // Editing works on the records the text was built from (the original normalizes them in place).
+    m_doc.records = m_model.records;
+}
+
+void MainWindow::selectionChanged()
+{
+    m_klav->scrollToPosition(m_text->selectionStart());
+    updateStats();
+    klavogramMoved();
+    const bool selected = m_text->selectionLength() != 0;
+    m_deleteButton->setEnabled(selected);
+    m_blockButton->setEnabled(selected);
+}
+
+void MainWindow::deleteSelection()
+{
+    const auto [from, to] = Editing::recordRange(m_model, m_text->selectionStart(), m_text->selectionLength());
+    if (to == 0)
+        return;
+    normalizeRecords();
+    m_undo = m_doc.records;
+    Editing::deleteRange(m_doc.records, from, to);
+    recalculate();
+}
+
+void MainWindow::removeNonText()
+{
+    const auto [b, e] = Stats::range(m_model, m_text->selectionStart(), m_text->selectionLength(), m_byPauses->isChecked());
+    normalizeRecords();
+    m_undo = m_doc.records;
+    Editing::removeNonText(m_doc.records, m_model.recordOfElement(b), m_model.recordOfElement(e));
+    recalculate();
+}
+
+void MainWindow::undo()
+{
+    // One level: the records before the last deletion and the current ones change places.
+    if (m_undo.isEmpty())
+        return;
+    normalizeRecords();
+    m_doc.records.swap(m_undo);
+    recalculate();
+}
+
+void MainWindow::editLabel(int record)
+{
+    normalizeRecords();
+    askLabel(record);
+}
+
+void MainWindow::askLabel(int record)
+{
+    if (record < 0 || record >= m_doc.records.size())
+        return;
+    bool ok = false;
+    const QString text = QInputDialog::getText(this, tr("Текстовая метка"), tr("Текст метки"), QLineEdit::Normal,
+                                               m_doc.records[record].comment, &ok);
+    if (ok)
+        m_doc.records[record].comment = text;
+    const int scroll = m_text->verticalScrollBar()->value();
+    recalculate();
+    m_text->verticalScrollBar()->setValue(scroll);
+}
+
+void MainWindow::mark()
+{
+    const int start = m_text->selectionStart();
+    const int from = m_model.recordAt(start), to = m_model.recordAt(start + m_text->selectionLength());
+    if (from >= to) {
+        editLabel(from); // no selection: the comment at the cursor
+        return;
+    }
+    normalizeRecords();
+    const int label = Editing::markRange(m_doc.records, from, to);
+    if (label > 0) {
+        askLabel(label);
+        return;
+    }
+    const int scroll = m_text->verticalScrollBar()->value();
+    recalculate();
+    m_text->verticalScrollBar()->setValue(scroll);
+}
+
+void MainWindow::removeLabel(int record)
+{
+    normalizeRecords();
+    Editing::removeLabel(m_doc.records, record);
+    const int scroll = m_text->verticalScrollBar()->value();
+    recalculate();
+    m_text->verticalScrollBar()->setValue(scroll);
+}
+
+void MainWindow::copy(int kind)
+{
+    const auto [b, e] = Stats::range(m_model, m_text->selectionStart(), m_text->selectionLength(), m_byPauses->isChecked());
+    QString text;
+    if (kind == 2) {
+        const QSettings s;
+        Editing::TagOptions opt;
+        opt.color = s.value(QStringLiteral("CopyBlock1"), true).toBool();
+        opt.strike = s.value(QStringLiteral("CopyBlock2"), true).toBool();
+        opt.colorNext = s.value(QStringLiteral("CopyBlock3"), true).toBool();
+        text = Editing::copyTagged(m_model, b, e, opt);
+    } else {
+        text = Editing::copyText(m_model, b, e, kind == 1);
+    }
+    QApplication::clipboard()->setText(text.replace(QLatin1Char('\r'), QLatin1Char('\n')));
+}
+
+void MainWindow::textHovered(int textPos, const QPoint &globalPos)
+{
+    // Memo4MouseMove: the pause at a fragment separator, the label of marked text.
+    m_labelRecord = -1;
+    QString hint;
+    if (textPos >= 0 && textPos < m_model.text.size() && m_model.size() > 0) {
+        if (m_model.text.at(textPos) == QChar(0x2021)) {
+            const int e = m_model.elementAt(textPos);
+            if (e > 0 && e < m_model.size() && !m_model.klav.isEmpty()) {
+                const int last = int(m_model.klav.size()) - 1;
+                const qint64 gap = m_model.klav[std::min(m_model.klavOfElement(e), last)].t
+                                   - m_model.klav[std::min(m_model.klavOfElement(e - 1), last)].t;
+                hint = formatFixed(double(0.001L * gap), 3, QLocale()) + QLatin1Char(' ') + Texts::units().ms;
+            }
+        } else {
+            const int r = m_model.recordAt(textPos);
+            if (r < m_model.records.size()) {
+                const int start = Editing::labelStart(m_model.records, r);
+                if (start >= 0) {
+                    m_labelRecord = start;
+                    hint = m_model.records[start].comment;
+                } else if (!m_model.records[r].comment.isEmpty()) {
+                    m_labelRecord = r;
+                }
+            }
+        }
+    }
+    if (hint.isEmpty())
+        QToolTip::hideText();
+    else
+        QToolTip::showText(globalPos, hint, m_text);
+}
+
+void MainWindow::showTextMenu(const QPoint &globalPos)
+{
+    const int label = m_labelRecord;
+    QMenu menu(this);
+    if (m_text->selectionLength() != 0) {
+        menu.addAction(tr("Удалить"), this, &MainWindow::deleteSelection);
+        menu.addAction(tr("Пометить"), this, &MainWindow::mark);
+    }
+    if (label >= 0) {
+        menu.addAction(tr("Редактировать метку"), this, [this, label] { editLabel(label); });
+        menu.addAction(tr("Удалить метку"), this, [this, label] { removeLabel(label); });
+    }
+    menu.addAction(tr("Копировать"), this, [this] { copy(0); });
+    menu.addAction(tr("Копировать без ошибок"), this, [this] { copy(1); });
+    menu.addAction(tr("Копировать с тегами"), this, [this] { copy(2); });
+    menu.exec(globalPos);
 }
 
 void MainWindow::keyEvent(const HookEvent &e)
@@ -647,6 +834,8 @@ bool MainWindow::openFile(const QString &path)
             return false;
         }
         m_path.clear(); // a journal is saved as a new .tsf
+        m_loaded = false;
+        m_undo.clear();
         m_clean = true;
         setDocument(doc, tr("Журнал %1").arg(name), false);
         return true;
@@ -660,6 +849,8 @@ bool MainWindow::openFile(const QString &path)
     if (err == Tsf::ReadError::NewerVersion)
         QMessageBox::warning(this, appTitle(), tr("Этот файл создан в более поздней версии программы."));
     m_path = path;
+    m_loaded = true;
+    m_undo.clear();
     m_clean = doc.signed_ && doc.signatureValid;
     if (!doc.fingerZonesName.isEmpty()) {
         // The finger layout of the file: an equal one that is already known, or a new one (LoadTsf).
@@ -693,24 +884,59 @@ void MainWindow::openJournal()
 
 void MainWindow::save()
 {
+    saveDocument(false);
+}
+
+void MainWindow::saveDocument(bool block)
+{
+    // SaveTsf: the properties first. A loaded file keeps its author and date; a new recording and a
+    // block get the author from the settings and the current time.
+    QSettings settings;
+    const bool fresh = !m_loaded || block;
+    FilePropertiesDialog properties(this);
+    if (fresh)
+        properties.setProperties(settings.value(QStringLiteral("autor")).toString(), nowString(), QString(), false);
+    else
+        properties.setProperties(m_doc.author, m_doc.date, m_doc.comment, true);
+    if (properties.exec() != QDialog::Accepted)
+        return;
     QString path = QFileDialog::getSaveFileName(this, {}, m_path, QStringLiteral("Typing statistics files (*.tsf)"));
     if (path.isEmpty())
         return;
     if (QFileInfo(path).suffix().isEmpty())
         path += QStringLiteral(".tsf");
-    // The finger layout goes into the file unless it is the built-in one (SaveTsf).
-    m_doc.fingerZonesName.clear();
-    m_doc.fingers.clear();
+
+    TsfDocument doc = m_doc;
+    doc.author = properties.author();
+    doc.date = properties.date();
+    doc.comment = properties.description();
+    if (!m_loaded && doc.author != settings.value(QStringLiteral("autor")).toString())
+        settings.setValue(QStringLiteral("autor"), doc.author);
+    if (block) {
+        // The records of the selection; nothing selected - all of them.
+        const auto [from, to] = Editing::recordRange(m_model, m_text->selectionStart(), m_text->selectionLength());
+        doc.records = to == 0 ? m_model.records : m_model.records.mid(from, to - from);
+        doc.attachedVideo.clear();
+    }
+    // The finger layout goes into the file unless it is the built-in one.
+    doc.fingerZonesName.clear();
+    doc.fingers.clear();
     if (m_fingers->currentIndex() > 0) {
-        m_doc.fingerZonesName = m_fingers->currentText();
-        m_doc.fingers = m_schemes.zones(m_fingers->currentText()).toStrings();
+        doc.fingerZonesName = m_fingers->currentText();
+        doc.fingers = m_schemes.zones(m_fingers->currentText()).toStrings();
     }
     // A recording made here or loaded with a valid signature is signed (g_fileClean).
-    if (!Tsf::write(path, m_doc, m_clean)) {
+    if (!Tsf::write(path, doc, m_clean)) {
         QMessageBox::warning(this, appTitle(), tr("Не удалось сохранить файл %1").arg(path));
         return;
     }
+    if (block)
+        return;
+    const KeyRecords records = m_doc.records;
+    m_doc = doc;
+    m_doc.records = records;
     m_path = path;
+    m_loaded = true;
     setWindowTitle(appTitle() + QStringLiteral(" - ") + QFileInfo(path).fileName());
 }
 
@@ -718,6 +944,8 @@ void MainWindow::clear()
 {
     m_path.clear();
     m_clean = true;
+    m_loaded = false;
+    m_undo.clear();
     m_needRecalc = false;
     m_capture->setChecked(true);
     setDocument({}, {}, false);

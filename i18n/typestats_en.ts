@@ -37,6 +37,33 @@
     </message>
 </context>
 <context>
+    <name>FilePropertiesDialog</name>
+    <message>
+        <source>Свойства файла</source>
+        <translation>File properties</translation>
+    </message>
+    <message>
+        <source>Автор</source>
+        <translation>Author</translation>
+    </message>
+    <message>
+        <source>Дата</source>
+        <translation>Date</translation>
+    </message>
+    <message>
+        <source>Описание</source>
+        <translation>Description</translation>
+    </message>
+    <message>
+        <source>OK</source>
+        <translation>OK</translation>
+    </message>
+    <message>
+        <source>Отмена</source>
+        <translation>Cancel</translation>
+    </message>
+</context>
+<context>
     <name>GraphWidget</name>
     <message>
         <source>Мгновенная скорость</source>
@@ -317,6 +344,38 @@
     <message>
         <source>Не удалось сохранить файл %1</source>
         <translation>Cannot save file %1</translation>
+    </message>
+    <message>
+        <source>Текстовая метка</source>
+        <translation>Text label</translation>
+    </message>
+    <message>
+        <source>Текст метки</source>
+        <translation>Label text</translation>
+    </message>
+    <message>
+        <source>Удалить</source>
+        <translation>Delete</translation>
+    </message>
+    <message>
+        <source>Пометить</source>
+        <translation>Mark</translation>
+    </message>
+    <message>
+        <source>Редактировать метку</source>
+        <translation>Edit label</translation>
+    </message>
+    <message>
+        <source>Удалить метку</source>
+        <translation>Remove label</translation>
+    </message>
+    <message>
+        <source>Копировать</source>
+        <translation>Copy</translation>
+    </message>
+    <message>
+        <source>Копировать с тегами</source>
+        <translation>Copy with tags</translation>
     </message>
 </context>
 <context>
