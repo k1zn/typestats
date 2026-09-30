@@ -47,6 +47,9 @@ else()
 endif()
 
 qt_add_executable(TypingStatistics WIN32 MACOSX_BUNDLE src/main.cpp resources/resources.qrc)
+if(WIN32)
+    target_sources(TypingStatistics PRIVATE resources/app.rc) # the icon of the .exe
+endif()
 target_compile_definitions(TypingStatistics PRIVATE TS_VERSION="${PROJECT_VERSION}")
 target_link_libraries(TypingStatistics PRIVATE tsui)
 
