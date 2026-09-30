@@ -125,6 +125,7 @@ MainWindow::MainWindow(QWidget *parent)
     // Left: text, graph with its scroll bar, klavogram.
     m_text = new TextView;
     auto *graphPane = new QWidget;
+    m_graphPane = graphPane;
     auto *graphLayout = new QVBoxLayout(graphPane);
     graphLayout->setContentsMargins(0, 0, 0, 0);
     graphLayout->setSpacing(0);
@@ -174,6 +175,7 @@ MainWindow::MainWindow(QWidget *parent)
     split->setSizes({652, 218});
     right->setMinimumWidth(100);
     m_leftSplit = left;
+    connect(left, &QSplitter::splitterMoved, this, &MainWindow::graphPaneResized);
     m_mainSplit = split;
     root->addWidget(split, 1);
 
@@ -389,6 +391,7 @@ void MainWindow::loadSettings()
     m_keys->horizontalHeader()->resizeSection(0, s.value(QStringLiteral("DlitCol1Width"), 80).toInt());
     m_keys->horizontalHeader()->resizeSection(1, s.value(QStringLiteral("DlitCol2Width"), 80).toInt());
     m_fingers->setCurrentIndex(std::max(0, m_fingers->findText(s.value(QStringLiteral("FingerZonesName")).toString())));
+    graphPaneResized();
 
     m_live->loadSettings();
     m_extra->loadSettings();
@@ -992,6 +995,11 @@ void MainWindow::createGraphPanels()
         klavogramMoved();
     });
     connect(m_graphScroll, &QScrollBar::valueChanged, this, [this](int value) {
+        if (m_graphFolded) {
+            m_klav->setScrollMs(float(value)); // ScrollBar1Scroll: milliseconds of the klavogram
+            klavogramMoved();
+            return;
+        }
         m_graph->setScrollValue(value);
         graphMoved();
     });
@@ -1018,6 +1026,8 @@ void MainWindow::toggleAxisPanel()
 
 void MainWindow::toggleLegend()
 {
+    if (m_graphFolded)
+        return;
     m_legend->setVisible(!m_legend->isVisible());
     m_legend->raise();
     m_legend->keepInside();
@@ -1047,8 +1057,45 @@ qint64 MainWindow::drawTimeOfElement(int element) const
     return k < m_model.klav.size() ? m_model.klav[k].tDraw : m_model.klav.last().tDraw;
 }
 
+void MainWindow::graphPaneResized()
+{
+    // Panel1CanResize.
+    const QList<int> sizes = m_leftSplit->sizes();
+    const int pane = sizes.value(1), bar = m_graphScroll->sizeHint().height();
+    if (pane < 100) {
+        if (!m_graphFolded) {
+            m_graphFolded = true;
+            m_graph->hide();
+            m_legend->hide();
+            m_axisPanel->hide();
+        }
+        if (pane != bar) // only the scroll bar is left; the klavogram takes the rest
+            m_leftSplit->setSizes({sizes.value(0), bar, sizes.value(2) + pane - bar});
+    } else if (m_graphFolded) {
+        m_graphFolded = false;
+        m_graph->show();
+        QSettings s;
+        m_legend->setVisible(s.value(QStringLiteral("LegendVisible"), true).toBool());
+    }
+    klavogramMoved();
+}
+
 void MainWindow::syncGraphScrollBar()
 {
+    if (m_graphFolded) {
+        // FUN_0040687c for the folded graph: the scroll bar spans the klavogram in milliseconds.
+        const float zoom = m_klav->zoom();
+        const float page = float(m_klav->width()) / zoom;
+        const float left = float(-m_klav->width()) / (zoom * 4.0f);
+        const qint64 last = m_model.klav.isEmpty() ? 0 : m_model.klav.last().tDraw;
+        const float end = std::max(0.0f, float(0.001L * last) + left);
+        const QSignalBlocker blocker(m_graphScroll);
+        m_graphScroll->setRange(int(3.0f * left), std::max(int(3.0f * left), int(end + page) - int(page)));
+        m_graphScroll->setSingleStep(std::max(1, int(0.05f * page)));
+        m_graphScroll->setPageStep(int(page));
+        m_graphScroll->setValue(int(m_klav->scrollMs()));
+        return;
+    }
     const GraphWidget::ScrollParams s = m_graph->scrollParams();
     const QSignalBlocker blocker(m_graphScroll);
     m_graphScroll->setRange(s.min, std::max(s.min, s.max));

@@ -88,6 +88,8 @@ private:
     void klavogramMoved();
     void graphMoved();
     void syncGraphScrollBar();
+    // Panel1 lower than 100 px: the graph folds away and its scroll bar moves the klavogram.
+    void graphPaneResized();
     qint64 drawTimeOfElement(int element) const;
     void createGraphPanels();
     void toggleAxisPanel();
@@ -135,6 +137,8 @@ private:
     LegendPanel *m_legend = nullptr;
     AxisPanel *m_axisPanel = nullptr;
     bool m_legendPlaced = false;
+    bool m_graphFolded = false;
+    QWidget *m_graphPane = nullptr;
     QScrollBar *m_graphScroll = nullptr;
     KlavogramWidget *m_klav = nullptr;
     QTableWidget *m_stats = nullptr;

@@ -220,3 +220,22 @@ SpeedButton17 нажата. Ключи пресета: `LegendVisible` (1), `Leg
 
 PopupMenu2 (правый клик по оси): «Настройка оси Y», «Показать легенду» (видна, только когда легенда закрыта), —,
 радио «Скорость» / «Ритмичность» / «Гистограмма» (`N9Click`: режим оси `+0xdc`).
+
+## «Свёрнутый» график (Panel1 ниже 100 px)
+
+`Panel1CanResize` (0x425000): новая высота < 100 → `DAT_0058e1d5 = 1`, легенда (Panel2) прячется, от Panel1 остаётся
+только Panel4 со ScrollBar1 (22 px), клавограмма (Panel7) забирает освободившееся место. Высота ≥ 100 → режим
+снимается, легенда возвращается, если не была закрыта (пункт N8 не виден).
+
+В свёрнутом режиме ScrollBar1 прокручивает клавограмму (`FUN_0040687c`, ветка `DAT_0058e1d5`), всё в мс,
+`W` — ширина клавограммы, `z` — её масштаб (px/мс):
+```
+page = W / z;  left = −W / (4·z);  end = max(0, tDraw(последняя запись) · 0.001 + left)
+SmallChange = max(1, trunc(0.05 · page)); Min = trunc(3 · left); Max = trunc(end + page)
+LargeChange = PageSize = trunc(page);    Position = trunc(scrollMs клавограммы)
+```
+`ScrollBar1Scroll`: `scrollMs = pos` (pos ≤ Max − PageSize), затем подсветка текста, ListView1, перерисовка. Любое
+движение клавограммы (`FUN_00424e64`) ставит `Position = trunc(scrollMs)`; изменение её масштаба перестраивает
+параметры полосы.
+
+Порт: `MainWindow::graphPaneResized` (по `splitterMoved` и после загрузки размеров) и ветка в `syncGraphScrollBar`.

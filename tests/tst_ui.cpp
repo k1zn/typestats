@@ -25,6 +25,7 @@
 #include <QCheckBox>
 #include <QLineEdit>
 #include <QScrollBar>
+#include <QSplitter>
 #include <QSettings>
 #include <QTableWidget>
 #include <QTemporaryDir>
@@ -281,7 +282,7 @@ private slots:
         x->m_filterOn[2]->setChecked(true);
         QVERIFY(x->rows().size() < triples);
         for (const ExtraStats::Row &r : x->rows())
-            QVERIFY(!r.text.contains(QLatin1Char(u'о')));
+            QVERIFY(!r.text.contains(QChar(u'о')));
 
         x->m_list->selectAll();
         x->copy();
@@ -485,6 +486,33 @@ private slots:
         QCOMPARE(extra.rows.size(), w.m_extra->rows().size());
         QCOMPARE(extra.rows.first().at(0).toString(), w.m_extra->rows().first().text);
         QCOMPARE(extra.rows.first().at(2).toInt(), w.m_extra->rows().first().value);
+    }
+
+    void foldedGraph()
+    {
+        MainWindow w;
+        w.resize(876, 579);
+        w.show();
+        QVERIFY(w.openFile(golden("обыка.tsf")));
+        QList<int> sizes = w.m_leftSplit->sizes();
+        QVERIFY(sizes[1] >= 100);
+        // The graph pane is dragged below 100 px: only its scroll bar is left, for the klavogram.
+        w.m_leftSplit->setSizes({sizes[0], 80, sizes[2] + sizes[1] - 80});
+        w.graphPaneResized();
+        QVERIFY(w.m_graphFolded);
+        QVERIFY(!w.m_graph->isVisible());
+        QVERIFY(!w.m_legend->isVisible());
+        QCOMPARE(w.m_leftSplit->sizes()[1], w.m_graphScroll->sizeHint().height());
+        QVERIFY(w.m_graphScroll->maximum() > 1000); // milliseconds of the recording
+        w.m_graphScroll->setValue(3000);
+        QCOMPARE(int(w.m_klav->scrollMs()), 3000);
+        QVERIFY(w.m_keys->rowCount() > 0);
+        // Dragged back up: the graph returns.
+        sizes = w.m_leftSplit->sizes();
+        w.m_leftSplit->setSizes({sizes[0], 150, sizes[2] - 150 + sizes[1]});
+        w.graphPaneResized();
+        QVERIFY(!w.m_graphFolded);
+        QVERIFY(w.m_graph->isVisible());
     }
 
 private:
