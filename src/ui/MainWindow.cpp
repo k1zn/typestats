@@ -1340,6 +1340,9 @@ void MainWindow::updateKeyList()
 void MainWindow::setDocument(const TsfDocument &doc, const QString &title, bool damaged)
 {
     m_doc = doc;
+    // Recording goes on into this vector, on the hook's time: room for a while, so that the next key
+    // does not reallocate the whole recording (milliseconds at half a million records).
+    m_doc.records.reserve(m_doc.records.size() + std::max<qsizetype>(m_doc.records.size() / 2, 4096));
     setTitle(title);
     m_damaged->setVisible(damaged);
     m_damaged->raise();

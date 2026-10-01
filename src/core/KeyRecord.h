@@ -41,6 +41,9 @@ struct KeyRecord
     bool has(quint32 f) const { return (flags & f) == f; }
 };
 
+// Movable as bytes (QString is): a growing vector of records is reallocated, not copied one by one.
+Q_DECLARE_TYPEINFO(KeyRecord, Q_RELOCATABLE_TYPE);
+
 using KeyRecords = QVector<KeyRecord>;
 
 namespace Vk {
