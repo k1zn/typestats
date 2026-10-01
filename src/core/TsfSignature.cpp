@@ -12,13 +12,16 @@
 // rendered as 32 lowercase hex digits. The description ("comment") is not covered.
 QString TsfSignature::compute(const TsfDocument &doc)
 {
-    QCryptographicHash md5(QCryptographicHash::Md5);
+    QByteArray data(doc.records.size() * 12, Qt::Uninitialized);
+    uchar *p = reinterpret_cast<uchar *>(data.data());
     for (const KeyRecord &r : doc.records) {
-        quint32 le[3] = {qToLittleEndian(r.dtUs),
-                         qToLittleEndian(r.flags & ~quint32(KeyRecord::Transient)),
-                         qToLittleEndian(quint32(r.ch))};
-        md5.addData(QByteArrayView(reinterpret_cast<const char *>(le), sizeof le));
+        qToLittleEndian<quint32>(r.dtUs, p);
+        qToLittleEndian<quint32>(r.flags & ~quint32(KeyRecord::Transient), p + 4);
+        qToLittleEndian<quint32>(r.ch, p + 8);
+        p += 12;
     }
+    QCryptographicHash md5(QCryptographicHash::Md5);
+    md5.addData(data);
     md5.addData(Cp1251::encode(doc.author));
     md5.addData(Cp1251::encode(doc.date));
     md5.addData(QByteArrayView("TypingStatistics"));

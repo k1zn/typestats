@@ -153,6 +153,41 @@ private slots:
         }
     }
 
+    // TS_PERF_DUMP=name: every .tsf of TS_PERF_DIR and the golden ones read, dumped as text and written
+    // back, to compare the file code before and after a change.
+    void dumpFiles()
+    {
+        const QString tag = qEnvironmentVariable("TS_PERF_DUMP");
+        if (tag.isEmpty())
+            QSKIP("TS_PERF_DUMP is not set");
+        QStringList paths;
+        for (const QString &f : QDir(m_dir).entryList({QStringLiteral("*.tsf")}))
+            paths << QDir(m_dir).filePath(f);
+        for (const QString &f : QDir(QStringLiteral(TS_GOLDEN_DIR)).entryList({QStringLiteral("*.tsf")}))
+            paths << QStringLiteral(TS_GOLDEN_DIR "/") + f;
+        const QString out = QDir(m_dir).filePath(QStringLiteral("dump_") + tag);
+        QDir().mkpath(out);
+        for (const QString &path : paths) {
+            if (QFileInfo(path).fileName().startsWith(QLatin1String("w_")))
+                continue;
+            TsfDocument d;
+            const int err = int(Tsf::read(path, d));
+            QString text = QStringLiteral("err=%1 version=%2 author=%3|comment=%4|date=%5|zones=%6|fingers=%7|video=%8|shift=%9|")
+                               .arg(err).arg(d.version).arg(d.author, d.comment, d.date, d.fingerZonesName,
+                                                            d.fingers.join(u'/'), d.attachedVideo)
+                               .arg(d.videoTimeShiftMs);
+            text += QStringLiteral("signed=%1 valid=%2\n").arg(d.signed_).arg(d.signatureValid);
+            for (const KeyRecord &r : d.records)
+                text += QStringLiteral("%1 %2 %3 %4\n").arg(r.dtUs).arg(r.flags).arg(int(r.ch)).arg(r.comment);
+            const QString name = QFileInfo(path).completeBaseName();
+            QFile f(QDir(out).filePath(name + QStringLiteral(".txt")));
+            QVERIFY(f.open(QIODevice::WriteOnly));
+            f.write(text.toUtf8());
+            QVERIFY(Tsf::write(QDir(out).filePath(name + QStringLiteral("_signed.tsf")), d, true));
+            QVERIFY(Tsf::write(QDir(out).filePath(name + QStringLiteral("_plain.tsf")), d, false));
+        }
+    }
+
     // The core on the whole recording.
     void core()
     {

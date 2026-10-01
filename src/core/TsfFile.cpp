@@ -5,18 +5,19 @@
 #include "TsfSignature.h"
 
 #include <QFile>
-#include <cctype>
+
+#include <array>
 
 namespace {
 
-// Mimics TStringList::LoadFromFile line splitting (CR, LF or CRLF).
-QStringList splitLines(const QString &text)
+// Mimics TStringList::LoadFromFile line splitting (CR, LF or CRLF). The lines point into text.
+QList<QStringView> splitLines(QStringView text)
 {
-    QStringList lines;
-    int start = 0;
-    const int n = text.size();
-    for (int i = 0; i < n; ++i) {
-        QChar c = text[i];
+    QList<QStringView> lines;
+    qsizetype start = 0;
+    const qsizetype n = text.size();
+    for (qsizetype i = 0; i < n; ++i) {
+        const QChar c = text[i];
         if (c == u'\r' || c == u'\n') {
             lines.append(text.mid(start, i - start));
             if (c == u'\r' && i + 1 < n && text[i + 1] == u'\n')
@@ -29,36 +30,82 @@ QStringList splitLines(const QString &text)
     return lines;
 }
 
-// TStrings::Values[name]: first "name=value" line, name compared case-insensitively.
-QString value(const QStringList &lines, const QString &name)
+// The header keys, read in one pass over the lines.
+enum Key {
+    TsfVersion, Autor, Comment, Date, FingerZonesName, Finger0, AttachedVideo = Finger0 + 8, VideoTimeShift, Signature,
+    KeyCount
+};
+
+const std::array<QString, KeyCount> &keyNames()
 {
-    for (const QString &l : lines) {
-        int eq = l.indexOf(u'=');
-        if (eq == name.size() && l.left(eq).compare(name, Qt::CaseInsensitive) == 0)
-            return l.mid(eq + 1);
-    }
-    return {};
+    static const std::array<QString, KeyCount> names = [] {
+        std::array<QString, KeyCount> n;
+        n[TsfVersion] = QStringLiteral("tsfVersion");
+        n[Autor] = QStringLiteral("autor");
+        n[Comment] = QStringLiteral("comment");
+        n[Date] = QStringLiteral("date");
+        n[FingerZonesName] = QStringLiteral("FingerZonesName");
+        for (int i = 0; i < 8; ++i)
+            n[Finger0 + i] = QStringLiteral("Finger%1").arg(i);
+        n[AttachedVideo] = QStringLiteral("AttachedVideo");
+        n[VideoTimeShift] = QStringLiteral("VideoTimeShift");
+        n[Signature] = QStringLiteral("signature");
+        return n;
+    }();
+    return names;
 }
 
-bool isHex(QChar c) { return c.isDigit() || (c >= u'a' && c <= u'f') || (c >= u'A' && c <= u'F'); }
+// TStrings::Values[name] of every key: the first "name=value" line, name compared case-insensitively.
+std::array<QString, KeyCount> values(const QList<QStringView> &lines)
+{
+    const std::array<QString, KeyCount> &names = keyNames();
+    std::array<QString, KeyCount> v;
+    std::array<bool, KeyCount> found{};
+    for (QStringView l : lines) {
+        const qsizetype eq = l.indexOf(u'=');
+        if (eq <= 0)
+            continue;
+        for (int k = 0; k < KeyCount; ++k)
+            if (!found[k] && eq == names[k].size() && l.left(eq).compare(names[k], Qt::CaseInsensitive) == 0) {
+                found[k] = true;
+                v[k] = l.mid(eq + 1).toString();
+            }
+    }
+    return v;
+}
+
+// A hex digit as sscanf and QString::toUInt see it: QChar::isDigit() takes other scripts' digits too,
+// which toUInt does not convert (they count as 0). -1: not a digit.
+int hexDigit(QChar c)
+{
+    const char16_t u = c.unicode();
+    if (u >= u'0' && u <= u'9')
+        return u - u'0';
+    if (u >= u'a' && u <= u'f')
+        return u - u'a' + 10;
+    if (u >= u'A' && u <= u'F')
+        return u - u'A' + 10;
+    if (c.isDigit())
+        return int(QStringView(&c, 1).toUInt(nullptr, 16));
+    return -1;
+}
 
 // sscanf(line, "%x %s", &a, buf) == 2
-bool scanHexAndWord(const QString &l, quint32 &a, QString &word)
+bool scanHexAndWord(QStringView l, quint32 &a, QStringView &word)
 {
-    int i = 0, n = l.size();
+    qsizetype i = 0;
+    const qsizetype n = l.size();
     while (i < n && l[i].isSpace()) ++i;
-    if (i + 1 < n && l[i] == u'0' && (l[i + 1] == u'x' || l[i + 1] == u'X') && i + 2 < n && isHex(l[i + 2]))
+    if (i + 1 < n && l[i] == u'0' && (l[i + 1] == u'x' || l[i + 1] == u'X') && i + 2 < n && hexDigit(l[i + 2]) >= 0)
         i += 2;
-    int s = i;
+    const qsizetype s = i;
     quint32 v = 0;
-    while (i < n && isHex(l[i])) {
-        v = v * 16 + QStringView(l).mid(i, 1).toUInt(nullptr, 16);
-        ++i;
-    }
+    for (int d; i < n && (d = hexDigit(l[i])) >= 0; ++i)
+        v = v * 16 + quint32(d);
     if (i == s)
         return false;
     while (i < n && l[i].isSpace()) ++i;
-    int w = i;
+    const qsizetype w = i;
     while (i < n && !l[i].isSpace()) ++i;
     if (i == w)
         return false;
@@ -68,60 +115,65 @@ bool scanHexAndWord(const QString &l, quint32 &a, QString &word)
 }
 
 // sscanf(line, "%d %d", &a, &b) == 2
-bool scanTwoInts(const QString &l, qint64 &a, qint64 &b)
+bool scanTwoInts(QStringView l, qint64 &a, qint64 &b)
 {
-    int i = 0, n = l.size();
+    qsizetype i = 0;
+    const qsizetype n = l.size();
     auto readInt = [&](qint64 &out) {
         while (i < n && l[i].isSpace()) ++i;
-        int s = i;
+        const qsizetype s = i;
         if (i < n && (l[i] == u'-' || l[i] == u'+')) ++i;
-        int d = i;
+        const qsizetype d = i;
         while (i < n && l[i].isDigit()) ++i;
         if (i == d)
             return false;
-        out = QStringView(l).mid(s, i - s).toLongLong();
+        out = l.mid(s, i - s).toLongLong();
         return true;
     };
     return readInt(a) && readInt(b);
 }
 
 // TryStrToInt64("0x" + word)
-bool parseHex64(const QString &word, quint64 &out)
+bool parseHex64(QStringView word, quint64 &out)
 {
     if (word.isEmpty() || word.size() > 16)
         return false;
-    for (QChar c : word)
-        if (!isHex(c))
+    quint64 v = 0;
+    bool ascii = true;
+    for (QChar c : word) {
+        const char16_t u = c.unicode();
+        int d;
+        if (u >= u'0' && u <= u'9')
+            d = u - u'0';
+        else if (u >= u'a' && u <= u'f')
+            d = u - u'a' + 10;
+        else if (u >= u'A' && u <= u'F')
+            d = u - u'A' + 10;
+        else if (c.isDigit())
+            d = 0, ascii = false;
+        else
             return false;
-    bool ok = false;
+        v = v * 16 + quint64(d);
+    }
+    if (ascii) {
+        out = v;
+        return true;
+    }
+    bool ok = false; // digits of other scripts: as toULongLong takes them
     out = word.toULongLong(&ok, 16);
     return ok;
 }
 
-} // namespace
-
-namespace Tsf {
-
-QString dataLine(const KeyRecord &r)
+TsfDocument parseLines(const QList<QStringView> &lines, Tsf::ReadError *err)
 {
-    quint64 packed = (quint64(r.ch) << 32) | (r.flags & ~quint32(KeyRecord::Transient));
-    QString line = QStringLiteral("%1 %2")
-                       .arg(r.dtUs, 8, 16, QLatin1Char('0'))
-                       .arg(packed, 12, 16, QLatin1Char('0'))
-                       .toUpper();
-    if (!r.comment.isEmpty())
-        line += QStringLiteral("\t;") + r.comment;
-    return line;
-}
-
-TsfDocument parse(const QStringList &lines, ReadError *err)
-{
+    const std::array<QString, KeyCount> header = values(lines);
     TsfDocument doc;
-    doc.version = value(lines, QStringLiteral("tsfVersion")).toInt();
+    doc.version = header[TsfVersion].toInt();
     if (err)
-        *err = doc.version > kCurrentVersion ? ReadError::NewerVersion : ReadError::None;
+        *err = doc.version > Tsf::kCurrentVersion ? Tsf::ReadError::NewerVersion : Tsf::ReadError::None;
 
-    for (const QString &l : lines) {
+    doc.records.reserve(lines.size());
+    for (QStringView l : lines) {
         KeyRecord r;
         if (doc.version == 0) {
             qint64 t, key;
@@ -133,7 +185,7 @@ TsfDocument parse(const QStringList &lines, ReadError *err)
             r.flags = (k & 0xFFFFFF00u) | Keyboard::vkToScan((k >> 16) & 0xFF);
         } else {
             quint32 t;
-            QString word;
+            QStringView word;
             quint64 packed;
             if (!scanHexAndWord(l, t, word) || !parseHex64(word, packed))
                 continue;
@@ -141,27 +193,53 @@ TsfDocument parse(const QStringList &lines, ReadError *err)
             r.flags = quint32(packed);
             r.ch = char16_t(packed >> 32);
         }
-        int semi = l.indexOf(u';');
+        const qsizetype semi = l.indexOf(u';');
         if (semi >= 0)
-            r.comment = l.mid(semi + 1);
+            r.comment = l.mid(semi + 1).toString();
         doc.records.append(r);
     }
 
-    doc.author = value(lines, QStringLiteral("autor"));
-    doc.comment = value(lines, QStringLiteral("comment"));
-    doc.date = value(lines, QStringLiteral("date"));
-    doc.fingerZonesName = value(lines, QStringLiteral("FingerZonesName"));
+    doc.author = header[Autor];
+    doc.comment = header[Comment];
+    doc.date = header[Date];
+    doc.fingerZonesName = header[FingerZonesName];
     if (!doc.fingerZonesName.isEmpty())
         for (int i = 0; i < 8; ++i)
-            doc.fingers.append(value(lines, QStringLiteral("Finger%1").arg(i)));
-    doc.attachedVideo = value(lines, QStringLiteral("AttachedVideo"));
+            doc.fingers.append(header[Finger0 + i]);
+    doc.attachedVideo = header[AttachedVideo];
     if (!doc.attachedVideo.isEmpty())
-        doc.videoTimeShiftMs = value(lines, QStringLiteral("VideoTimeShift")).toInt();
+        doc.videoTimeShiftMs = header[VideoTimeShift].toInt();
 
-    const QString sig = value(lines, QStringLiteral("signature"));
+    const QString &sig = header[Signature];
     doc.signed_ = !sig.isEmpty();
     doc.signatureValid = sig == TsfSignature::compute(doc);
     return doc;
+}
+
+} // namespace
+
+namespace Tsf {
+
+QString dataLine(const KeyRecord &r)
+{
+    // "%08X %012X": dt, then the character over the flags.
+    static constexpr char16_t kHex[] = u"0123456789ABCDEF";
+    const quint64 packed = (quint64(r.ch) << 32) | (r.flags & ~quint32(KeyRecord::Transient));
+    QString line(21, Qt::Uninitialized);
+    char16_t *p = reinterpret_cast<char16_t *>(line.data());
+    for (int i = 0; i < 8; ++i)
+        p[i] = kHex[(r.dtUs >> (28 - 4 * i)) & 0xF];
+    p[8] = u' ';
+    for (int i = 0; i < 12; ++i)
+        p[9 + i] = kHex[(packed >> (44 - 4 * i)) & 0xF];
+    if (!r.comment.isEmpty())
+        line += QStringLiteral("\t;") + r.comment;
+    return line;
+}
+
+TsfDocument parse(const QStringList &lines, ReadError *err)
+{
+    return parseLines(QList<QStringView>(lines.begin(), lines.end()), err);
 }
 
 QStringList serialize(const TsfDocument &doc, bool sign)
@@ -202,7 +280,8 @@ ReadError read(const QString &path, TsfDocument &doc)
     if (!f.open(QIODevice::ReadOnly))
         return ReadError::CannotOpen;
     ReadError err;
-    doc = parse(splitLines(Cp1251::decode(f.readAll())), &err);
+    const QString text = Cp1251::decode(f.readAll());
+    doc = parseLines(splitLines(text), &err);
     return err;
 }
 

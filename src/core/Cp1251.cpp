@@ -22,10 +22,10 @@ char16_t Cp1251::toUnicode(quint8 c)
 
 QString Cp1251::decode(const QByteArray &bytes)
 {
-    QString s;
-    s.reserve(bytes.size());
+    QString s(bytes.size(), Qt::Uninitialized);
+    char16_t *out = reinterpret_cast<char16_t *>(s.data());
     for (char c : bytes)
-        s.append(QChar(toUnicode(quint8(c))));
+        *out++ = toUnicode(quint8(c));
     return s;
 }
 
