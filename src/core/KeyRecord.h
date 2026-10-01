@@ -24,7 +24,7 @@ struct KeyRecord
         SingleChar   = 0x08000000,
         Packet       = 0x10000000,
         DeadKey      = 0x20000000,
-        SegmentStart = 0x40000000, // in-memory mark of the original (first press of a fragment), never in a file
+        SegmentStart = 0x40000000, // first press of a fragment: the original's Recalculate sets it and saves it; ignored on reading
         Win          = 0x80000000,
     };
 
