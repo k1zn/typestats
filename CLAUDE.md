@@ -32,6 +32,9 @@ cmake --build build
 cd build && ctest
 ```
 
+Опции CMake: `TS_VIDEO` (ON; OFF — без QtMultimedia, кнопки видео выключены, `tst_ui::video` пропускается),
+`TS_LRELEASE` (путь к `lrelease.exe`, если у Qt нет LinguistTools — статический Qt).
+
 Нюансы:
 - В Git Bash тесты ничего не печатают в консоль. Чтобы увидеть результат по кейсам:
   `./build/tst_tsf.exe -o /c/Users/kizn/AppData/Local/Temp/tst.txt,txt`.
@@ -120,13 +123,16 @@ src/cli/tsstat.cpp  консольная утилита: `tsstat [--split MS] [-
                     `--extra KIND [--avg] [--sort N] [--desc] [--pattern P] [--only S] [--any S] [--exclude S]` — список Form3;
                     `--to-journal out.tsj f.tsf` — записи файла журналом
 src/platform/KeyboardHook.*   сигнал `key(HookEvent{timeUs, flags, ch, chars, firstCh})` в потоке GUI. Windows — свой
-                    WH_KEYBOARD_LL, флаги как у 0x404598 (ToUnicodeEx, восстановление мёртвой клавиши через ToAsciiEx);
+                    WH_KEYBOARD_LL **в потоке GUI** (отметка времени `nowUs()` = steady_clock при входе в колбэк;
+                    занятый поток GUI её задерживает), флаги как у 0x404598 (ToUnicodeEx, восстановление мёртвой
+                    клавиши через ToAsciiEx); `toUnicode`/`clearDeadKey`/`capsLock` — для преобразования раскладки;
                     прочие ОС — libuiohook (без injected/extended/мёртвых клавиш, не проверялось).
                     `foregroundWindow()/foregroundTitle()` для автокомментариев
 src/main.cpp        QApplication: светлая схема, стиль windowsvista и шрифт 8 pt на Windows (вид оригинала), переводчик
                     (ключ `Language` = Russian/English, иначе язык системы; `--lang ru|en`), MainWindow, файл из аргумента
 src/ui/
-  MainWindow.*        Form1: тулбар по координатам DFM (иконки оригинала; неподключённые кнопки выключены),
+  MainWindow.*        Form1: тулбар по координатам DFM (иконки оригинала; все кнопки подключены, 20/21 выключены
+                      только без `TS_VIDEO`); заголовок «Ts: ON|OFF - Typing statistics v… - файл» (`updateTitle`),
                       сплиттеры, ListView2 (высота по числу строк + 1, как FUN_00429bbc) / ListView1, «Файл повреждён»,
                       открытие .tsf/.tsj, сохранение (подпись по `m_clean` = g_fileClean; расстановка пальцев в файл и из
                       файла), очистка, «Открыть журнал», опции пересчёта, выделение в тексте → статистика и список клавиш.
@@ -145,7 +151,9 @@ src/ui/
                       SpeedButton2 — Tkbd), трей (`m_tray`, меню, сворачивание в трей), `captureToggled` (отпускания
                       зажатых клавиш, `Ts: ON/OFF`), экспорт (`keyTable`/`extraTable`/`exportTable`), свёрнутый график
                       (`graphPaneResized`, `m_graphFolded`). `showForm(name)` — для `--show NAME` (снимки форм):
-                      settings, extra, hist, hist-fingers, hist-extra, kbd, about, input
+                      settings, extra, hist, hist-fingers, hist-extra, kbd, about, input, video.
+                      «Преобразовать в текущую раскладку» — `convertLayout` (`m_toUnicode` подменяется в тестах).
+                      Панели: `showAxisPanel`/`showLegend` только открывают, `updatePanelButtons`, `m_legendOpen`
   GraphWidget.*       PaintBox1 по `re/graph_paint.md`: ось Y (три подписи на линию), 8 серий, строка текста, линейка
                       (двойной правый клик), курсор (двойной клик), мышь (ЛКМ — сдвиг, ПКМ — масштаб, СКМ — быстрый сдвиг,
                       ЛКМ+ПКМ — масштаб клавограммы), `setKlavogramRange`/`pullKlavogramRange` (FUN_0043a918),
@@ -193,7 +201,8 @@ tests/tst_editing.cpp  Editing на синтетике
 tests/tst_ui.cpp    главное окно без экрана (ctest ставит QT_QPA_PLATFORM=offscreen; настройки — во временный INI):
                     открытие и отрисовка, удалить/отменить/копировать, метки, связка графика с клавограммой и мышь на
                     графике, запись через `keyEvent`, настройки, Form3, Form4, Tkbd, пресеты, выключение перехвата,
-                    экспорт, свёрнутый график. Тест — друг окон (`friend class TstUi`). Окна собраны в
+                    экспорт, свёрнутый график, преобразование раскладки, видео (пишет AVI сам), кнопки панелей,
+                    заголовок. Тест — друг окон (`friend class TstUi`). Окна собраны в
                     библиотеку `tsui` (src/ui + src/platform + src/export), ресурсы — в самих exe
 tests/tst_video.cpp Video на синтетике (время по клавограмме с паузой разбиения, кадры, пути); окно видео — в tst_ui
                     (тест сам пишет несжатый AVI из цветных кадров)
@@ -412,7 +421,15 @@ python re/scripts/diffstand.py файл --journal                               
    Все обработчики Form1 (`re/vmt_methods.json`) сверены с портом: кнопки и пункты меню перенесены. Кнопки 16/17
    (и N7/N8) только открывают панели и выключены, пока панель открыта; кнопка 4 только показывает Form10
    (переключает — хоткей Ctrl+Alt+O). «Только PCmo» (CheckBox6 Form1) скрыт и в оригинале — не переносится.
+   **Сравнение записи с оригиналом** (2026-10-01, обе программы писали один ввод, 842 записи; подробно —
+   `re/tsf_format.md`, «Что пишет оригинал»): флаги, символы, текст, n-граммы совпали; отличия файла — первая `dt`
+   (60 с у оригинала) и бит `0x40000000`; `dt` расходятся на 0,2–2,7 мс — у программы, чей хук стоит в цепочке вторым
+   (запущенной раньше), отметка позже.
    **СЛЕДУЮЩЕЕ**:
+   - хук в отдельном потоке (свой цикл сообщений, высокий приоритет, отметка QPC в колбэке, событие — в поток GUI
+     очередью): время нажатий не зависит от загрузки GUI, а долгий пересчёт не превышает `LowLevelHooksTimeout`
+     (иначе Windows молча снимает хук). Предложено пользователю, не сделано;
+   - аудит производительности (большие записи: пересчёт по таймеру, обновление Form3/Form4, отрисовка, путь нажатия);
    - не проверено руками (пользователь пока не пробовал): запись в чужих окнах, мышь графика и клавограммы, панели,
      трей, Form9 (набор в нём должен записываться), импорт настроек оригинала; «Преобразовать в текущую раскладку» на
      настоящей раскладке (ToUnicodeEx); видео на настоящей записи экрана (кодек AVI, сдвиг, размер окна).
