@@ -484,6 +484,13 @@ void MainWindow::applySettings()
     m_klav->setFontSize(std::clamp(s.value(QStringLiteral("KlavogrFontSize"), 9).toInt(), 8, 24));
     m_keyDigits = std::clamp(s.value(QStringLiteral("DlitDigits"), 3).toInt(), 0, 3);
     m_live->setSpeedRange(s.value(QStringLiteral("opLoSpeed"), 200).toInt(), s.value(QStringLiteral("opHiSpeed"), 500).toInt());
+    m_globalOnOff = s.value(QStringLiteral("GlobalOnOff"), true).toBool();
+    m_globalClear = s.value(QStringLiteral("GlobalClear"), true).toBool();
+    m_autoComments = s.value(QStringLiteral("AutoComments"), false).toBool();
+    m_journalOn = s.value(QStringLiteral("JournalOn"), false).toBool();
+    m_mainOptions.resize(MainStats::RowCount);
+    for (int i = 0; i < MainStats::RowCount; ++i)
+        m_mainOptions[i] = s.value(QStringLiteral("MainOption%1").arg(i), true).toBool();
     recalculate();
 }
 
@@ -862,12 +869,11 @@ void MainWindow::showTextMenu(const QPoint &globalPos)
 
 void MainWindow::keyEvent(const HookEvent &e)
 {
-    const QSettings settings;
     RecorderSettings s;
     s.capture = m_capture->isChecked();
-    s.globalOnOff = settings.value(QStringLiteral("GlobalOnOff"), true).toBool();
-    s.globalClear = settings.value(QStringLiteral("GlobalClear"), true).toBool();
-    s.autoComments = settings.value(QStringLiteral("AutoComments"), false).toBool();
+    s.globalOnOff = m_globalOnOff;
+    s.globalClear = m_globalClear;
+    s.autoComments = m_autoComments;
     s.splitMs = m_pause->value();
     s.byPauses = m_byPauses->isChecked();
     s.liveVisible = m_live->isVisible();
@@ -898,7 +904,7 @@ void MainWindow::keyEvent(const HookEvent &e)
     if (out.liveReset)
         m_liveTicks = 10; // shown at the next tick
     if (out.recorded) {
-        if (settings.value(QStringLiteral("JournalOn"), false).toBool())
+        if (m_journalOn)
             m_journal.append(m_doc.records.last());
         m_needRecalc = true;
         m_lastKey.start();
@@ -1260,10 +1266,9 @@ void MainWindow::updateStats()
     const QStringList names = Texts::statsRowNames();
     const QStringList values = m_model.size() ? Stats::format(Stats::compute(m_model, b, e, opt.splitMs, opt.byPauses), loc, Texts::units())
                                               : QStringList();
-    const QSettings s;
     QVector<QStringList> rows;
     for (int i = 0; i < names.size(); ++i)
-        if (s.value(QStringLiteral("MainOption%1").arg(i), true).toBool())
+        if (m_mainOptions.value(i, true))
             rows.append({names[i], values.value(i)});
     setRows(m_stats, rows);
     // The list is as tall as its rows plus one (FUN_00429bbc); the key list gets the rest.

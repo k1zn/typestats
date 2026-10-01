@@ -148,6 +148,9 @@ private:
     QString m_path; // empty: not saved yet
     QString m_titleDocument; // what the title names after the program: the file or the journal
     int m_keyDigits = 3;    // decimals of the times in the key list (DlitDigits)
+    // Settings needed on every key and every update of the statistics; read by applySettings().
+    bool m_globalOnOff = true, m_globalClear = true, m_autoComments = false, m_journalOn = false;
+    QVector<bool> m_mainOptions; // MainOption0..16: rows of the statistics list
     TextModel m_model;
     FingerZoneSchemes m_schemes;
 
