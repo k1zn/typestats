@@ -75,15 +75,26 @@ void TextView::mouseMoveEvent(QMouseEvent *e)
 void TextView::setModel(const TextModel &m)
 {
     const QSignalBlocker blocker(this);
-    setPlainText(m.text);
-    QTextCursor c(document());
+    // The text goes in piece by piece with its formats: restyling runs of a ready text costs far more.
+    setPlainText(QString());
+    QTextDocument *doc = document();
+    doc->setUndoRedoEnabled(false);
+    QTextCursor c(doc);
+    const QTextCharFormat base = c.charFormat();
     c.beginEditBlock();
+    qsizetype pos = 0;
     for (const TextRun &r : m.runs) {
-        c.setPosition(r.start);
-        c.setPosition(r.start + r.length, QTextCursor::KeepAnchor);
-        c.mergeCharFormat(formatOf(r.style));
+        if (r.start > pos)
+            c.insertText(m.text.mid(pos, r.start - pos), base);
+        QTextCharFormat f = base;
+        f.merge(formatOf(r.style));
+        c.insertText(m.text.mid(r.start, r.length), f);
+        pos = r.start + r.length;
     }
+    if (pos < m.text.size())
+        c.insertText(m.text.mid(pos), base);
     c.endEditBlock();
+    doc->setUndoRedoEnabled(true);
     moveCursor(QTextCursor::Start);
 }
 

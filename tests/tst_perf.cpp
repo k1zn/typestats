@@ -213,6 +213,39 @@ private slots:
         }
     }
 
+    // The text view by parts: plain text, styles, the first layout.
+    void textView()
+    {
+        for (int n : m_sizes) {
+            TsfDocument doc;
+            Tsf::read(tsf(n), doc);
+            const TextModel m = Recalc::run(doc.records, RecalcOptions());
+            log(QStringLiteral("# text %1 chars, %2 runs").arg(m.text.size()).arg(m.runs.size()));
+            TextView v;
+            v.resize(650, 120);
+            v.show();
+            QVERIFY(QTest::qWaitForWindowExposed(&v));
+            measure(QStringLiteral("text.setPlainText shown"), n, [&] { v.setPlainText(m.text); });
+            measure(QStringLiteral("text.setModel shown"), n, [&] { v.setModel(m); });
+            measure(QStringLiteral("text.setModel + processEvents"), n, [&] {
+                v.setModel(m);
+                QApplication::processEvents();
+            });
+            measure(QStringLiteral("text.setModel + paint"), n, [&] {
+                v.setModel(m);
+                v.grab();
+            });
+            v.hide();
+            measure(QStringLiteral("text.setModel hidden"), n, [&] { v.setModel(m); });
+            // TS_PERF_HTML=name: the document as HTML, to compare the styles before and after a change.
+            if (const QString html = qEnvironmentVariable("TS_PERF_HTML"); !html.isEmpty()) {
+                QFile f(QDir(m_dir).filePath(QStringLiteral("%1_%2.html").arg(html).arg(n)));
+                QVERIFY(f.open(QIODevice::WriteOnly));
+                f.write(v.document()->toHtml().toUtf8());
+            }
+        }
+    }
+
     // The main window: opening, the parts of recalculate(), selection, scrolling, painting.
     void window()
     {
