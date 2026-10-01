@@ -18,6 +18,7 @@ struct CharFilter
     bool onlyOn = false, anyOn = false, excludeOn = false;
     QString only, any, exclude;
     bool pass(QStringView text) const;
+    bool operator==(const CharFilter &) const = default;
 };
 
 // One position of a template.

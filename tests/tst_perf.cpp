@@ -371,6 +371,14 @@ private slots:
             measure(QStringLiteral("updateHistograms"), n, [&] { w.updateHistograms(); });
             measure(QStringLiteral("paint histograms"), n, [&] { w.m_hist->grab(); });
             measure(QStringLiteral("select 100 chars, Form3+Form4 open"), n, [&] { select(w, len / 2 + 7, 100); });
+            // A selection, then a click that drops it: the statistics go back to the whole text.
+            for (int k : {int(ExtraStats::Pairs), int(ExtraStats::Words)}) {
+                w.m_extra->m_kinds[k]->setChecked(true);
+                measure(QStringLiteral("select 100 + click, Form3 kind %1+Form4").arg(k), n, [&] {
+                    select(w, len / 2, 100);
+                    select(w, len / 3, 0);
+                });
+            }
             measure(QStringLiteral("recalculate, Form3+Form4 open"), n, [&] { w.recalculate(); });
             w.m_extra->hide();
             w.m_hist->hide();

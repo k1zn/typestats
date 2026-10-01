@@ -236,28 +236,34 @@ void ExtraStatsWindow::computeNow()
     if (!isVisible())
         return; // computed when shown
     m_dirty = false;
-    m_occ.clear();
-    if (m_model && m_model->size() > 0)
-        m_occ = ExtraStats::collect(*m_model, m_fingers, m_b, m_e, kind(), m_template->currentText(), filter());
+    const Collected source{m_model, m_model ? m_model->serial : 0, m_fingers, m_b, m_e, kind(), m_template->currentText(), filter()};
+    if (source != m_collected) {
+        m_occ.clear();
+        if (m_model && m_model->size() > 0)
+            m_occ = ExtraStats::collect(*m_model, m_fingers, m_b, m_e, source.kind, source.pattern, source.filter);
+        m_collected = source;
+        ++m_occVersion;
+    }
     showRows();
 }
 
 void ExtraStatsWindow::showRows()
 {
     const bool averages = m_averages->isChecked();
-    const QLocale loc;
-    m_rows = ExtraStats::rows(m_occ, averages, m_sort.mode, m_sort.descending);
-    QVector<QStringList> table;
-    table.reserve(m_rows.size());
-    for (const ExtraStats::Row &r : m_rows) {
-        QStringList row{ExtraStats::formatSpeed(r.speed, loc), r.text};
-        if (averages)
-            row << QString::number(r.value);
-        table << row;
+    const Sorted sorted{m_occVersion, averages, m_sort.mode, m_sort.descending};
+    if (sorted != m_sorted) {
+        m_rows = ExtraStats::rows(m_occ, averages, m_sort.mode, m_sort.descending);
+        m_sorted = sorted;
     }
     {
         const QSignalBlocker blocker(m_list->selectionModel());
-        m_listModel->setTable(m_sort.headers(averages, {tr("Скорость"), tr("Текст"), tr("Кол-во")}), table);
+        m_listModel->setTable(m_sort.headers(averages, {tr("Скорость"), tr("Текст"), tr("Кол-во")}), int(m_rows.size()),
+                              [this](int row, int column) {
+                                  const ExtraStats::Row &r = m_rows[row];
+                                  return column == 0 ? ExtraStats::formatSpeed(r.speed, QLocale())
+                                         : column == 1 ? r.text
+                                                       : QString::number(r.value);
+                              });
     }
     layoutControls();
     m_status->setText(tr("Всего:") + QLatin1Char(' ') + QString::number(m_rows.size()));

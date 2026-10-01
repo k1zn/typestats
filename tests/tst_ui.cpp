@@ -509,6 +509,18 @@ private slots:
         x->m_list->selectAll();
         x->copy();
         QCOMPARE(QApplication::clipboard()->text().count(QLatin1Char(' ')), int(x->rows().size()) - 1);
+
+        // A recalculated text of the same size is analysed again; the strings of the list are its rows'.
+        x->m_filterOn[2]->setChecked(false);
+        x->m_kinds[ExtraStats::Words]->setChecked(true);
+        const QVector<ExtraStats::Row> before = x->rows();
+        for (KeyRecord &r : w.m_doc.records)
+            r.dtUs = r.dtUs / 2 + 1;
+        w.recalculate();
+        QCOMPARE(x->rows().size(), before.size());
+        QVERIFY(x->rows().first().speed > before.first().speed);
+        QCOMPARE(x->m_list->model()->index(2, 1).data().toString(), x->rows().at(2).text);
+        QCOMPARE(x->m_list->model()->index(2, 0).data().toString(), ExtraStats::formatSpeed(x->rows().at(2).speed, QLocale()));
     }
 
     void histograms()

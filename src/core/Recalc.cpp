@@ -4,6 +4,7 @@
 #include "KeyName.h"
 
 #include <algorithm>
+#include <atomic>
 #include <bitset>
 
 namespace {
@@ -200,7 +201,9 @@ QVector<bool> erasedRecords(const KeyRecords &recs)
 
 TextModel run(const KeyRecords &document, const RecalcOptions &opt)
 {
+    static std::atomic<quint64> serials{0};
     TextModel m;
+    m.serial = ++serials;
     m.records = normalized(document);
     m.recErased = erasedRecords(m.records);
     const KeyRecords &recs = m.records;

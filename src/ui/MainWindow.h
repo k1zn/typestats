@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/FingerZones.h"
+#include "core/Histograms.h"
 #include "core/Journal.h"
 #include "core/Editing.h"
 #include "core/Recalc.h"
@@ -152,6 +153,8 @@ private:
     bool m_globalOnOff = true, m_globalClear = true, m_autoComments = false, m_journalOn = false;
     QVector<bool> m_mainOptions; // MainOption0..16: rows of the statistics list
     TextModel m_model;
+    Histograms::KeyLabel m_histLabels; // labelsFromRecords() of the model with this serial
+    quint64 m_histLabelsSerial = 0;
     FingerZoneSchemes m_schemes;
 
     TextView *m_text = nullptr;

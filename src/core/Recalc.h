@@ -51,6 +51,10 @@ struct TextAnchor
 
 struct TextModel
 {
+    // Different for every Recalc::run (copies share it): what is computed from a model can be kept
+    // while the serial stays the same.
+    quint64 serial = 0;
+
     // The records the model is built from: the document's without leading releases and auto-repeated
     // modifiers (the first one gets dt = 60 s). Record indexes below refer to this vector.
     KeyRecords records;

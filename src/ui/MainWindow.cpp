@@ -1292,7 +1292,11 @@ void MainWindow::updateHistograms()
     std::tie(source.recBegin, source.recEnd) = Histograms::recordRange(m_model, b, e);
     source.splitUs = quint32(m_pause->value()) * 1000;
     source.zones = m_schemes.zones(m_fingers->currentText());
-    source.label = Histograms::labelsFromRecords(m_model.records);
+    if (m_histLabelsSerial != m_model.serial) {
+        m_histLabels = Histograms::labelsFromRecords(m_model.records);
+        m_histLabelsSerial = m_model.serial;
+    }
+    source.label = m_histLabels;
     source.names = Texts::histogramNames();
     m_hist->setSource(source);
 }

@@ -4,6 +4,8 @@
 
 #include <QWidget>
 
+#include <optional>
+
 class QCheckBox;
 class QComboBox;
 class QFrame;
@@ -71,6 +73,31 @@ private:
     int m_b = 0, m_e = 0;
     bool m_placed = false; // the window was shown and has a position
     bool m_dirty = false; // the source changed while the window was locked
+
+    // What collect() was last run on: it is not run again for the same.
+    struct Collected
+    {
+        const TextModel *model = nullptr;
+        quint64 serial = 0;
+        QVector<quint8> fingers;
+        int b = 0, e = 0;
+        ExtraStats::Kind kind = ExtraStats::Words;
+        QString pattern;
+        ExtraStats::CharFilter filter;
+        bool operator==(const Collected &) const = default;
+    };
+    std::optional<Collected> m_collected;
+    int m_occVersion = 0; // changes with m_occ
+    // What m_rows were made of.
+    struct Sorted
+    {
+        int occVersion = -1;
+        bool averages = false;
+        int mode = 0;
+        bool descending = false;
+        bool operator==(const Sorted &) const = default;
+    };
+    Sorted m_sorted;
 
     QVector<ExtraStats::Occurrence> m_occ;   // everything found
     QVector<ExtraStats::Row> m_rows;         // the upper list
