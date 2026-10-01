@@ -8,6 +8,15 @@ set(CMAKE_AUTORCC ON)
 
 # TS_VIDEO=OFF: no attached video (Form5/Form6), no QtMultimedia - for the minimal static build.
 option(TS_VIDEO "Attached video through QtMultimedia" ON)
+# The core computes in the 80-bit x87 format (src/core/Ext80.h): long double where it is that format,
+# the software Ext80 elsewhere. TS_SOFT_EXT80=ON uses the software one everywhere (to test it).
+option(TS_SOFT_EXT80 "Software 80-bit arithmetic even where long double is x87" OFF)
+
+# The same floating-point results everywhere: no fused multiply-add (GCC contracts by default on
+# arm64, Clang within expressions).
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    add_compile_options(-ffp-contract=off)
+endif()
 
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Test)
 if(TS_VIDEO)
@@ -26,6 +35,9 @@ file(GLOB CORE_SOURCES CONFIGURE_DEPENDS src/core/*.cpp src/core/*.h)
 add_library(tscore STATIC ${CORE_SOURCES})
 target_include_directories(tscore PUBLIC src)
 target_link_libraries(tscore PUBLIC Qt6::Core)
+if(TS_SOFT_EXT80)
+    target_compile_definitions(tscore PUBLIC TS_SOFT_EXT80)
+endif()
 
 # --- command-line statistics (differential test bench) ---
 add_executable(tsstat src/cli/tsstat.cpp)

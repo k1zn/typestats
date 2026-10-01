@@ -1,5 +1,6 @@
 #include "Histograms.h"
 
+#include "Ext80.h"
 #include "NumberFormat.h"
 #include "KeyName.h"
 
@@ -13,7 +14,7 @@ namespace Histograms {
 
 namespace {
 
-constexpr long double kMs = 0.001L;
+const Ext kMs = kExtMilli;
 constexpr int kNoFinger = -1, kNoHand = -1;
 
 QString shown(const QString &name)
@@ -67,7 +68,7 @@ QVector<Bar> ranked(const Source &src, const std::array<float, 256> &sumUs, cons
         if (count[key] == 0)
             continue;
         Bar b;
-        b.value = float((long double)sumUs[key] / (long double)(count[key] * 1000));
+        b.value = float(Ext(sumUs[key]) / Ext(count[key] * 1000));
         if (!(b.value > 0.01))
             continue;
         b.label = label(src, quint8(key));
@@ -82,7 +83,7 @@ QVector<Bar> ranked(const Source &src, const std::array<float, 256> &sumUs, cons
 Bar single(const Press &p, const QString &label, int prevRec)
 {
     Bar b;
-    b.value = float(kMs * (long double)p.us);
+    b.value = float(kMs * Ext(p.us));
     b.label = label;
     b.rec = prevRec;
     return b;
@@ -164,7 +165,7 @@ Page build(const Source &src, const Node &node)
             const bool mine = node.kind == Node::AllKeys || p.key == node.key;
             const quint8 slot = node.kind == Node::AllKeys ? p.key : prev;
             if (mine && p.good) {
-                sum[slot] = float((long double)p.us + (long double)sum[slot]);
+                sum[slot] = float(Ext(p.us) + Ext(sum[slot]));
                 ++count[slot];
             }
             prev = p.key;
@@ -198,7 +199,7 @@ Page build(const Source &src, const Node &node)
         forEachPress(src, [&](const Press &p) {
             if (p.good) {
                 ++count[p.finger];
-                sum[p.finger] = float(kMs * (long double)p.us + (long double)sum[p.finger]);
+                sum[p.finger] = float(kMs * Ext(p.us) + Ext(sum[p.finger]));
             }
         });
         page.bars = averages(sum, count, n.fingersShort);
@@ -223,7 +224,7 @@ Page build(const Source &src, const Node &node)
             prevHand = p.hand;
             if (p.finger == node.finger) {
                 ++count[rel];
-                sum[rel] = float(kMs * (long double)p.us + (long double)sum[rel]);
+                sum[rel] = float(kMs * Ext(p.us) + Ext(sum[rel]));
             }
         });
         page.bars = averages(sum, count, n.relations);

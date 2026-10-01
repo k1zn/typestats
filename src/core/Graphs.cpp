@@ -1,10 +1,12 @@
 #include "Graphs.h"
 
+#include "Ext80.h"
+
 #include <cmath>
 
-// long double is the 80-bit x87 format with MinGW; the original computes in it and rounds to float
-// on every store, so the same is done here to get identical values.
-using ext = long double;
+// The original computes in the 80-bit x87 format and rounds to float on every store, so the same is
+// done here to get identical values.
+using ext = Ext;
 
 namespace {
 

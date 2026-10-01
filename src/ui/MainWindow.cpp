@@ -17,6 +17,7 @@
 #include "FilePropertiesDialog.h"
 #include "FingerZonesDialog.h"
 #include "core/Editing.h"
+#include "core/Ext80.h"
 #include "core/Journal.h"
 #include "core/KeyList.h"
 #include "core/MainStats.h"
@@ -838,7 +839,7 @@ void MainWindow::textHovered(int textPos, const QPoint &globalPos)
                 const int last = int(m_model.klav.size()) - 1;
                 const qint64 gap = m_model.klav[std::min(m_model.klavOfElement(e), last)].t
                                    - m_model.klav[std::min(m_model.klavOfElement(e - 1), last)].t;
-                hint = formatFixed(double(0.001L * gap), 3, QLocale()) + QLatin1Char(' ') + Texts::units().ms;
+                hint = formatFixed(double(kExtMilli * gap), 3, QLocale()) + QLatin1Char(' ') + Texts::units().ms;
             }
         } else {
             const int r = m_model.recordAt(textPos);
@@ -1103,8 +1104,8 @@ void MainWindow::createGraphPanels()
     connect(m_graph, &GraphWidget::elementClicked, this, &MainWindow::scrollKlavogramToElement);
     connect(m_graph, &GraphWidget::klavogramSpanRequested, this, [this](int element) {
         // The klavogram is zoomed to span from its first element to the one under the mouse.
-        const float from = float(0.001L * drawTimeOfElement(m_graph->klavogramFrom()));
-        const float span = float(0.001L * (drawTimeOfElement(element) - 100)) - from;
+        const float from = float(kExtMilli * drawTimeOfElement(m_graph->klavogramFrom()));
+        const float span = float(kExtMilli * (drawTimeOfElement(element) - 100)) - from;
         m_klav->setZoom(span > 0.01f ? float(m_klav->width()) / span : 300.0f);
         klavogramMoved();
     });
@@ -1127,7 +1128,7 @@ void MainWindow::createGraphPanels()
 void MainWindow::scrollKlavogramToElement(int element)
 {
     // The klavogram starts at the element (FUN_004050cc).
-    m_klav->setScrollMs(float(0.001L * (drawTimeOfElement(element) - 100)));
+    m_klav->setScrollMs(float(kExtMilli * (drawTimeOfElement(element) - 100)));
     klavogramMoved();
 }
 
@@ -1212,7 +1213,7 @@ void MainWindow::syncGraphScrollBar()
         const float page = float(m_klav->width()) / zoom;
         const float left = float(-m_klav->width()) / (zoom * 4.0f);
         const qint64 last = m_model.klav.isEmpty() ? 0 : m_model.klav.last().tDraw;
-        const float end = std::max(0.0f, float(0.001L * last) + left);
+        const float end = std::max(0.0f, float(kExtMilli * last) + left);
         const QSignalBlocker blocker(m_graphScroll);
         m_graphScroll->setRange(int(3.0f * left), std::max(int(3.0f * left), int(end + page) - int(page)));
         m_graphScroll->setSingleStep(std::max(1, int(0.05f * page)));
@@ -1232,7 +1233,7 @@ void MainWindow::graphMoved()
 {
     // The part shown on the klavogram is kept in sight: the klavogram follows the graph.
     if (m_graph->pullKlavogramRange())
-        m_klav->setScrollMs(float(0.001L * drawTimeOfElement(m_graph->klavogramFrom())));
+        m_klav->setScrollMs(float(kExtMilli * drawTimeOfElement(m_graph->klavogramFrom())));
     klavogramMoved();
 }
 

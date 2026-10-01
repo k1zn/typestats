@@ -1,5 +1,6 @@
 // Histograms (Form4, re/histograms.md) on synthetic records.
 
+#include "core/Ext80.h"
 #include "core/Histograms.h"
 #include "core/NumberFormat.h"
 
@@ -160,12 +161,17 @@ private slots:
         QCOMPARE(formatFixed(-0.004, 2, c), QStringLiteral("0.00"));
         QCOMPARE(formatFixed(1234567.891, 3, QLocale(QLocale::Russian)), QStringLiteral("1234567,891"));
         QCOMPARE(formatFixed(2.5, 0, c), QStringLiteral("3"));
+        QCOMPARE(formatFixed(std::nan(""), 2, c), QStringLiteral("NAN")); // as FloatToStrF
+        QCOMPARE(formatFixed(-HUGE_VAL, 2, c), QStringLiteral("-INF"));
+        QCOMPARE(formatFixed(3e19, 1, c), QStringLiteral("30000000000000000000.0"));
 
         // The same strings as the plain formula (the first implementation) for many numbers.
         auto plain = [](double v, int decimals, const QLocale &loc) {
-            const long double scale = std::pow(10.0L, decimals);
-            const long double scaled = std::floor(std::fabs((long double)v) * scale + 0.5L);
-            const long double whole = std::floor(scaled / scale);
+            Ext scale = Ext(1);
+            for (int i = 0; i < decimals; ++i)
+                scale = scale * Ext(10);
+            const Ext scaled = extFloor(extFabs(Ext(v)) * scale + Ext(0.5));
+            const Ext whole = extFloor(scaled / scale);
             QString s = QString::number(qulonglong(whole));
             if (decimals > 0)
                 s += loc.decimalPoint() + QString::number(qulonglong(scaled - whole * scale)).rightJustified(decimals, u'0');

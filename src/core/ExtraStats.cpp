@@ -1,5 +1,6 @@
 #include "ExtraStats.h"
 
+#include "Ext80.h"
 #include "NumberFormat.h"
 #include "FingerZones.h"
 #include "IniFile.h"
@@ -23,7 +24,7 @@ QString shown(const QString &name)
 // (length - 1) characters typed in sumMs.
 float speedOf(qsizetype length, float sumMs)
 {
-    return float((long double)(length * 60000 - 60000) / (long double)sumMs);
+    return float(Ext(length * 60000 - 60000) / Ext(sumMs));
 }
 
 bool isRuLower(QChar c) { return (c >= QChar(0x430) && c <= QChar(0x44F)) || c == QChar(0x451); }
@@ -242,7 +243,7 @@ QVector<Row> rows(const QVector<Occurrence> &occ, bool averages, int sortMode, b
             qsizetype j = i;
             for (; j < sorted.size() && sorted[j].text == sorted[i].text; ++j, ++count)
                 sum += sorted[j].speed;
-            r.append({float((long double)sum / (long double)count), count, sorted[i].text});
+            r.append({float(Ext(sum) / Ext(count)), count, sorted[i].text});
             i = j;
         }
         // The groups are in text order already.

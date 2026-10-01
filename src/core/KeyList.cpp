@@ -1,5 +1,6 @@
 #include "KeyList.h"
 
+#include "Ext80.h"
 #include "KeyName.h"
 #include "NumberFormat.h"
 
@@ -14,7 +15,7 @@ float scrollForPosition(const TextModel &m, int selStart)
     const int k = m.klavAt(selStart);
     // The original checks size < k only, and reads one record past the end for k == size.
     const qint64 t = k < m.klav.size() ? m.klav[k].tDraw : m.klav.last().tDraw;
-    return float(0.001L * (t - 100));
+    return float(kExtMilli * (t - 100));
 }
 
 QVector<KeyListRow> rows(const QVector<KlavRecord> &klav, const QLocale &loc, double fromUs, double toUs, int limit,
@@ -36,7 +37,7 @@ QVector<KeyListRow> rows(const QVector<KlavRecord> &klav, const QLocale &loc, do
         const quint8 scan = r.flags & KeyRecord::ScanMask; // indexed by scan code, not VK
         if (!r.down) {
             if (pressRow[scan] >= 0) {
-                out[pressRow[scan]].duration = formatFixed(double(0.001L * (r.t - pressT[scan])), digits, loc);
+                out[pressRow[scan]].duration = formatFixed(double(kExtMilli * (r.t - pressT[scan])), digits, loc);
                 pressRow[scan] = -1;
             }
             continue;
@@ -44,7 +45,7 @@ QVector<KeyListRow> rows(const QVector<KlavRecord> &klav, const QLocale &loc, do
         pressRow[scan] = out.size();
         pressT[scan] = r.t;
         KeyListRow row;
-        const float pause = float(0.001L * (r.t - prev));
+        const float pause = float(kExtMilli * (r.t - prev));
         if (pause <= 59000.0f)
             row.pause = formatFixed(double(pause), digits, loc);
         row.key = keyDisplayName(r.flags, r.ch);

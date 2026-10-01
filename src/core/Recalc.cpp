@@ -1,6 +1,7 @@
 #include "Recalc.h"
 
 #include "Cp1251.h"
+#include "Ext80.h"
 #include "KeyName.h"
 
 #include <algorithm>
@@ -324,7 +325,7 @@ TextModel run(const KeyRecords &document, const RecalcOptions &opt)
             lastElemMapIdx = m.anchors.size();
             if (startsFragment)
                 m.fragmentStarts.append(elem);
-            m.pauses.append(float(0.001L * acc));
+            m.pauses.append(float(kExtMilli * acc));
             m.names.append(name);
             m.flags.append(r.flags);
             m.recIndex.append(ri);

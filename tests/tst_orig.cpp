@@ -16,7 +16,6 @@
 #include <QJsonObject>
 #include <QTest>
 
-#include <cfloat>
 #include <cmath>
 #include <cstring>
 
@@ -124,26 +123,6 @@ QStringList bits(const QJsonArray &a)
     return r;
 }
 
-// The original computes in 80-bit x87 precision and the core repeats that with long double. Where
-// long double is narrower (MSVC, arm64) the last bits of a float may differ, so there the values
-// are compared with a tolerance instead of bit by bit.
-constexpr bool kExactFloats = LDBL_MANT_DIG == 64;
-
-bool sameFloats(const QStringList &got, const QStringList &want)
-{
-    if (kExactFloats || got.size() != want.size())
-        return got == want;
-    for (qsizetype i = 0; i < got.size(); ++i) {
-        const quint32 ua = got[i].toUInt(nullptr, 16), ub = want[i].toUInt(nullptr, 16);
-        float a, b;
-        std::memcpy(&a, &ua, 4);
-        std::memcpy(&b, &ub, 4);
-        if (std::fabs(a - b) > 1e-4f * std::max({std::fabs(a), std::fabs(b), 1.0f}))
-            return false;
-    }
-    return true;
-}
-
 } // namespace
 
 class TstOrig : public QObject
@@ -214,7 +193,7 @@ private slots:
                 {"medRhythm", &g.medRhythm}, {"arrhythmia", &g.arrhythmia}};
             for (const auto &[name, v] : all) {
                 const QStringList want = bits(series[QLatin1String(name)].toArray());
-                if (!sameFloats(bits(*v), want)) {
+                if (bits(*v) != want) {
                     qWarning() << "series" << name;
                     QCOMPARE(bits(*v), want);
                 }
@@ -258,11 +237,10 @@ private slots:
                 gotLv << ExtraStats::formatSpeed(r.speed, ru) + QLatin1Char('|') + r.text
                              + (averages ? QLatin1Char('|') + QString::number(r.value) : QString());
             }
-            if (got != want || !sameFloats(gotSpeed, wantSpeed) || gotLv != lv1Rows(x[QLatin1String("lv")].toArray()))
+            if (got != want || gotSpeed != wantSpeed || gotLv != lv1Rows(x[QLatin1String("lv")].toArray()))
                 qWarning() << "extra" << xi << x[QLatin1String("kind")].toInt() << x[QLatin1String("pattern")].toString();
             QCOMPARE(got, want);
-            if (!sameFloats(gotSpeed, wantSpeed))
-                QCOMPARE(gotSpeed, wantSpeed);
+            QCOMPARE(gotSpeed, wantSpeed);
             QCOMPARE(gotLv, lv1Rows(x[QLatin1String("lv")].toArray()));
             QCOMPARE(sort.headers(averages), bits(x[QLatin1String("headers")].toArray()));
             if (x.contains(QLatin1String("occ"))) {
@@ -317,7 +295,7 @@ private slots:
                     r << QString::number(v.toInt());
                 return r;
             };
-            if (!sameFloats(bits(values), bits(h[QLatin1String("values")].toArray()))) {
+            if (bits(values) != bits(h[QLatin1String("values")].toArray())) {
                 qWarning() << "hist" << hi << kind << h[QLatin1String("path")].toArray();
                 QCOMPARE(bits(values), bits(h[QLatin1String("values")].toArray()));
             }

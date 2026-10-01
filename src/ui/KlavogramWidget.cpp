@@ -56,7 +56,7 @@ QString trackLabel(const KlavRecord &r)
 
 qint64 xOf(const KlavRecord &r, float scrollMs, float zoom)
 {
-    return qint64((0.001L * r.tDraw - (long double)scrollMs) * (long double)zoom);
+    return qint64((kExtMilli * r.tDraw - Ext(scrollMs)) * Ext(zoom));
 }
 
 } // namespace
@@ -115,7 +115,7 @@ std::pair<double, double> KlavogramWidget::visibleSpanUs() const
     return {double(start), double(end)};
 }
 
-int KlavogramWidget::firstRecordAt(long double drawUs) const
+int KlavogramWidget::firstRecordAt(Ext drawUs) const
 {
     const QVector<KlavRecord> &klav = m_model->klav;
     const qint64 t = qint64(drawUs);
@@ -128,8 +128,8 @@ std::pair<int, int> KlavogramWidget::visibleRecords() const
 {
     if (!m_model)
         return {0, 0};
-    return {firstRecordAt((long double)m_scrollMs * 1000.0L),
-            firstRecordAt(((long double)width() / m_zoom + m_scrollMs) * 1000.0L)};
+    return {firstRecordAt(Ext(m_scrollMs) * Ext(1000)),
+            firstRecordAt((Ext(width()) / m_zoom + m_scrollMs) * Ext(1000))};
 }
 
 qint64 KlavogramWidget::absoluteTime(qint64 drawUs) const
@@ -166,7 +166,7 @@ void KlavogramWidget::clampScroll()
 {
     const float minScroll = float(-width()) / (m_zoom * 4.0f) * 3.0f;
     m_scrollMs = std::max(m_scrollMs, minScroll);
-    float maxScroll = m_model && !m_model->klav.isEmpty() ? float(0.001L * m_model->klav.last().tDraw) : 0.0f;
+    float maxScroll = m_model && !m_model->klav.isEmpty() ? float(kExtMilli * m_model->klav.last().tDraw) : 0.0f;
     maxScroll = std::max(maxScroll, 0.0f);
     m_scrollMs = std::min(m_scrollMs, maxScroll);
 }
@@ -201,7 +201,7 @@ void KlavogramWidget::mouseMoveEvent(QMouseEvent *e)
             changed = true;
         }
         if (right) {
-            m_zoom = float((long double)m_zoom - 0.01L * (long double)(m_lastMouseX - x) * (long double)m_zoom);
+            m_zoom = float(Ext(m_zoom) - kExtCenti * Ext(m_lastMouseX - x) * Ext(m_zoom));
             m_zoom = std::clamp(m_zoom, 0.04f, 300.0f);
             changed = true;
         }
@@ -294,7 +294,7 @@ void KlavogramWidget::drawKeys(QPainter &p, int top, int rowHeight)
     auto track = [&](const KlavRecord &r) { return int(m_zones.finger(r.flags)); };
 
     // Go back until every track has been seen: that restores the keys held at the left edge.
-    int start = firstRecordAt((long double)m_scrollMs * 1000.0L);
+    int start = firstRecordAt(Ext(m_scrollMs) * Ext(1000));
     std::array<bool, kTracks> seen{};
     for (; start > 0; --start) {
         if (start >= klav.size())
@@ -388,7 +388,7 @@ void KlavogramWidget::paintEvent(QPaintEvent *)
         float best = 1e30f;
         qint64 bestDraw = 0;
         const QVector<KlavRecord> &klav = m_model->klav;
-        auto pxOf = [this](const KlavRecord &r) { return (float(0.001L * r.tDraw) - m_scrollMs) * m_zoom; };
+        auto pxOf = [this](const KlavRecord &r) { return (float(kExtMilli * r.tDraw) - m_scrollMs) * m_zoom; };
         // x does not decrease along the records, so the nearest one is next to the first record at
         // the cursor or beyond the widget: the search starts at the first of the records before it
         // that share its x (the earliest of equally near records wins).
@@ -449,7 +449,7 @@ void KlavogramWidget::paintEvent(QPaintEvent *)
             p.drawLine(m_selectionX, top - 1, m_selectionX, top + rowHeight * kTracks - 1);
             const QLocale loc;
             const StatsUnits units = Texts::units();
-            const QString time = formatFixed(std::fabs(double(0.001L * (m_cursorT - m_selectionT))), 3, loc)
+            const QString time = formatFixed(std::fabs(double(kExtMilli * (m_cursorT - m_selectionT))), 3, loc)
                                  + QLatin1Char(' ') + units.ms;
             const QString speed = formatFixed(measuredSpeed(m_selectionT, m_cursorT), 2, loc) + QLatin1Char(' ') + tr("зн/мин");
             const int tw = std::max(fm.horizontalAdvance(time), fm.horizontalAdvance(speed));

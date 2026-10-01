@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/Ext80.h"
 #include "core/FingerZones.h"
 #include "core/Recalc.h"
 
@@ -47,7 +48,7 @@ private:
     friend class TstUi;
     friend class TstPerf;
 
-    int firstRecordAt(long double drawUs) const;
+    int firstRecordAt(Ext drawUs) const;
     qint64 absoluteTime(qint64 drawUs) const;
     float measuredSpeed(qint64 fromT, qint64 toT) const;
     void clampScroll();

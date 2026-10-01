@@ -174,7 +174,7 @@ private slots:
                     float best = 1e30f;
                     qint64 bestDraw = 0;
                     for (const KlavRecord &r : klav) {
-                        const float px = (float(0.001L * r.tDraw) - k->m_scrollMs) * k->m_zoom;
+                        const float px = (float(kExtMilli * r.tDraw) - k->m_scrollMs) * k->m_zoom;
                         const float distance = std::fabs(px - float(x));
                         if (distance < best) {
                             best = distance;

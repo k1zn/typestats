@@ -1,27 +1,43 @@
 #include "NumberFormat.h"
 
+#include "Ext80.h"
+
+#include <algorithm>
 #include <array>
 #include <cmath>
 
 QString formatFixed(double v, int decimals, const QLocale &loc)
 {
-    static const std::array<long double, 19> powers = [] {
-        std::array<long double, 19> p;
-        for (int i = 0; i < int(p.size()); ++i)
-            p[i] = std::pow(10.0L, i);
+    if (!std::isfinite(v)) // as FloatToStrF writes them
+        return std::isnan(v) ? QStringLiteral("NAN") : v < 0 ? QStringLiteral("-INF") : QStringLiteral("INF");
+    static const std::array<Ext, 19> powers = [] {
+        std::array<Ext, 19> p;
+        p[0] = Ext(1);
+        for (std::size_t i = 1; i < p.size(); ++i)
+            p[i] = p[i - 1] * Ext(10); // exact
         return p;
     }();
-    const bool small = decimals >= 0 && decimals < int(powers.size());
-    const long double scale = small ? powers[decimals] : std::pow(10.0L, decimals);
-    const long double scaled = std::floor(std::fabs((long double)v) * scale + 0.5L);
-    const long double whole = std::floor(scaled / scale);
-    const bool minus = v < 0 && scaled != 0;
+    decimals = std::clamp(decimals, 0, int(powers.size()) - 1);
+    // The rounding of the original: |v|·10^decimals + 0.5 in 80-bit precision, then the integer part.
+    const Ext scaled = extFloor(extFabs(Ext(v)) * powers[decimals] + Ext(0.5));
+    const bool minus = v < 0 && scaled != Ext(0);
     const QString point = decimals > 0 ? loc.decimalPoint() : QString();
-    // The fraction has no more digits than decimals unless long double rounding says otherwise.
-    if (!small || point.size() > 4 || qulonglong(scaled - whole * scale) >= qulonglong(scale)) {
-        QString s = QString::number(qulonglong(whole));
+
+    if (scaled >= Ext(18446744073709551616.0)) { // 2^64: an integer double, or close to it
+        QString s = QString::number(std::fabs(v), 'f', decimals);
         if (decimals > 0)
-            s += point + QString::number(qulonglong(scaled - whole * scale)).rightJustified(decimals, u'0');
+            s.replace(QLatin1Char('.'), point);
+        return minus ? u'-' + s : s;
+    }
+    std::uint64_t scale = 1;
+    for (int i = 0; i < decimals; ++i)
+        scale *= 10;
+    const auto n = std::uint64_t(scaled);
+    std::uint64_t whole = n / scale, frac = n % scale;
+    if (point.size() > 4) {
+        QString s = QString::number(whole);
+        if (decimals > 0)
+            s += point + QString::number(frac).rightJustified(decimals, u'0');
         return minus ? u'-' + s : s;
     }
 
@@ -30,17 +46,15 @@ QString formatFixed(double v, int decimals, const QLocale &loc)
     char16_t *const end = buf + std::size(buf);
     char16_t *p = end;
     if (decimals > 0) {
-        qulonglong frac = qulonglong(scaled - whole * scale);
         for (int i = 0; i < decimals; ++i, frac /= 10)
             *--p = char16_t(u'0' + frac % 10);
         for (qsizetype i = point.size() - 1; i >= 0; --i)
             *--p = point[i].unicode();
     }
-    qulonglong w = qulonglong(whole);
     do {
-        *--p = char16_t(u'0' + w % 10);
-        w /= 10;
-    } while (w != 0);
+        *--p = char16_t(u'0' + whole % 10);
+        whole /= 10;
+    } while (whole != 0);
     if (minus)
         *--p = u'-';
     return QString(reinterpret_cast<const QChar *>(p), end - p);
