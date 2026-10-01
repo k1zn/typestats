@@ -41,6 +41,7 @@
 #include <QTemporaryDir>
 #include <QTest>
 #include <QTextCursor>
+#include <QTextDocument>
 
 #include <algorithm>
 
@@ -81,7 +82,7 @@ class TstPerf : public QObject
             f();
             t << double(e.nsecsElapsed()) / 1e6;
             if (i == 0 && t[0] > 3000.0)
-                runs = std::min(runs, 3);
+                runs = std::min(runs, t[0] > 20000.0 ? 1 : 3); // something went very slow: once is enough
         }
         std::sort(t.begin(), t.end());
         const double med = t[t.size() / 2];
@@ -275,6 +276,22 @@ private slots:
             });
             v.hide();
             measure(QStringLiteral("text.setModel hidden"), n, [&] { v.setModel(m); });
+            measure(QStringLiteral("text: a detached QTextDocument"), n, [&] {
+                QTextDocument doc;
+                QTextCursor c(&doc);
+                const QTextCharFormat base = c.charFormat();
+                c.beginEditBlock();
+                qsizetype pos = 0;
+                for (const TextRun &r : m.runs) {
+                    if (r.start > pos)
+                        c.insertText(m.text.mid(pos, r.start - pos), base);
+                    c.insertText(m.text.mid(r.start, r.length), base);
+                    pos = r.start + r.length;
+                }
+                if (pos < m.text.size())
+                    c.insertText(m.text.mid(pos), base);
+                c.endEditBlock();
+            });
             // TS_PERF_HTML=name: the document as HTML, to compare the styles before and after a change.
             if (const QString html = qEnvironmentVariable("TS_PERF_HTML"); !html.isEmpty()) {
                 QFile f(QDir(m_dir).filePath(QStringLiteral("%1_%2.html").arg(html).arg(n)));
@@ -507,5 +524,14 @@ private slots:
     }
 };
 
-QTEST_MAIN(TstPerf)
+int main(int argc, char *argv[])
+{
+    // QTest kills a test function after 5 minutes with qFatal, which on Windows is a "fail fast"
+    // crash report; a slow variant under measurement should just be slow.
+    if (!qEnvironmentVariableIsSet("QTEST_FUNCTION_TIMEOUT"))
+        qputenv("QTEST_FUNCTION_TIMEOUT", "3600000");
+    QApplication app(argc, argv);
+    TstPerf test;
+    return QTest::qExec(&test, argc, argv);
+}
 #include "tst_perf.moc"
