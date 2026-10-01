@@ -207,6 +207,16 @@ TextModel run(const KeyRecords &document, const RecalcOptions &opt)
     m.records = normalized(document);
     m.recErased = erasedRecords(m.records);
     const KeyRecords &recs = m.records;
+    // The model lives as long as the recording is open: its vectors get their sizes at once rather
+    // than room left from growing. Every record gives at most one klavogram record, every press at
+    // most one element.
+    const qsizetype presses = std::count_if(recs.begin(), recs.end(), [](const KeyRecord &r) { return r.isDown(); });
+    m.klav.reserve(recs.size());
+    m.flags.reserve(presses);
+    m.recIndex.reserve(presses);
+    m.names.reserve(presses);
+    m.pauses.reserve(presses);
+    m.anchors.reserve(presses);
     Klavogram klav(m.klav);
     QVector<Segment> segs;
     const double split = opt.splitMs * 1000.0;
@@ -324,6 +334,7 @@ TextModel run(const KeyRecords &document, const RecalcOptions &opt)
         ++klavIdx;
     }
     flushParagraph(m, segs);
+    m.anchors.squeeze();
     return m;
 }
 

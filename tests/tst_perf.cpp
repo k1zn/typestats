@@ -456,6 +456,33 @@ private slots:
 #endif
     }
 
+    // What the parts of a large recording take: the document, the model, the text view.
+    void memoryByParts()
+    {
+        for (int n : m_sizes) {
+            auto mb = [](qint64 bytes) { return QString::number(double(bytes) / 1048576.0, 'f', 1) + QStringLiteral(" MB"); };
+            qint64 at = privateBytes();
+            auto step = [&](const QString &what) {
+                const qint64 now = privateBytes();
+                log(QStringLiteral("%1\t%2\t%3").arg(QStringLiteral("memory: ") + what, -40).arg(n, 7).arg(mb(now - at)));
+                at = now;
+            };
+            TsfDocument doc;
+            Tsf::read(tsf(n), doc);
+            step(QStringLiteral("TsfDocument"));
+            TextModel m = Recalc::run(doc.records, RecalcOptions());
+            step(QStringLiteral("TextModel"));
+            const GraphSeries g = Graphs::compute(m);
+            step(QStringLiteral("GraphSeries"));
+            TextView v;
+            v.resize(650, 120);
+            v.show();
+            v.setModel(m);
+            v.grab();
+            step(QStringLiteral("TextView (shown, painted)"));
+        }
+    }
+
     void startupAndMemory()
     {
         measure(QStringLiteral("MainWindow() + show"), 0, [&] {
