@@ -242,6 +242,8 @@ private slots:
         const QVector<Row> r{{600, 2, "ab"}};
         QCOMPARE(toText(r, false, QLocale::c()), QStringLiteral("Текст\tСкорость\r\nab\t600.00\r\n"));
         QCOMPARE(toText(r, true, QLocale::c()), QStringLiteral("Текст\tСкорость\tКол-во\r\nab\t600.00\t2\r\n"));
+        QCOMPARE(toText(r, true, QLocale::c(), {QStringLiteral("Text"), QStringLiteral("Speed"), QStringLiteral("Count")}),
+                 QStringLiteral("Text\tSpeed\tCount\r\nab\t600.00\t2\r\n"));
     }
 
     void templateList()

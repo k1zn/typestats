@@ -76,8 +76,10 @@ struct Sort
 // Two decimals, halves rounded away from zero (FloatToStrF ffFixed of the original).
 QString formatSpeed(float speed, const QLocale &loc);
 
-// "Сохранить": header and rows as tab-separated text, in list order.
-QString toText(const QVector<Row> &rows, bool averages, const QLocale &loc);
+// "Сохранить": header and rows as tab-separated text, in list order. The captions of the header are the
+// text, the speed and the count (the window gives translated ones).
+QString toText(const QVector<Row> &rows, bool averages, const QLocale &loc,
+               const QStringList &captions = {QStringLiteral("Текст"), QStringLiteral("Скорость"), QStringLiteral("Кол-во")});
 
 // Templates of the combo box: ExStats.ini, a plain list of lines (UTF-16 LE with BOM as the
 // original writes it; UTF-8 and cp1251 are read too).

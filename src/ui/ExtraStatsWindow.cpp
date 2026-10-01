@@ -352,7 +352,8 @@ void ExtraStatsWindow::save()
     }
     // UTF-8 with a signature (the original writes ANSI, which loses characters outside the code page).
     f.write("\xEF\xBB\xBF");
-    f.write(ExtraStats::toText(m_rows, m_averages->isChecked(), QLocale()).toUtf8());
+    f.write(ExtraStats::toText(m_rows, m_averages->isChecked(), QLocale(), {tr("Текст"), tr("Скорость"), tr("Кол-во")})
+                .toUtf8());
 }
 
 bool ExtraStatsWindow::eventFilter(QObject *o, QEvent *e)
