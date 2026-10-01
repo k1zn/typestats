@@ -44,7 +44,7 @@ void Recorder::resetLive()
 void Recorder::updateLive(const HookEvent &e, const RecorderSettings &s)
 {
     const bool backspace = ((e.flags & KeyRecord::VkMask) >> 16) == Vk::Back;
-    const bool character = !backspace && keyDisplayName(e.flags, e.ch).size() == 1;
+    const bool character = !backspace && keyDisplayChar(e.flags, e.ch).has_value();
     if (backspace || character) {
         const bool pause = !m_liveLast || e.timeUs - *m_liveLast > qint64(s.splitMs) * 1000;
         if (!pause)

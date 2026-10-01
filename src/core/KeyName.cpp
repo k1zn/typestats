@@ -27,6 +27,18 @@ static const char *noCharName(quint8 vk)
     }
 }
 
+std::optional<char16_t> keyDisplayChar(quint32 flags, char16_t ch)
+{
+    // Keys without a character have long names, Alt and Ctrl add a prefix.
+    if (flags & (KeyRecord::NoChar | KeyRecord::Alt | KeyRecord::Ctrl))
+        return std::nullopt;
+    switch ((flags >> 16) & 0xFF) {
+    case 0x08: case 0x09: case 0x1B: return std::nullopt;
+    case 0x0D: return u'\r';
+    }
+    return ch;
+}
+
 QString keyDisplayName(quint32 flags, char16_t ch)
 {
     const quint8 vk = (flags >> 16) & 0xFF;

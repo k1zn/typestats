@@ -154,8 +154,8 @@ QVector<bool> erasedRecords(const KeyRecords &recs)
             }
             continue;
         }
-        const QByteArray name = Cp1251::encode(keyDisplayName(r.flags, r.ch));
-        if (name.size() != 1)
+        const std::optional<char16_t> single = keyDisplayChar(r.flags, r.ch);
+        if (!single)
             continue;
         if (cbs == 0) {
             if (bs != 0) {
@@ -164,7 +164,7 @@ QVector<bool> erasedRecords(const KeyRecords &recs)
             }
             continue;
         }
-        const char c = name[0];
+        const char c = Cp1251::fromUnicode(*single);
         bool stop;
         do {
             stop = false;

@@ -147,7 +147,7 @@ float KlavogramWidget::measuredSpeed(qint64 fromT, qint64 toT) const
     qint64 first = 0, last = 0;
     int n = 0;
     for (const KlavRecord &r : m_model->klav) {
-        if (r.t < fromT || !r.down || r.erased || keyDisplayName(r.flags, r.ch).size() != 1)
+        if (r.t < fromT || !r.down || r.erased || !keyDisplayChar(r.flags, r.ch))
             continue;
         if (r.t > toT)
             break;

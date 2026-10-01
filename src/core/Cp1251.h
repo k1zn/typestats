@@ -8,5 +8,6 @@
 namespace Cp1251 {
 QString decode(const QByteArray &bytes);
 QByteArray encode(const QString &text);  // unmappable characters become '?'
+char fromUnicode(char16_t u);            // one character of encode()
 char16_t toUnicode(quint8 c);
 }

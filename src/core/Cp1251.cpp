@@ -29,7 +29,7 @@ QString Cp1251::decode(const QByteArray &bytes)
     return s;
 }
 
-QByteArray Cp1251::encode(const QString &text)
+char Cp1251::fromUnicode(char16_t u)
 {
     static const QHash<char16_t, char> reverse = [] {
         QHash<char16_t, char> h;
@@ -37,14 +37,14 @@ QByteArray Cp1251::encode(const QString &text)
             h.insert(kHigh[i], char(0x80 + i));
         return h;
     }();
+    return u < 0x80 ? char(u) : reverse.value(u, '?');
+}
+
+QByteArray Cp1251::encode(const QString &text)
+{
     QByteArray out;
     out.reserve(text.size());
-    for (QChar qc : text) {
-        char16_t u = qc.unicode();
-        if (u < 0x80)
-            out.append(char(u));
-        else
-            out.append(reverse.value(u, '?'));
-    }
+    for (QChar qc : text)
+        out.append(fromUnicode(qc.unicode()));
     return out;
 }

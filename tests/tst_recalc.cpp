@@ -72,6 +72,19 @@ private slots:
         QCOMPARE(keyDisplayName(0x43 << 16 | KeyRecord::HasChar | KeyRecord::Ctrl | KeyRecord::Alt, u'c'),
                  QStringLiteral("[Ctrl+Alt+c]"));
         QCOMPARE(keyDisplayName(0xFF << 16 | KeyRecord::NoChar, 0), QStringLiteral("[Unrecognized key]"));
+        // keyDisplayChar agrees with the length of the name everywhere.
+        const quint32 mods[] = {0, KeyRecord::Alt, KeyRecord::Ctrl, KeyRecord::Shift, KeyRecord::Alt | KeyRecord::Ctrl};
+        for (quint32 vk = 0; vk < 256; ++vk)
+            for (quint32 kind : {quint32(KeyRecord::HasChar), quint32(KeyRecord::NoChar), 0u})
+                for (quint32 mod : mods)
+                    for (char16_t ch : {char16_t(0), char16_t(u'a'), char16_t(0x44F), char16_t(0x2588)}) {
+                        const quint32 flags = vk << 16 | kind | mod;
+                        const QString name = keyDisplayName(flags, ch);
+                        const std::optional<char16_t> c = keyDisplayChar(flags, ch);
+                        QCOMPARE(c.has_value(), name.size() == 1);
+                        if (c)
+                            QCOMPARE(QChar(*c), name[0]);
+                    }
     }
 
     void backspaceMarksPreviousChars()
