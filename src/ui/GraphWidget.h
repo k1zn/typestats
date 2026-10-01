@@ -82,6 +82,8 @@ protected:
     void mouseDoubleClickEvent(QMouseEvent *e) override;
 
 private:
+    friend class TstPerf;
+
     struct Scale
     {
         double scale = 1.0, offset = 0.0; // units (percent of the height) = (value − offset) · scale

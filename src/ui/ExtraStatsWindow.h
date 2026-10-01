@@ -52,6 +52,7 @@ protected:
 
 private:
     friend class TstUi;
+    friend class TstPerf;
 
     ExtraStats::Kind kind() const;
     ExtraStats::CharFilter filter() const;

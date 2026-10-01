@@ -44,6 +44,8 @@ protected:
     void resizeEvent(QResizeEvent *e) override;
 
 private:
+    friend class TstPerf;
+
     int firstRecordAt(long double drawUs) const;
     qint64 absoluteTime(qint64 drawUs) const;
     float measuredSpeed(qint64 fromT, qint64 toT) const;

@@ -55,6 +55,7 @@ protected:
 
 private:
     friend class TstUi;
+    friend class TstPerf;
 
     QWidget *createToolBar();
     QToolButton *toolButton(QWidget *panel, int n, int x, int y, int h, const QString &hint);
