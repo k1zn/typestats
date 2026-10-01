@@ -109,6 +109,8 @@ private:
     void updatePanelButtons();
     void showAxisMenu(const QPoint &globalPos);
     void setDocument(const TsfDocument &doc, const QString &title, bool damaged);
+    // Room in the records for the keys to come, whenever the records are replaced.
+    void keepRoomForRecording();
     // "Ts: ON - Typing statistics v… - file": the capture state goes first, as the original's
     // application title (Application->Title) shows it on the task bar.
     void setTitle(const QString &document);
@@ -155,6 +157,9 @@ private:
     TextModel m_model;
     Histograms::KeyLabel m_histLabels; // labelsFromRecords() of the model with this serial
     quint64 m_histLabelsSerial = 0;
+    QVector<quint8> m_extraFingers; // fingerSeries() of the model with this serial and these zones
+    quint64 m_extraFingersSerial = 0;
+    FingerZones m_extraFingersZones;
     FingerZoneSchemes m_schemes;
 
     TextView *m_text = nullptr;

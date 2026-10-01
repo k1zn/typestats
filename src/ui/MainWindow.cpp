@@ -696,6 +696,15 @@ void MainWindow::normalizeRecords()
 {
     // Editing works on the records the text was built from (the original normalizes them in place).
     m_doc.records = m_model.records;
+    keepRoomForRecording();
+}
+
+void MainWindow::keepRoomForRecording()
+{
+    // Recording goes on into this vector, on the hook's time: room for a while, so that the next key
+    // does not reallocate the whole recording (milliseconds at half a million records). The room
+    // survives the copies of editing: a copy of a vector with reserved room keeps it.
+    m_doc.records.reserve(m_doc.records.size() + std::max<qsizetype>(m_doc.records.size() / 2, 4096));
 }
 
 void MainWindow::selectionChanged()
@@ -748,6 +757,7 @@ void MainWindow::undo()
         return;
     normalizeRecords();
     m_doc.records.swap(m_undo);
+    keepRoomForRecording();
     recalculate();
 }
 
@@ -1314,7 +1324,13 @@ void MainWindow::updateExtraStats()
     if (!m_extra || !m_extra->isVisible())
         return;
     const auto [b, e] = Stats::range(m_model, m_text->selectionStart(), m_text->selectionLength(), m_byPauses->isChecked());
-    m_extra->setSource(&m_model, fingerSeries(m_model, m_schemes.zones(m_fingers->currentText())), b, e);
+    const FingerZones zones = m_schemes.zones(m_fingers->currentText());
+    if (m_extraFingersSerial != m_model.serial || !(m_extraFingersZones == zones)) {
+        m_extraFingers = fingerSeries(m_model, zones);
+        m_extraFingersSerial = m_model.serial;
+        m_extraFingersZones = zones;
+    }
+    m_extra->setSource(&m_model, m_extraFingers, b, e);
 }
 
 void MainWindow::showExtraStats()
@@ -1340,9 +1356,7 @@ void MainWindow::updateKeyList()
 void MainWindow::setDocument(const TsfDocument &doc, const QString &title, bool damaged)
 {
     m_doc = doc;
-    // Recording goes on into this vector, on the hook's time: room for a while, so that the next key
-    // does not reallocate the whole recording (milliseconds at half a million records).
-    m_doc.records.reserve(m_doc.records.size() + std::max<qsizetype>(m_doc.records.size() / 2, 4096));
+    keepRoomForRecording();
     setTitle(title);
     m_damaged->setVisible(damaged);
     m_damaged->raise();

@@ -1,4 +1,4 @@
-// Temporary: offscreen pictures of the windows, to compare two builds (not in git).
+// Temporary: offscreen pictures of the windows, to compare two builds. Copied into tests/ only for the comparison.
 #include "ui/MainWindow.h"
 #include "ui/TextView.h"
 

@@ -36,6 +36,7 @@
 
 #include "xlsxdocument.h"
 #include <QTest>
+#include <QTextBlock>
 #include <QTextCursor>
 #include <QComboBox>
 #include <QToolButton>
@@ -215,6 +216,49 @@ private slots:
         QCOMPARE(w.m_model.text, text);
         w.undo(); // and back again
         QCOMPARE(w.m_model.size(), 264);
+    }
+
+    void recordingKeepsRoom()
+    {
+        // The next key must not reallocate the whole recording inside the hook, also after editing.
+        MainWindow w;
+        QVERIFY(w.openFile(golden("обыка.tsf")));
+        auto room = [&w] { return w.m_doc.records.capacity() - w.m_doc.records.size(); };
+        QVERIFY(room() >= 4096);
+        select(w, 9, 5);
+        w.deleteSelection();
+        QVERIFY(room() >= 4096);
+        w.undo();
+        QVERIFY(room() >= 4096);
+        select(w, 0, 40);
+        w.removeNonText();
+        QVERIFY(room() >= 4096);
+        w.normalizeRecords();
+        QVERIFY(room() >= 4096);
+    }
+
+    void textFormatsAfterRecalculate()
+    {
+        // The text cursor inside a coloured run does not colour the text built next (QTextEdit::setPlainText
+        // takes the format at the cursor).
+        MainWindow w;
+        w.show();
+        QVERIFY(w.openFile(golden("824.tsf")));
+        const QString html = w.m_text->document()->toHtml();
+        int coloured = -1;
+        for (QTextBlock b = w.m_text->document()->begin(); b.isValid() && coloured < 0; b = b.next())
+            for (auto it = b.begin(); !it.atEnd(); ++it)
+                if (it.fragment().charFormat().hasProperty(QTextFormat::ForegroundBrush) && it.fragment().length() > 1) {
+                    coloured = it.fragment().position() + 1;
+                    break;
+                }
+        QVERIFY(coloured > 0);
+        select(w, coloured, 0);
+        w.recalculate();
+        QCOMPARE(w.m_text->document()->toHtml(), html);
+        select(w, coloured, 1);
+        w.recalculate();
+        QCOMPARE(w.m_text->document()->toHtml(), html);
     }
 
     void convertLayout()
@@ -521,6 +565,21 @@ private slots:
         QVERIFY(x->rows().first().speed > before.first().speed);
         QCOMPARE(x->m_list->model()->index(2, 1).data().toString(), x->rows().at(2).text);
         QCOMPARE(x->m_list->model()->index(2, 0).data().toString(), ExtraStats::formatSpeed(x->rows().at(2).speed, QLocale()));
+
+        // The fingers follow the scheme, also when a scheme of the same name is edited.
+        w.m_schemes = FingerZoneSchemes(); // not stored next to the test
+        FingerZones zones = FingerZones::standard();
+        zones.setReadOnly(false);
+        const int scan = w.m_model.flags.first() & 0x7f;
+        zones.assign(scan, 7, false);
+        w.m_schemes.store(QStringLiteral("Моя"), zones);
+        w.m_fingers->addItem(QStringLiteral("Моя"));
+        w.m_fingers->setCurrentText(QStringLiteral("Моя"));
+        QCOMPARE(x->m_fingers, fingerSeries(w.m_model, zones));
+        zones.assign(scan, 2, false);
+        w.m_schemes.store(QStringLiteral("Моя"), zones);
+        w.zonesChanged();
+        QCOMPARE(x->m_fingers, fingerSeries(w.m_model, zones));
     }
 
     void histograms()
