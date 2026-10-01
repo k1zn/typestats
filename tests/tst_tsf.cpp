@@ -64,6 +64,54 @@ private slots:
         QCOMPARE(Tsf::parse(lines).records.size(), 0);
     }
 
+    void edgeCases()
+    {
+        // sscanf("%x %s") and TStrings::Values as the original reads them.
+        const QStringList lines = {
+            QStringLiteral("  0001A2B3 04440D41001E"),
+            QStringLiteral("0x0001A2B3 04440D41001E\t;комм=ент;с;точкой"),
+            QStringLiteral("1a2b3 0000000041001e"),
+            QStringLiteral("FFFFFFFFF 04440D41001E"),          // dt wraps around
+            QStringLiteral("0001A2B3 1234567890ABCDEF0"),      // more than 16 digits: not data
+            QStringLiteral("0001A2B3 G4440D41001E"),
+            QStringLiteral("0001A2B3"),
+            QStringLiteral("zzz 123"),
+            QStringLiteral("AUTOR=Первый"),
+            QStringLiteral("autor=второй"),                    // the first one counts
+            QStringLiteral("Date=01.01.2020"),
+            QStringLiteral("comment=описание = с равно"),
+            QStringLiteral("FingerZonesName=Своя"),
+            QStringLiteral("finger0=1"), QStringLiteral("Finger1=2"), QStringLiteral("FINGER7=8"),
+            QStringLiteral("AttachedVideo=v.avi"), QStringLiteral("VideoTimeShift=-250"),
+            QStringLiteral("tsfVersion=1"),
+            QStringLiteral("signature=0123"),
+            QStringLiteral("\t00000010   0000000041001E   хвост ; коммент"),
+        };
+        const TsfDocument d = Tsf::parse(lines);
+        const QList<std::tuple<quint32, quint32, int, QString>> expected = {
+            {0x1A2B3, 0x0D41001E, 0x444, {}},
+            {0x1A2B3, 0x0D41001E, 0x444, QStringLiteral("комм=ент;с;точкой")},
+            {0x1A2B3, 0x41001E, 0, {}},
+            {0xFFFFFFFF, 0x0D41001E, 0x444, {}},
+            {0x10, 0x41001E, 0, QStringLiteral(" коммент")},
+        };
+        QCOMPARE(d.records.size(), expected.size());
+        for (int i = 0; i < expected.size(); ++i) {
+            const auto &[dt, flags, ch, comment] = expected[i];
+            QCOMPARE(d.records[i].dtUs, dt);
+            QCOMPARE(d.records[i].flags, flags);
+            QCOMPARE(int(d.records[i].ch), ch);
+            QCOMPARE(d.records[i].comment, comment);
+        }
+        QCOMPARE(d.author, QStringLiteral("Первый"));
+        QCOMPARE(d.date, QStringLiteral("01.01.2020"));
+        QCOMPARE(d.comment, QStringLiteral("описание = с равно"));
+        QCOMPARE(d.fingers, (QStringList{"1", "2", "", "", "", "", "", "8"}));
+        QCOMPARE(d.videoTimeShiftMs, -250);
+        QVERIFY(d.signed_);
+        QVERIFY(!d.signatureValid);
+    }
+
     void version0()
     {
         // "%d %d": dt, key with ANSI char in the low byte and vk in bits 16..23
