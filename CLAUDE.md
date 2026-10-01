@@ -101,7 +101,8 @@ src/core/      только QtCore, тестируемо
                       равенство), FingerZoneSchemes (FingerZones.ini + adopt() для LoadTsf), fingerSeries() — ГОТОВО,
                       серия сверена с оригиналом побитно (tst_orig, series.finger)
   KeyList.*           ListView1 «Пауза/Длительность/Клавиша» (0x437d98 + 0x404c44, scrollForPosition 0x414500):
-                      `rows(klav, loc, fromUs, toUs, limit)` — ГОТОВО, сверено. Окно времени считает UI; формула
+                      `rows(klav, loc, fromUs, toUs, limit, digits)` (начало окна — бинарным поиском по `tDraw`) —
+                      ГОТОВО, сверено. Окно времени считает UI; формула
                       оригинала (float!) — в `tst_orig.cpp::portLv1`: `start = scrollMs·1000 − 10`,
                       `end = start + widthPx·1000/zoom`, zoom px/мс (0.25 по умолч., 0.04..300)
   ExtraStats.*        Form3 «Дополнительная статистика» (0x43ff3c): parseTemplate, CharFilter, collect → вхождения,
@@ -149,7 +150,9 @@ src/ui/
                       AutoComments, JournalOn, StatWin*, TextWin*, UserName…). `applySettings()` — FUN_00429bbc (шрифты,
                       DlitDigits → `m_keyDigits`, трей, пересчёт). Окна Form3/Form4 получают источник в `updateStats()`
                       (`updateExtraStats`/`updateHistograms`, только видимые). Пресеты (`selectPreset`/`createPreset`/
-                      `deletePreset`, правый клик по SpeedButton8), расстановки (SpeedButton9 создать/правый — удалить,
+                      `deletePreset`, правый клик по SpeedButton8; после них и после Form8 всегда `applySettings()` —
+                      он же кэширует GlobalOnOff/GlobalClear/AutoComments/JournalOn/MainOption* для `keyEvent` и
+                      `updateStats`), расстановки (SpeedButton9 создать/правый — удалить,
                       SpeedButton2 — Tkbd), трей (`m_tray`, меню, сворачивание в трей), `captureToggled` (отпускания
                       зажатых клавиш, `Ts: ON/OFF`), экспорт (`keyTable`/`extraTable`/`exportTable`), свёрнутый график
                       (`graphPaneResized`, `m_graphFolded`). `showForm(name)` — для `--show NAME` (снимки форм):
@@ -162,7 +165,6 @@ src/ui/
                       `scrollParams` (FUN_0043c170), масштабы осей `rescale` (FUN_00405b34). Сверено с эталоном на глаз;
                       мышь руками не проверялась. Сетка — перо PS_DOT как в GDI (штрих 3/3)
   GraphPanels.*       FloatingPanel (заголовок-перетаскивание, красная кнопка), LegendPanel (Panel2), AxisPanel (Panel9)
-  TextView.*          + клавиши Del/Ins/Ctrl+C, контекстное меню, `hovered(pos)` для подсказок
   FilePropertiesDialog.*  Form2 «Свойства файла» (автор, дата, описание) — перед сохранением
   LiveStatsWindow.*   Form10 «Оперативная статистика»: скорость (цвет — радуга FUN_0042a17c), % ошибок, строка состояния
   Texts.*             переводимые подписи для ядра (StatsUnits, названия строк ListView2, `histogramNames()`), список
@@ -183,8 +185,10 @@ src/ui/
                       размер кадра, поверх всех; `opened(bool)`. В MainWindow: `attachVideo`/`videoOpened`/`updateVideo`
                       (из `klavogramMoved`), `m_videoAttached`, `m_fileDir`
   VideoPropertiesDialog.*  Form6 «Свойства видео» (кнопка 21; `--show video`)
-  TextView.*          Memo4: QTextEdit, Arial 16 px, стили TextRun (красный/синий/зелёный/подчёркивание),
-                      `setVisibleRange` — жёлтая подсветка участка, видимого на клавограмме
+  TextView.*          Memo4: QTextEdit, Arial 16 px, стили TextRun (красный/синий/зелёный/подчёркивание), `setModel`
+                      вставляет текст кусками с форматом (не `setPlainText` + `mergeCharFormat`: медленно и берёт формат
+                      под курсором), `setVisibleRange` — жёлтая подсветка участка, видимого на клавограмме;
+                      клавиши Del/Ins/Ctrl+C, контекстное меню, `hovered(pos)` для подсказок
   KlavogramWidget.*   PaintBox3 по `re/klavogram.md`: 9 дорожек по пальцам, цвета по числу зажатых клавиш, шкала
                       времени, рамки стёртых/injected, мышь (ЛКМ — прокрутка, ПКМ — масштаб, СКМ — быстрая
                       прокрутка, колесо, двойной клик — режим курсора, ЛКМ+ПКМ — измерение с плашкой),
@@ -194,7 +198,8 @@ src/export/TableExport.*  таблица → .xlsx (QXlsx, с диаграммо
 i18n/               `typestats_en.ts` (исходные строки русские), `en.json` (словарь), `update.py`: lupdate + заполнение .ts
                     из словаря, печатает непереведённое. После новых `tr()`: `source env.sh && python i18n/update.py`
 resources/icons/    оригинальные иконки кнопок (<Form>_<SpeedButtonN>.png) + app.ico/png; resources.qrc
-tests/tst_tsf.cpp   юнит-тесты + golden: подпись и побайтовый round-trip 4 реальных файлов
+tests/tst_tsf.cpp   юнит-тесты + golden: подпись и побайтовый round-trip 4 реальных файлов; крайние случаи разбора
+                    (семантика sscanf и TStrings::Values)
 tests/tst_recalc.cpp  KeyName, разметка BS/Ctrl+BS, нормализация, текст/фрагменты, статистика на синтетике, golden-прогон
 tests/tst_zones.cpp FingerZones, FingerZoneSchemes, IniFile
 tests/tst_extra.cpp ExtraStats на синтетике
@@ -350,7 +355,7 @@ python re/scripts/diffstand.py файл --journal                               
   - затем `ch<<32 | flags` в 12 hex-цифрах;
   - заголовок `key=value` в конце.
 - **Подпись:** MD5(для каждой записи dt, flags&~0x100, ch как 3×u32 LE; + author + date + "TypingStatistics"), hex в нижнем регистре.
-- **Флаги, выставляемые в памяти:** `0x100` Erased (символ потом стёрт BS/Ctrl+BS), `0x200` Marked («Пометить»,
+- **Флаги, выставляемые в памяти оригиналом:** `0x100` Erased (символ потом стёрт BS/Ctrl+BS), `0x200` Marked («Пометить»,
   сохраняется в файл), `0x1000` = LLKHF_INJECTED (стиль «PCmo», синий), `0x40000000` SegmentStart (первое нажатие фрагмента; оригинал сохраняет его в файл, при чтении снимается).
 - **Recalculate** (подробно — `re/text_reconstruction.md`):
   - удаляет ведущие отпускания, первой записи dt = 60 000 000;
@@ -358,7 +363,7 @@ python re/scripts/diffstand.py файл --journal                               
     Отпускания НЕ удаляются (их отсеивает клавограмма);
   - разметка стёртых проходом с конца; Ctrl+BS съедает пробелы перед курсором и одно слово
     ИЛИ прогон пунктуации, пробел перед словом остаётся (подтверждено пользователем);
-  - фрагмент начинается, если с прошлой записи клавограммы прошло > UpDown1 мс (200..10000, по умолч. 500)
+  - фрагмент начинается, если с прошлой записи клавограммы прошло > UpDown1 мс (200..10000, по умолч. 2000; в DFM 500)
     и нет зажатых клавиш; в тексте — «‡» (синий) или, при «Разбивать по паузам» (CheckBox3), строка из 8 «—»;
   - «Только текст» = CheckBox2: из длинных имён остаются только [LShift],[RShift],[BackSpace],[Ctrl+BackSpace];
   - комментарий записи: «(…)» — в строку, иначе отдельным абзацем, зелёный; Enter — новый абзац;
@@ -435,7 +440,9 @@ python re/scripts/diffstand.py файл --journal                               
    - хук в отдельном потоке (свой цикл сообщений, высокий приоритет, отметка QPC в колбэке, событие — в поток GUI
      очередью): время нажатий не зависит от загрузки GUI, а долгий пересчёт не превышает `LowLevelHooksTimeout`
      (иначе Windows молча снимает хук). Предложено пользователю, не сделано;
-   - ~~аудит производительности~~ — сделан (2026-10-01, `re/perf.md`). На 500k записей: нажатие 273 → 5 мкс (QSettings
+   - ~~аудит производительности~~ — сделан и проверен (2026-10-01, `re/perf.md`; проверка: эквивалентность коммитов,
+     снимки окон до/после побайтно, доделки — запас записей после правки, кэш пальцев Form3).
+     На 500k записей: нажатие 273 → 5 мкс (QSettings
      на каждое событие), открыть `.tsf` 712 → 260 мс, пересчёт 358 → 174 мс, Form3 при открытом окне 246 → 8 мс,
      память 170 → ~95 МБ. Стенд:
      `python re/scripts/gen_big.py $TEMP/tsperf` → `cmake --build build-release --target tst_perf` →
@@ -455,11 +462,12 @@ python re/scripts/diffstand.py файл --journal                               
    есть только там, где `long double` 80-битный (MinGW/GCC x86). На MSVC и macOS arm64 он 64-битный — возможны
    расхождения в последнем бите float (на экране практически не видны). `tst_orig` это уже учитывает (`sameFloats`);
    сам код не менялся.
-2. `Recalc::erasedRecords` переводит имя клавиши в cp1251, чтобы сравнить с набором пунктуации (у оригинала ANSI).
-   Символ вне cp1251 превращается в `?` и считается пунктуацией — поведение оригинала; при переписывании на QChar
-   сохранить.
-3. Мелочи: режим сортировки Form3 — `int` 0..3 (сделать enum); тексты `Histograms::Names`, заголовки `ExtraStats::Sort`,
-   `Stats::rowNames` — русские литералы, на этапе i18n перевести на `tr()`/таблицу `.lng`.
+2. `Recalc::erasedRecords` переводит символ клавиши в cp1251 (`Cp1251::fromUnicode`), чтобы сравнить с набором
+   пунктуации (у оригинала ANSI). Символ вне cp1251 превращается в `?` и считается пунктуацией — поведение оригинала;
+   при переписывании на QChar сохранить.
+3. Мелочи: режим сортировки Form3 — `int` 0..3 (сделать enum). Окна берут подписи из `Texts`/`tr()`, но в ядре
+   остались русские литералы: `Stats::rowNames` (tsstat, тесты), умолчание `ExtraStats::Sort::headers` и заголовок
+   `ExtraStats::toText` «Текст\tСкорость» — он попадает в файл «Сохранить» Form3 и в английском интерфейсе.
 
 Уже убрано:
 - Recalc не трогает документ: нормализованная копия записей, «стёрто» и «начало фрагмента» — в `TextModel`
