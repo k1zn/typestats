@@ -5,9 +5,11 @@ wanted number of records is reached. Every copy starts after a pause longer than
 (a new fragment) with an auto-comment; inside the copies, now and then, a character is followed by
 BackSpace and typed again, a key gets a "(…)" comment and a short pause becomes a split pause.
 
-    python re/scripts/gen_big.py OUTDIR [--sizes 10000,100000,500000] [--seed 1]
+    python re/scripts/gen_big.py OUTDIR [--sizes 10000,100000,500000] [--seed 1] [--sources 824.tsf,обыка.tsf]
+                                        [--prefix big]
 
-Writes OUTDIR/big_<n>.tsf (unsigned) and OUTDIR/big_<n>.tsj (a journal of the same records).
+Writes OUTDIR/<prefix>_<n>.tsf (unsigned) and OUTDIR/<prefix>_<n>.tsj (a journal of the same records).
+`--sources 824.tsf --prefix digits` gives a recording without some finger tracks (the klavogram's worst case).
 """
 import argparse
 import os
@@ -95,14 +97,17 @@ def main():
     ap.add_argument("outdir")
     ap.add_argument("--sizes", default="10000,100000,500000")
     ap.add_argument("--seed", type=int, default=1)
+    ap.add_argument("--sources", default="824.tsf,обыка.tsf", help="golden recordings to copy")
+    ap.add_argument("--prefix", default="big")
     a = ap.parse_args()
     os.makedirs(a.outdir, exist_ok=True)
-    sources = [read_tsf(os.path.join(GOLDEN, name)) for name in ("824.tsf", "обыка.tsf")]
+    sources = [read_tsf(os.path.join(GOLDEN, name)) for name in a.sources.split(",")]
     for size in (int(s) for s in a.sizes.split(",")):
         recs = generate(size, sources, random.Random(a.seed))
-        write_tsf(os.path.join(a.outdir, "big_%d.tsf" % size), recs)
-        write_tsj(os.path.join(a.outdir, "big_%d.tsj" % size), recs)
-        print("big_%d: %d records" % (size, len(recs)))
+        name = "%s_%d" % (a.prefix, size)
+        write_tsf(os.path.join(a.outdir, name + ".tsf"), recs)
+        write_tsj(os.path.join(a.outdir, name + ".tsj"), recs)
+        print("%s: %d records" % (name, len(recs)))
 
 
 if __name__ == "__main__":

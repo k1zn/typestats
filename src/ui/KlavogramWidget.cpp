@@ -10,6 +10,7 @@
 #include <QPainter>
 #include <QWheelEvent>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 
@@ -146,7 +147,10 @@ float KlavogramWidget::measuredSpeed(qint64 fromT, qint64 toT) const
         std::swap(fromT, toT);
     qint64 first = 0, last = 0;
     int n = 0;
-    for (const KlavRecord &r : m_model->klav) {
+    const QVector<KlavRecord> &klav = m_model->klav;
+    const auto from = std::lower_bound(klav.begin(), klav.end(), fromT, [](const KlavRecord &r, qint64 v) { return r.t < v; });
+    for (auto it = from; it != klav.end(); ++it) {
+        const KlavRecord &r = *it;
         if (r.t < fromT || !r.down || r.erased || !keyDisplayChar(r.flags, r.ch))
             continue;
         if (r.t > toT)
@@ -383,8 +387,24 @@ void KlavogramWidget::paintEvent(QPaintEvent *)
     if (m_cursorMode && m_model) {
         float best = 1e30f;
         qint64 bestDraw = 0;
-        for (const KlavRecord &r : m_model->klav) {
-            const float px = (float(0.001L * r.tDraw) - m_scrollMs) * m_zoom;
+        const QVector<KlavRecord> &klav = m_model->klav;
+        auto pxOf = [this](const KlavRecord &r) { return (float(0.001L * r.tDraw) - m_scrollMs) * m_zoom; };
+        // x does not decrease along the records, so the nearest one is next to the first record at
+        // the cursor or beyond the widget: the search starts at the first of the records before it
+        // that share its x (the earliest of equally near records wins).
+        auto start = std::partition_point(klav.begin(), klav.end(), [&](const KlavRecord &r) {
+            const float px = pxOf(r);
+            return px < float(m_cursorX) && !(px > float(w));
+        });
+        if (start != klav.begin()) {
+            --start;
+            const float px = pxOf(*start);
+            while (start != klav.begin() && pxOf(*(start - 1)) == px)
+                --start;
+        }
+        for (auto it = start; it != klav.end(); ++it) {
+            const KlavRecord &r = *it;
+            const float px = pxOf(r);
             const float distance = std::fabs(px - float(m_cursorX));
             if (distance < best) {
                 best = distance;

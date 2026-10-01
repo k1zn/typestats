@@ -3,6 +3,8 @@
 #include "KeyName.h"
 #include "NumberFormat.h"
 
+#include <algorithm>
+
 namespace KeyList {
 
 float scrollForPosition(const TextModel &m, int selStart)
@@ -23,10 +25,12 @@ QVector<KeyListRow> rows(const QVector<KlavRecord> &klav, const QLocale &loc, do
     qint64 pressT[256] = {};
     std::fill(std::begin(pressRow), std::end(pressRow), -1);
     qint64 prev = 0;
-    for (const KlavRecord &r : klav) {
+    // Drawing times do not decrease: the window starts at the first record not before fromUs.
+    const auto first = std::lower_bound(klav.begin(), klav.end(), fromUs,
+                                        [](const KlavRecord &r, double v) { return double(r.tDraw) < v; });
+    for (auto it = first; it != klav.end(); ++it) {
+        const KlavRecord &r = *it;
         const double t = double(r.tDraw);
-        if (t < fromUs)
-            continue;
         if (t > toUs)
             break;
         const quint8 scan = r.flags & KeyRecord::ScanMask; // indexed by scan code, not VK

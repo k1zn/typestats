@@ -152,6 +152,47 @@ private slots:
         QVERIFY(w.windowTitle().startsWith(QStringLiteral("Ts: ON - ")));
     }
 
+    void klavogramCursor()
+    {
+        // The cursor mode sticks to the nearest key event: the same one as a search from the first record.
+        MainWindow w;
+        w.resize(876, 579);
+        w.show();
+        QVERIFY(w.openFile(golden("824.tsf")));
+        KlavogramWidget *k = w.m_klav;
+        k->m_cursorMode = true;
+        const QVector<KlavRecord> &klav = w.m_model.klav;
+        int checked = 0;
+        for (float zoom : {0.04f, 0.25f, 3.0f, 300.0f})
+            for (float scroll : {-500.0f, 0.0f, 0.001f * klav[klav.size() / 2].tDraw, 0.001f * klav.last().tDraw}) {
+                k->setZoom(zoom);
+                k->setScrollMs(scroll);
+                for (int x : {-1000, 1, 5, 100, 333, k->width() - 1, k->width() + 50}) {
+                    k->m_cursorX = x;
+                    k->grab();
+                    float best = 1e30f;
+                    qint64 bestDraw = 0;
+                    for (const KlavRecord &r : klav) {
+                        const float px = (float(0.001L * r.tDraw) - k->m_scrollMs) * k->m_zoom;
+                        const float distance = std::fabs(px - float(x));
+                        if (distance < best) {
+                            best = distance;
+                            bestDraw = r.tDraw;
+                        } else if (distance > best) {
+                            break;
+                        }
+                        if (px > float(k->width()))
+                            break;
+                    }
+                    const qint64 drawUs =
+                        best > 8.0f ? qint64((float(x) / k->m_zoom + k->m_scrollMs) * 1000.0f) : bestDraw;
+                    QCOMPARE(k->m_cursorT, k->absoluteTime(drawUs));
+                    ++checked;
+                }
+            }
+        QCOMPARE(checked, 4 * 4 * 7);
+    }
+
     void deleteUndoCopy()
     {
         MainWindow w;

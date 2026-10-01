@@ -44,6 +44,7 @@ protected:
     void resizeEvent(QResizeEvent *e) override;
 
 private:
+    friend class TstUi;
     friend class TstPerf;
 
     int firstRecordAt(long double drawUs) const;
