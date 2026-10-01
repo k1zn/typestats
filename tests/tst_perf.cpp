@@ -20,6 +20,7 @@
 #include "core/Cp1251.h"
 #include "export/TableExport.h"
 #include "ui/ExtraStatsWindow.h"
+#include "ui/StringTableModel.h"
 #include "ui/GraphPanels.h"
 #include "ui/GraphWidget.h"
 #include "ui/HistogramWindow.h"
@@ -33,6 +34,8 @@
 #include <QDir>
 #include <QElapsedTimer>
 #include <QFile>
+#include <QCheckBox>
+#include <QComboBox>
 #include <QRadioButton>
 #include <QSettings>
 #include <QTemporaryDir>
@@ -340,6 +343,30 @@ private slots:
             for (int k : {int(ExtraStats::Words), int(ExtraStats::Pairs), int(ExtraStats::Sentences)}) {
                 w.m_extra->m_kinds[k]->setChecked(true);
                 measure(QStringLiteral("updateExtraStats kind %1").arg(k), n, [&] { w.updateExtraStats(); });
+            }
+            // Form3 by parts, words of the whole text.
+            {
+                ExtraStatsWindow *x = w.m_extra;
+                x->m_kinds[ExtraStats::Words]->setChecked(true);
+                measure(QStringLiteral("  extra: setSource (words)"), n, [&] { w.updateExtraStats(); });
+                measure(QStringLiteral("  extra: fingerSeries"), n,
+                        [&] { fingerSeries(w.m_model, w.m_schemes.zones(w.m_fingers->currentText())); });
+                measure(QStringLiteral("  extra: computeNow"), n, [&] { x->computeNow(); });
+                measure(QStringLiteral("  extra: showRows"), n, [&] { x->showRows(); });
+                measure(QStringLiteral("  extra: rows()"), n, [&] { ExtraStats::rows(x->m_occ, false, 0); });
+                QVector<QStringList> table;
+                measure(QStringLiteral("  extra: format the table"), n, [&] {
+                    table.clear();
+                    for (const ExtraStats::Row &r : x->m_rows)
+                        table << QStringList{ExtraStats::formatSpeed(r.speed, QLocale()), r.text};
+                });
+                measure(QStringLiteral("  extra: model setTable"), n,
+                        [&] { x->m_listModel->setTable({QStringLiteral("a"), QStringLiteral("b")}, table); });
+                measure(QStringLiteral("  extra: selectRow(0)"), n, [&] { x->selectRow(0); });
+                measure(QStringLiteral("  extra: paint"), n, [&] { x->grab(); });
+                x->m_averages->setChecked(true);
+                measure(QStringLiteral("  extra: setSource (words, averages)"), n, [&] { w.updateExtraStats(); });
+                x->m_averages->setChecked(false);
             }
             measure(QStringLiteral("updateHistograms"), n, [&] { w.updateHistograms(); });
             measure(QStringLiteral("paint histograms"), n, [&] { w.m_hist->grab(); });

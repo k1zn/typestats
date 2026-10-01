@@ -3,7 +3,10 @@
 #include "core/Histograms.h"
 #include "core/NumberFormat.h"
 
+#include <QRandomGenerator>
 #include <QTest>
+
+#include <cmath>
 
 using namespace Histograms;
 
@@ -157,6 +160,32 @@ private slots:
         QCOMPARE(formatFixed(-0.004, 2, c), QStringLiteral("0.00"));
         QCOMPARE(formatFixed(1234567.891, 3, QLocale(QLocale::Russian)), QStringLiteral("1234567,891"));
         QCOMPARE(formatFixed(2.5, 0, c), QStringLiteral("3"));
+
+        // The same strings as the plain formula (the first implementation) for many numbers.
+        auto plain = [](double v, int decimals, const QLocale &loc) {
+            const long double scale = std::pow(10.0L, decimals);
+            const long double scaled = std::floor(std::fabs((long double)v) * scale + 0.5L);
+            const long double whole = std::floor(scaled / scale);
+            QString s = QString::number(qulonglong(whole));
+            if (decimals > 0)
+                s += loc.decimalPoint() + QString::number(qulonglong(scaled - whole * scale)).rightJustified(decimals, u'0');
+            return v < 0 && scaled != 0 ? u'-' + s : s;
+        };
+        const QLocale ru(QLocale::Russian);
+        QRandomGenerator rnd(7);
+        QVector<double> values = {0.0, -0.0, 0.5, -0.5, 0.005, 0.0049999, 1.0, 9.995, 99.9995, 1e15, -1e15, 123456789.125};
+        for (int i = 0; i < 40000; ++i) {
+            const double magnitude = std::pow(10.0, rnd.bounded(-4, 12));
+            values << (rnd.generateDouble() - 0.3) * magnitude << double(float(rnd.generateDouble() * magnitude))
+                   << std::round(rnd.generateDouble() * magnitude * 1000.0) / 1000.0 + 0.0005;
+        }
+        for (double v : values)
+            for (int d = 0; d <= 4; ++d) {
+                const QLocale &loc = d % 2 ? ru : c;
+                if (formatFixed(v, d, loc) != plain(v, d, loc))
+                    QFAIL(qPrintable(QStringLiteral("%1 %2: %3 != %4").arg(v, 0, 'g', 17).arg(d)
+                                         .arg(formatFixed(v, d, loc), plain(v, d, loc))));
+            }
     }
 };
 
