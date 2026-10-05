@@ -32,7 +32,7 @@ QList<QStringView> splitLines(QStringView text)
 
 // The header keys, read in one pass over the lines.
 enum Key {
-    TsfVersion, Autor, Comment, Date, FingerZonesName, Finger0, AttachedVideo = Finger0 + 8, VideoTimeShift, Signature,
+    TsfVersion, Autor, Comment, Date, FingerZonesName, Finger0, AttachedVideo = Finger0 + 8, VideoTimeShift, Signature, Platform,
     KeyCount
 };
 
@@ -50,6 +50,7 @@ const std::array<QString, KeyCount> &keyNames()
         n[AttachedVideo] = QStringLiteral("AttachedVideo");
         n[VideoTimeShift] = QStringLiteral("VideoTimeShift");
         n[Signature] = QStringLiteral("signature");
+        n[Platform] = QStringLiteral("Platform");
         return n;
     }();
     return names;
@@ -206,6 +207,7 @@ TsfDocument parseLines(const QList<QStringView> &lines, Tsf::ReadError *err)
     if (!doc.fingerZonesName.isEmpty())
         for (int i = 0; i < 8; ++i)
             doc.fingers.append(header[Finger0 + i]);
+    doc.platform = keyPlatformFromName(header[Platform]);
     doc.attachedVideo = header[AttachedVideo];
     if (!doc.attachedVideo.isEmpty())
         doc.videoTimeShiftMs = header[VideoTimeShift].toInt();
@@ -271,6 +273,9 @@ QStringList serialize(const TsfDocument &doc, bool sign)
         if (doc.videoTimeShiftMs != 0)
             lines.append(QStringLiteral("VideoTimeShift=%1").arg(doc.videoTimeShiftMs));
     }
+    // The port's own key (the original skips unknown lines of the header; not signed).
+    if (doc.platform != KeyPlatform::Windows)
+        lines.append(QStringLiteral("Platform=") + keyPlatformName(doc.platform));
     return lines;
 }
 

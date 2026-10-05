@@ -27,5 +27,5 @@ float scrollForPosition(const TextModel &m, int selStart);
 QVector<KeyListRow> rows(const QVector<KlavRecord> &klav, const QLocale &loc,
                          double fromUs = -std::numeric_limits<double>::infinity(),
                          double toUs = std::numeric_limits<double>::infinity(), int limit = -1,
-                         int digits = 3);
+                         int digits = 3, KeyPlatform keyNames = KeyPlatform::Windows);
 }

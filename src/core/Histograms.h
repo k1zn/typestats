@@ -69,7 +69,7 @@ struct Page
 using KeyLabel = std::function<QString(quint8 key)>;
 // Labels taken from the recording itself: the character the key produced most often without
 // Shift (with it, if it was never pressed alone).
-KeyLabel labelsFromRecords(const KeyRecords &recs);
+KeyLabel labelsFromRecords(const KeyRecords &recs, KeyPlatform keyNames = KeyPlatform::Windows);
 
 struct Source
 {

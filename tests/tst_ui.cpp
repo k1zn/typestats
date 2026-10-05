@@ -121,9 +121,12 @@ private slots:
     void opensAndPaints()
     {
         MainWindow w;
+        QCOMPARE(w.m_doc.platform, currentKeyPlatform()); // a new recording is this system's
         w.resize(876, 579);
         w.show();
         QVERIFY(w.openFile(golden("обыка.tsf")));
+        QCOMPARE(w.m_doc.platform, KeyPlatform::Windows); // the original's file
+        QCOMPARE(w.m_model.keyNames, KeyPlatform::Windows);
         QCOMPARE(w.m_model.size(), 269);
         QCOMPARE(w.m_stats->rowCount(), 17);
         QCOMPARE(w.m_stats->item(0, 1)->text(), QStringLiteral("269 (269)"));

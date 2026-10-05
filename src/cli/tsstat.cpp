@@ -87,6 +87,7 @@ int main(int argc, char *argv[])
             f.write(Journal::encode(r));
         return 0;
     }
+    opt.keyNames = doc.platform;
     const TextModel m = Recalc::run(doc.records, opt);
     if (printText) {
         out << m.text << "\n";

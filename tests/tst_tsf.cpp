@@ -2,6 +2,7 @@
 
 #include <QDir>
 #include <QFile>
+#include <QTemporaryDir>
 #include <QTest>
 
 class TstTsf : public QObject
@@ -55,6 +56,37 @@ private slots:
         QCOMPARE(back.date, d.date);
         QCOMPARE(back.fingerZonesName, d.fingerZonesName);
         QCOMPARE(back.fingers, d.fingers);
+    }
+
+    void platform()
+    {
+        // Where the recording was made: the port's own header key; the original skips it, the signature
+        // does not cover it. No key - Windows (every older file).
+        TsfDocument d;
+        KeyRecord r;
+        r.dtUs = 5;
+        r.flags = 0x5B << 16 | 0x5B | KeyRecord::Extended | KeyRecord::NoChar;
+        d.records.append(r);
+        d.author = QStringLiteral("a");
+        d.date = QStringLiteral("d");
+        QTemporaryDir dir;
+        const QString path = dir.filePath(QStringLiteral("p.tsf"));
+        for (KeyPlatform p : {KeyPlatform::Windows, KeyPlatform::Linux, KeyPlatform::MacOS}) {
+            d.platform = p;
+            QVERIFY(Tsf::write(path, d, true));
+            QFile f(path);
+            QVERIFY(f.open(QIODevice::ReadOnly));
+            const QByteArray bytes = f.readAll();
+            QCOMPARE(bytes.contains("Platform="), p != KeyPlatform::Windows);
+            TsfDocument back;
+            QCOMPARE(Tsf::read(path, back), Tsf::ReadError::None);
+            QCOMPARE(back.platform, p);
+            QVERIFY(back.signed_ && back.signatureValid);
+            QCOMPARE(back.records.size(), 1);
+        }
+        QCOMPARE(Tsf::parse({QStringLiteral("platform=LINUX")}).platform, KeyPlatform::Linux);
+        QCOMPARE(Tsf::parse({QStringLiteral("Platform=Amiga")}).platform, KeyPlatform::Windows);
+        QCOMPARE(Tsf::parse({QStringLiteral("Platform=macOS")}).records.size(), 0);
     }
 
     void headerLinesAreNotData()

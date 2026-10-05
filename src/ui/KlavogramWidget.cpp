@@ -41,9 +41,9 @@ struct HeldKey
 };
 
 // The label of a key on its track; keys with long names get a symbol.
-QString trackLabel(const KlavRecord &r)
+QString trackLabel(const KlavRecord &r, KeyPlatform keyNames)
 {
-    const QString name = keyDisplayName(r.flags, r.ch);
+    const QString name = keyDisplayName(r.flags, r.ch, keyNames);
     if (name == QLatin1String("[LShift]") || name == QLatin1String("[RShift]"))
         return QString(QChar(0x21D1));
     if (name == QLatin1String("[BackSpace]"))
@@ -326,7 +326,7 @@ void KlavogramWidget::drawKeys(QPainter &p, int top, int rowHeight)
         if (x >= 0 && hadKeys) {
             const KlavRecord &key = *held[f].first().press;
             const int y = top + rowHeight * f;
-            const QString label = trackLabel(key);
+            const QString label = trackLabel(key, m_model->keyNames);
             const int lw = fm.horizontalAdvance(label);
             if (lw < x - lastX[f] - 1 && fm.height() < rowHeight) {
                 p.setPen(black);

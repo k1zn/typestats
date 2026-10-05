@@ -1,5 +1,6 @@
 #pragma once
 
+#include "KeyName.h"
 #include "KeyRecord.h"
 
 #include <QVector>
@@ -15,6 +16,7 @@ struct RecalcOptions
     bool onlyText = true;      // CheckBox2 "Только текст"; registry "TextOnly", default 1
     bool byPauses = false;     // CheckBox3 "Разбивать по паузам"; registry "SplitOnEnter", default 0
     bool onlyInjected = false; // CheckBox6 "Только PCmo" (hidden in the original)
+    KeyPlatform keyNames = KeyPlatform::Windows; // the system the recording was made on: names of its keys
 };
 
 namespace TextStyle {
@@ -51,6 +53,8 @@ struct TextAnchor
 
 struct TextModel
 {
+    KeyPlatform keyNames = KeyPlatform::Windows; // RecalcOptions::keyNames
+
     // Different for every Recalc::run (copies share it): what is computed from a model can be kept
     // while the serial stays the same.
     quint64 serial = 0;

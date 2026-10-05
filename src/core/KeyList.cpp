@@ -19,7 +19,7 @@ float scrollForPosition(const TextModel &m, int selStart)
 }
 
 QVector<KeyListRow> rows(const QVector<KlavRecord> &klav, const QLocale &loc, double fromUs, double toUs, int limit,
-                         int digits)
+                         int digits, KeyPlatform keyNames)
 {
     QVector<KeyListRow> out;
     int pressRow[256];
@@ -48,7 +48,7 @@ QVector<KeyListRow> rows(const QVector<KlavRecord> &klav, const QLocale &loc, do
         const float pause = float(kExtMilli * (r.t - prev));
         if (pause <= 59000.0f)
             row.pause = formatFixed(double(pause), digits, loc);
-        row.key = keyDisplayName(r.flags, r.ch);
+        row.key = keyDisplayName(r.flags, r.ch, keyNames);
         if (row.key == QLatin1String("\r"))
             row.key = QStringLiteral("[Enter]");
         out.append(row);

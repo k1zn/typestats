@@ -104,7 +104,7 @@ QVector<Bar> averages(const float *sum, const int *count, const QStringList &lab
 
 } // namespace
 
-KeyLabel labelsFromRecords(const KeyRecords &recs)
+KeyLabel labelsFromRecords(const KeyRecords &recs, KeyPlatform keyNames)
 {
     // Per key: how often every (lower-case) character was produced without Shift (what the key
     // itself gives, as the original's ToUnicodeEx without modifiers) and with it, and a record
@@ -139,8 +139,8 @@ KeyLabel labelsFromRecords(const KeyRecords &recs)
         // with Ctrl or Alt (Alt+Tab).
         const quint8 vk = (plain[key] & KeyRecord::VkMask) >> 16;
         const bool control = vk == Vk::Back || vk == Vk::Tab || vk == Vk::Return || vk == Vk::Escape;
-        (*names)[key] = n || control ? keyDisplayName(plain[key] | KeyRecord::HasChar, best)
-                                     : keyDisplayName(plain[key] | KeyRecord::NoChar, 0);
+        (*names)[key] = n || control ? keyDisplayName(plain[key] | KeyRecord::HasChar, best, keyNames)
+                                     : keyDisplayName(plain[key] | KeyRecord::NoChar, 0, keyNames);
     }
     return [names](quint8 key) { return (*names)[key]; };
 }

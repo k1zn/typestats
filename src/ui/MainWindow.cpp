@@ -115,6 +115,7 @@ QFrame *bevel(QWidget *parent, int x, int y, int w, int h, QFrame::Shape shape)
 MainWindow::MainWindow(QWidget *parent)
     : QWidget(parent), m_schemes(AppPaths::file(QStringLiteral("FingerZones.ini"))), m_journal(AppPaths::dataDir())
 {
+    m_doc.platform = currentKeyPlatform(); // a recording made here
     updateTitle();
     setMinimumWidth(220);
 
@@ -984,7 +985,8 @@ TableExport::Table MainWindow::keyTable() const
         const double v = loc.toDouble(text, &ok);
         return ok ? QVariant(v) : QVariant();
     };
-    const auto all = KeyList::rows(m_model.klav, loc);
+    const auto all = KeyList::rows(m_model.klav, loc, -std::numeric_limits<double>::infinity(),
+                                    std::numeric_limits<double>::infinity(), -1, 3, m_model.keyNames);
     for (const KeyListRow &row : all)
         table.rows.append({row.key, number(row.pause), number(row.duration)});
     return table;
@@ -1239,6 +1241,7 @@ RecalcOptions MainWindow::options() const
     opt.splitMs = m_pause->value();
     opt.onlyText = m_onlyText->isChecked();
     opt.byPauses = m_byPauses->isChecked();
+    opt.keyNames = m_doc.platform;
     return opt;
 }
 
@@ -1288,7 +1291,7 @@ void MainWindow::updateHistograms()
     source.splitUs = quint32(m_pause->value()) * 1000;
     source.zones = m_schemes.zones(m_fingers->currentText());
     if (m_histLabelsSerial != m_model.serial) {
-        m_histLabels = Histograms::labelsFromRecords(m_model.records);
+        m_histLabels = Histograms::labelsFromRecords(m_model.records, m_model.keyNames);
         m_histLabelsSerial = m_model.serial;
     }
     source.label = m_histLabels;
@@ -1333,7 +1336,7 @@ void MainWindow::updateKeyList()
     // As many rows as fit in the list.
     const int limit = std::max(1, m_keys->viewport()->height() / m_keys->verticalHeader()->defaultSectionSize());
     QVector<QStringList> rows;
-    for (const KeyListRow &row : KeyList::rows(m_model.klav, QLocale(), from, to, limit, m_keyDigits))
+    for (const KeyListRow &row : KeyList::rows(m_model.klav, QLocale(), from, to, limit, m_keyDigits, m_model.keyNames))
         rows.append({row.pause, row.duration, row.key});
     setRows(m_keys, rows);
 }
@@ -1362,6 +1365,7 @@ bool MainWindow::openFile(const QString &path)
         m_loaded = false;
         m_undo.clear();
         m_clean = true;
+        doc.platform = currentKeyPlatform(); // a journal is written here
         setDocument(doc, tr("Журнал %1").arg(name), false);
         return true;
     }
@@ -1474,5 +1478,7 @@ void MainWindow::clear()
     m_needRecalc = false;
     m_capture->setChecked(true);
     m_input->clear();
-    setDocument({}, {}, false);
+    TsfDocument fresh;
+    fresh.platform = currentKeyPlatform(); // recorded here
+    setDocument(fresh, {}, false);
 }

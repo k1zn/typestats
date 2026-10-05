@@ -1,5 +1,6 @@
 #pragma once
 
+#include "KeyName.h"
 #include "KeyRecord.h"
 
 #include <QStringList>
@@ -16,6 +17,7 @@ struct TsfDocument
     QStringList fingers;     // Finger0..Finger7
     QString attachedVideo;
     int videoTimeShiftMs = 0;
+    KeyPlatform platform = KeyPlatform::Windows; // "Platform": where it was recorded; none - Windows
     bool signed_ = false;     // file had a signature line
     bool signatureValid = true;
 };

@@ -72,6 +72,17 @@ private slots:
         QCOMPARE(keyDisplayName(0x43 << 16 | KeyRecord::HasChar | KeyRecord::Ctrl | KeyRecord::Alt, u'c'),
                  QStringLiteral("[Ctrl+Alt+c]"));
         QCOMPARE(keyDisplayName(0xFF << 16 | KeyRecord::NoChar, 0), QStringLiteral("[Unrecognized key]"));
+        // The names of the system the recording was made on (Windows': the original's, files without the mark).
+        const quint32 lwin = 0x5B << 16 | KeyRecord::NoChar, ralt = 0xA5 << 16 | KeyRecord::NoChar;
+        QCOMPARE(keyDisplayName(lwin, 0), QStringLiteral("[LWin]"));
+        QCOMPARE(keyDisplayName(lwin, 0, KeyPlatform::Linux), QStringLiteral("[LSuper]"));
+        QCOMPARE(keyDisplayName(lwin, 0, KeyPlatform::MacOS), QStringLiteral("[LCmd]"));
+        QCOMPARE(keyDisplayName(ralt, 0, KeyPlatform::Linux), QStringLiteral("[RAlt]"));
+        QCOMPARE(keyDisplayName(ralt, 0, KeyPlatform::MacOS), QStringLiteral("[ROption]"));
+        QCOMPARE(keyDisplayName(0x43 << 16 | KeyRecord::HasChar | KeyRecord::Alt, u'c', KeyPlatform::MacOS), QStringLiteral("[Option+c]"));
+        QCOMPARE(keyDisplayName(0xA0 << 16 | KeyRecord::NoChar, 0, KeyPlatform::MacOS), QStringLiteral("[LShift]"));
+        QCOMPARE(keyPlatformFromName(keyPlatformName(KeyPlatform::MacOS)), KeyPlatform::MacOS);
+        QCOMPARE(keyPlatformName(KeyPlatform::Windows), QString());
         // keyDisplayChar agrees with the length of the name everywhere.
         const quint32 mods[] = {0, KeyRecord::Alt, KeyRecord::Ctrl, KeyRecord::Shift, KeyRecord::Alt | KeyRecord::Ctrl};
         for (quint32 vk = 0; vk < 256; ++vk)
@@ -156,6 +167,24 @@ private slots:
         const auto [b, e] = Stats::range(p, p.text.size() - 1, 0, true);
         QCOMPARE(b, 3);
         QCOMPARE(e, 5);
+    }
+
+    void keyNamesOfThePlatform()
+    {
+        // The text names the keys as the system the recording was made on does.
+        Typist t;
+        t.text(QStringLiteral("a"), 100000);
+        t.press(0x5B, 0, 100000, 0x5B | KeyRecord::Extended);
+        t.release(0x5B, 50000);
+        RecalcOptions opt;
+        opt.onlyText = false;
+        QCOMPARE(Recalc::run(t.recs, opt).text, QStringLiteral("a[LWin]"));
+        opt.keyNames = KeyPlatform::Linux;
+        const TextModel m = Recalc::run(t.recs, opt);
+        QCOMPARE(m.text, QStringLiteral("a[LSuper]"));
+        QCOMPARE(m.keyNames, KeyPlatform::Linux);
+        opt.keyNames = KeyPlatform::MacOS;
+        QCOMPARE(Recalc::run(t.recs, opt).text, QStringLiteral("a[LCmd]"));
     }
 
     void simpleStats()

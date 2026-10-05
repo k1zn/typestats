@@ -205,6 +205,7 @@ TextModel run(const KeyRecords &document, const RecalcOptions &opt)
     static std::atomic<quint64> serials{0};
     TextModel m;
     m.serial = ++serials;
+    m.keyNames = opt.keyNames;
     m.records = normalized(document);
     m.recErased = erasedRecords(m.records);
     const KeyRecords &recs = m.records;
@@ -258,7 +259,7 @@ TextModel run(const KeyRecords &document, const RecalcOptions &opt)
             comment = r.comment;
             pushMap(ri);
         }
-        QString name = keyDisplayName(r.flags, r.ch);
+        QString name = keyDisplayName(r.flags, r.ch, opt.keyNames);
         if (name.size() > 1 && opt.onlyText && name != QLatin1String("[LShift]")
             && name != QLatin1String("[RShift]") && name != QLatin1String("[BackSpace]")
             && name != QLatin1String("[Ctrl+BackSpace]"))

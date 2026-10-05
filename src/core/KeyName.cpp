@@ -39,7 +39,37 @@ std::optional<char16_t> keyDisplayChar(quint32 flags, char16_t ch)
     return ch;
 }
 
-QString keyDisplayName(quint32 flags, char16_t ch)
+KeyPlatform currentKeyPlatform()
+{
+#if defined(Q_OS_MACOS)
+    return KeyPlatform::MacOS;
+#elif defined(Q_OS_WIN)
+    return KeyPlatform::Windows;
+#else
+    return KeyPlatform::Linux;
+#endif
+}
+
+QString keyPlatformName(KeyPlatform p)
+{
+    switch (p) {
+    case KeyPlatform::Linux: return QStringLiteral("Linux");
+    case KeyPlatform::MacOS: return QStringLiteral("macOS");
+    case KeyPlatform::Windows: break;
+    }
+    return {};
+}
+
+KeyPlatform keyPlatformFromName(const QString &name)
+{
+    if (name.compare(QLatin1String("Linux"), Qt::CaseInsensitive) == 0)
+        return KeyPlatform::Linux;
+    if (name.compare(QLatin1String("macOS"), Qt::CaseInsensitive) == 0)
+        return KeyPlatform::MacOS;
+    return KeyPlatform::Windows;
+}
+
+QString keyDisplayName(quint32 flags, char16_t ch, KeyPlatform platform)
 {
     const quint8 vk = (flags >> 16) & 0xFF;
     QString s;
@@ -53,12 +83,16 @@ QString keyDisplayName(quint32 flags, char16_t ch)
     } else {
         // These come back already bracketed and without Alt/Ctrl prefixes.
         switch (vk) {
-        case 0x5B: return QStringLiteral("[LWin]");
-        case 0x5C: return QStringLiteral("[RWin]");
+        case 0x5B:
+            return platform == KeyPlatform::Linux ? QStringLiteral("[LSuper]")
+                   : platform == KeyPlatform::MacOS ? QStringLiteral("[LCmd]") : QStringLiteral("[LWin]");
+        case 0x5C:
+            return platform == KeyPlatform::Linux ? QStringLiteral("[RSuper]")
+                   : platform == KeyPlatform::MacOS ? QStringLiteral("[RCmd]") : QStringLiteral("[RWin]");
         case 0xA2: return QStringLiteral("[LCtrl]");
         case 0xA3: return QStringLiteral("[RCtrl]");
-        case 0xA4: return QStringLiteral("[LAlt]");
-        case 0xA5: return QStringLiteral("[RAlt]");
+        case 0xA4: return platform == KeyPlatform::MacOS ? QStringLiteral("[LOption]") : QStringLiteral("[LAlt]");
+        case 0xA5: return platform == KeyPlatform::MacOS ? QStringLiteral("[ROption]") : QStringLiteral("[RAlt]");
         }
         if (vk >= 0x70 && vk <= 0x7B)
             s = QLatin1Char('F') + QString::number(vk - 0x6F);
@@ -68,7 +102,7 @@ QString keyDisplayName(quint32 flags, char16_t ch)
     if (s.isEmpty())
         s = QChar(ch);
     if (flags & KeyRecord::Alt)
-        s.prepend(QLatin1String("Alt+"));
+        s.prepend(platform == KeyPlatform::MacOS ? QLatin1String("Option+") : QLatin1String("Alt+"));
     if (flags & KeyRecord::Ctrl)
         s.prepend(QLatin1String("Ctrl+"));
     if (s.size() > 1)
