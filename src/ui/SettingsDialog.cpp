@@ -1,4 +1,5 @@
 #include "SettingsDialog.h"
+#include "Hotkeys.h"
 
 #include "Texts.h"
 
@@ -65,8 +66,8 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent)
 
     auto *hotkeys = new QGroupBox(tr("Глобальные горячие клавиши"), this);
     hotkeys->setGeometry(0, 64, 297, 57);
-    m_globalClear = checkBox(hotkeys, tr("LCtrl+LWin (Очистить)"), 8, 16, "GlobalClear", true);
-    m_globalOnOff = checkBox(hotkeys, tr("F8+F9 (Управление перехватом)"), 8, 32, "GlobalOnOff", true);
+    m_globalClear = checkBox(hotkeys, tr("%1 (Очистить)").arg(Hotkeys::clear()), 8, 16, "GlobalClear", true);
+    m_globalOnOff = checkBox(hotkeys, tr("%1 (Управление перехватом)").arg(Hotkeys::onOff()), 8, 32, "GlobalOnOff", true);
 
     auto *tags = new QGroupBox(tr("Копирование текста с тегами (для вставки в блог)"), this);
     tags->setGeometry(0, 120, 297, 73);

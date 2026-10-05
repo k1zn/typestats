@@ -1,5 +1,6 @@
 #include "TextView.h"
 
+#include "Hotkeys.h"
 #include "Look.h"
 
 #include <QAbstractTextDocumentLayout>
@@ -47,15 +48,18 @@ void TextView::setFontSize(int points)
 void TextView::keyPressEvent(QKeyEvent *e)
 {
     // Memo4KeyDown.
-    const Qt::KeyboardModifiers mods = e->modifiers() & (Qt::ShiftModifier | Qt::ControlModifier | Qt::AltModifier);
-    if (mods == Qt::NoModifier && e->key() == Qt::Key_Delete) {
+    switch (Hotkeys::textAction(e)) {
+    case Hotkeys::TextAction::Delete:
         emit deleteRequested();
-    } else if (mods == Qt::NoModifier && e->key() == Qt::Key_Insert) {
+        break;
+    case Hotkeys::TextAction::Mark:
         emit markRequested();
-    } else if (mods == Qt::ControlModifier && (e->key() == Qt::Key_Insert || e->key() == Qt::Key_C)) {
+        break;
+    case Hotkeys::TextAction::Copy:
         if (textCursor().hasSelection())
             emit copyRequested();
-    } else {
+        break;
+    case Hotkeys::TextAction::None:
         QTextEdit::keyPressEvent(e);
         return;
     }

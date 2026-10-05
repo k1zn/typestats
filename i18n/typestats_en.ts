@@ -498,10 +498,6 @@ Special thanks to Urikor (for the great site and the hosting), Avtandilina, Dron
         <translation>Warning! The file is damaged!</translation>
     </message>
     <message>
-        <source>Очистить (LCtrl+LWin)</source>
-        <translation>Clear (LCtrl+LWin)</translation>
-    </message>
-    <message>
         <source>Прочитать</source>
         <translation>Open</translation>
     </message>
@@ -546,28 +542,12 @@ Special thanks to Urikor (for the great site and the hosting), Avtandilina, Dron
         <translation>Help</translation>
     </message>
     <message>
-        <source>Удалить (Del)</source>
-        <translation>Delete (Del)</translation>
-    </message>
-    <message>
-        <source>Копировать (Ctrl+C)</source>
-        <translation>Copy (Ctrl+C)</translation>
-    </message>
-    <message>
         <source>Копировать без ошибок</source>
         <translation>Copy without errors</translation>
     </message>
     <message>
-        <source>Отменить (Ctrl+Z)</source>
-        <translation>Undo (Ctrl+Z)</translation>
-    </message>
-    <message>
         <source>Удалить нетекстовые клавиши</source>
         <translation>Remove non-text keys</translation>
-    </message>
-    <message>
-        <source>Пометить (Ins)</source>
-        <translation>Mark (Ins)</translation>
     </message>
     <message>
         <source>Свойства видео</source>
@@ -582,10 +562,6 @@ Special thanks to Urikor (for the great site and the hosting), Avtandilina, Dron
         <translation>Legend</translation>
     </message>
     <message>
-        <source>Ввод текста (F4)</source>
-        <translation>Text input (F4)</translation>
-    </message>
-    <message>
         <source>Преобразовать в текущую раскладку</source>
         <translation>Convert to the current layout</translation>
     </message>
@@ -596,10 +572,6 @@ Special thanks to Urikor (for the great site and the hosting), Avtandilina, Dron
     <message>
         <source>Вкл</source>
         <translation>On</translation>
-    </message>
-    <message>
-        <source>Управление перехватом (F8+F9)</source>
-        <translation>Capture on/off (F8+F9)</translation>
     </message>
     <message>
         <source>Только текст</source>
@@ -793,6 +765,34 @@ Special thanks to Urikor (for the great site and the hosting), Avtandilina, Dron
         <source>Не удалось записать журнал %1</source>
         <translation>Could not write the journal %1</translation>
     </message>
+    <message>
+        <source>Очистить (%1)</source>
+        <translation>Clear (%1)</translation>
+    </message>
+    <message>
+        <source>Удалить (%1)</source>
+        <translation>Delete (%1)</translation>
+    </message>
+    <message>
+        <source>Копировать (%1)</source>
+        <translation>Copy (%1)</translation>
+    </message>
+    <message>
+        <source>Отменить (%1)</source>
+        <translation>Undo (%1)</translation>
+    </message>
+    <message>
+        <source>Пометить (%1)</source>
+        <translation>Mark (%1)</translation>
+    </message>
+    <message>
+        <source>Ввод текста (%1)</source>
+        <translation>Text input (%1)</translation>
+    </message>
+    <message>
+        <source>Управление перехватом (%1)</source>
+        <translation>Capture on/off (%1)</translation>
+    </message>
 </context>
 <context>
     <name>SettingsDialog</name>
@@ -827,14 +827,6 @@ Special thanks to Urikor (for the great site and the hosting), Avtandilina, Dron
     <message>
         <source>Глобальные горячие клавиши</source>
         <translation>Global hot keys</translation>
-    </message>
-    <message>
-        <source>LCtrl+LWin (Очистить)</source>
-        <translation>LCtrl+LWin (Clear)</translation>
-    </message>
-    <message>
-        <source>F8+F9 (Управление перехватом)</source>
-        <translation>F8+F9 (Capture on/off)</translation>
     </message>
     <message>
         <source>Копирование текста с тегами (для вставки в блог)</source>
@@ -891,6 +883,14 @@ Special thanks to Urikor (for the great site and the hosting), Avtandilina, Dron
     <message>
         <source>Системный трей недоступен</source>
         <translation>The system tray is not available</translation>
+    </message>
+    <message>
+        <source>%1 (Очистить)</source>
+        <translation>%1 (Clear)</translation>
+    </message>
+    <message>
+        <source>%1 (Управление перехватом)</source>
+        <translation>%1 (Capture on/off)</translation>
     </message>
 </context>
 <context>

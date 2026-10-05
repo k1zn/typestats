@@ -6,6 +6,7 @@
 #include "ui/ExtraStatsWindow.h"
 #include "ui/FingerZonesDialog.h"
 #include "ui/GraphPanels.h"
+#include "ui/Hotkeys.h"
 #include "ui/GraphWidget.h"
 #include "ui/HistogramWindow.h"
 #include "ui/KlavogramWidget.h"
@@ -41,6 +42,7 @@
 #include <QComboBox>
 #include <QToolButton>
 #include <QMessageBox>
+#include <QKeyEvent>
 
 class TstUi : public QObject
 {
@@ -136,6 +138,43 @@ private slots:
         QVERIFY(w.windowTitle().endsWith(QStringLiteral(" - обыка.tsf")));
         w.m_capture->setChecked(true);
         QVERIFY(w.windowTitle().startsWith(QStringLiteral("Ts: ON - ")));
+    }
+
+    void hotkeyNames()
+    {
+        // The keys are named as the system names them.
+#if defined(Q_OS_WIN)
+        const QString clear = QStringLiteral("LCtrl+LWin"), copy = QStringLiteral("Ctrl+C"), mark = QStringLiteral("Ins");
+#elif defined(Q_OS_MACOS)
+        const QString clear = QStringLiteral("L⌃+L⌘"), copy = QStringLiteral("⌘C"), mark = QStringLiteral("⌘I");
+#else
+        const QString clear = QStringLiteral("LCtrl+LSuper"), copy = QStringLiteral("Ctrl+C"), mark = QStringLiteral("Ins");
+#endif
+        QCOMPARE(Hotkeys::clear(), clear);
+        QCOMPARE(Hotkeys::copy(), copy);
+        QCOMPARE(Hotkeys::mark(), mark);
+        MainWindow w;
+        QStringList hints;
+        for (const QToolButton *b : w.findChildren<QToolButton *>())
+            hints << b->toolTip();
+        QVERIFY(hints.contains(QStringLiteral("Очистить (") + clear + u')'));
+        QVERIFY(hints.contains(QStringLiteral("Копировать (") + copy + u')'));
+
+        auto action = [](int key, Qt::KeyboardModifiers mods) {
+            const QKeyEvent e(QEvent::KeyPress, key, mods);
+            return Hotkeys::textAction(&e);
+        };
+        QCOMPARE(action(Qt::Key_Delete, Qt::NoModifier), Hotkeys::TextAction::Delete);
+        QCOMPARE(action(Qt::Key_Insert, Qt::NoModifier), Hotkeys::TextAction::Mark);
+        QCOMPARE(action(Qt::Key_C, Qt::ControlModifier), Hotkeys::TextAction::Copy);
+        QCOMPARE(action(Qt::Key_Insert, Qt::ControlModifier), Hotkeys::TextAction::Copy);
+        QCOMPARE(action(Qt::Key_C, Qt::NoModifier), Hotkeys::TextAction::None);
+#ifdef Q_OS_MACOS
+        QCOMPARE(action(Qt::Key_Backspace, Qt::NoModifier), Hotkeys::TextAction::Delete);
+        QCOMPARE(action(Qt::Key_I, Qt::ControlModifier), Hotkeys::TextAction::Mark);
+#else
+        QCOMPARE(action(Qt::Key_Backspace, Qt::NoModifier), Hotkeys::TextAction::None);
+#endif
     }
 
     void hookFailure()

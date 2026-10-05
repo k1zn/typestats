@@ -9,6 +9,7 @@
 #include "KlavogramWidget.h"
 #include "ExtraStatsWindow.h"
 #include "AppPaths.h"
+#include "Hotkeys.h"
 #include "LiveStatsWindow.h"
 #include "SettingsDialog.h"
 #include "TextView.h"
@@ -273,7 +274,7 @@ QWidget *MainWindow::createToolBar()
         return b;
     };
     // Upper row.
-    action(1, 6, 4, 23, tr("Очистить (LCtrl+LWin)"), &MainWindow::clear);
+    action(1, 6, 4, 23, tr("Очистить (%1)").arg(Hotkeys::clear()), &MainWindow::clear);
     action(6, 30, 4, 23, tr("Прочитать"), &MainWindow::open);
     m_saveButton = action(5, 54, 4, 23, tr("Сохранить"), &MainWindow::save);
     m_blockButton = action(27, 78, 4, 23, tr("Сохранить блок"), nullptr);
@@ -289,17 +290,17 @@ QWidget *MainWindow::createToolBar()
     m_helpButton = action(3, 270, 4, 23, tr("Справка"), &MainWindow::showHelpMenu);
     bevel(bar, 3, 29, 294, 2, QFrame::HLine);
     // Lower row.
-    m_deleteButton = action(10, 6, 32, 22, tr("Удалить (Del)"), &MainWindow::deleteSelection);
+    m_deleteButton = action(10, 6, 32, 22, tr("Удалить (%1)").arg(Hotkeys::deleteKey()), &MainWindow::deleteSelection);
     m_deleteButton->setEnabled(false);
-    connect(action(11, 30, 32, 22, tr("Копировать (Ctrl+C)"), nullptr, true), &QToolButton::clicked, this, [this] { copy(0); });
+    connect(action(11, 30, 32, 22, tr("Копировать (%1)").arg(Hotkeys::copy()), nullptr, true), &QToolButton::clicked, this, [this] { copy(0); });
     connect(action(13, 54, 32, 22, tr("Копировать без ошибок"), nullptr, true), &QToolButton::clicked, this, [this] { copy(1); });
-    action(14, 78, 32, 22, tr("Отменить (Ctrl+Z)"), &MainWindow::undo);
+    action(14, 78, 32, 22, tr("Отменить (%1)").arg(Hotkeys::undo()), &MainWindow::undo);
     action(18, 102, 32, 22, tr("Удалить нетекстовые клавиши"), &MainWindow::removeNonText);
-    action(15, 126, 32, 22, tr("Пометить (Ins)"), &MainWindow::mark);
+    action(15, 126, 32, 22, tr("Пометить (%1)").arg(Hotkeys::mark()), &MainWindow::mark);
     action(21, 150, 32, 22, tr("Свойства видео"), nullptr);
     m_axisButton = action(16, 174, 32, 22, tr("Настройка оси Y графиков"), &MainWindow::showAxisPanel);
     m_legendButton = action(17, 198, 32, 22, tr("Легенда"), &MainWindow::showLegend);
-    action(23, 222, 32, 22, tr("Ввод текста (F4)"), &MainWindow::showTextInput);
+    action(23, 222, 32, 22, tr("Ввод текста (%1)").arg(Hotkeys::textInput()), &MainWindow::showTextInput);
     action(25, 246, 32, 22, tr("Преобразовать в текущую раскладку"), &MainWindow::convertLayout);
     QToolButton *quit = toolButton(bar, 24, 270, 32, 22, tr("Выход"));
     quit->setEnabled(true);
@@ -307,7 +308,7 @@ QWidget *MainWindow::createToolBar()
 
     bevel(bar, 297, 2, 2, 53, QFrame::VLine);
     m_capture = new QCheckBox(tr("Вкл"), bar);
-    m_capture->setToolTip(tr("Управление перехватом (F8+F9)"));
+    m_capture->setToolTip(tr("Управление перехватом (%1)").arg(Hotkeys::onOff()));
     m_capture->setChecked(true);
     m_capture->move(304, 1);
     m_onlyText = new QCheckBox(tr("Только текст"), bar);
