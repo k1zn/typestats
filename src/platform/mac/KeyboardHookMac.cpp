@@ -150,19 +150,26 @@ char16_t ctrlChar(quint8 vk, bool shift)
     return 0;
 }
 
+// The swap is its own inverse: the same for the hook's codes and for the table's.
+int isoSwapped(int keycode)
+{
+    if (!Layout::instance().iso())
+        return keycode;
+    if (keycode == int(kVK_ISO_Section))
+        return int(kVK_ANSI_Grave);
+    if (keycode == int(kVK_ANSI_Grave))
+        return int(kVK_ISO_Section);
+    return keycode;
+}
+
 std::optional<Keyboard::ScanCode> scanOf(quint16 keycode)
 {
-    if (Layout::instance().iso() && (keycode == kVK_ISO_Section || keycode == kVK_ANSI_Grave))
-        keycode = keycode == kVK_ISO_Section ? kVK_ANSI_Grave : kVK_ISO_Section;
-    return Keyboard::macToScan(keycode);
+    return Keyboard::macToScan(isoSwapped(keycode));
 }
 
 int keycodeOf(Keyboard::ScanCode scan)
 {
-    int keycode = Keyboard::scanToMac(scan);
-    if (Layout::instance().iso() && (keycode == kVK_ISO_Section || keycode == kVK_ANSI_Grave))
-        keycode = keycode == kVK_ISO_Section ? kVK_ANSI_Grave : kVK_ISO_Section;
-    return keycode;
+    return isoSwapped(Keyboard::scanToMac(scan));
 }
 
 // --- the tap ---
