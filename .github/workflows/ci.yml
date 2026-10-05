@@ -16,7 +16,7 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: jurplel/install-qt-action@v4
         with:
           version: ${{ env.QT_VERSION }}
@@ -39,7 +39,7 @@ jobs:
           windeployqt --release --no-translations --no-opengl-sw --no-system-d3d-compiler --no-quick-import --compiler-runtime dist/TypingStatistics/TypingStatistics.exe
           cd dist/TypingStatistics
           rm -rf generic tls networkinformation iconengines imageformats/qgif.dll imageformats/qjpeg.dll imageformats/qsvg.dll Qt6Svg.dll Qt6Network.dll
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: TypingStatistics-windows-x64
           path: dist/TypingStatistics
@@ -64,7 +64,7 @@ jobs:
             package: false
     name: linux (${{ matrix.name }})
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Packages
         run: |
           sudo apt-get update
@@ -85,7 +85,7 @@ jobs:
       - name: AppImage
         if: matrix.package
         run: bash ci/linux/appimage.sh build
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: matrix.package
         with:
           name: TypingStatistics-linux-x86_64
@@ -105,7 +105,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     name: macos (${{ matrix.arch }})
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: jurplel/install-qt-action@v4
         with:
           version: ${{ env.QT_VERSION }}
@@ -126,7 +126,7 @@ jobs:
           codesign --force --deep --sign - build/TypingStatistics.app
           hdiutil create -volname "Typing statistics" -srcfolder build/TypingStatistics.app -ov -format UDZO \
             build/TypingStatistics-macos-${{ matrix.arch }}.dmg
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: TypingStatistics-macos-${{ matrix.arch }}
           path: build/TypingStatistics-macos-${{ matrix.arch }}.dmg
