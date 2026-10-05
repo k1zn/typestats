@@ -22,7 +22,6 @@ find_package(Qt6 QUIET COMPONENTS LinguistTools)
 
 # --- third party ---
 set(BUILD_SHARED_LIBS OFF)
-add_subdirectory(third_party/libuiohook EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/QXlsx EXCLUDE_FROM_ALL)
 
 # --- core (Qt Core only, unit-testable) ---
@@ -38,15 +37,56 @@ endif()
 add_executable(tsstat src/cli/tsstat.cpp)
 target_link_libraries(tsstat PRIVATE tscore)
 
+# --- the keyboard hook and the desktop (src/platform) ---
+set(PLATFORM_SOURCES
+    src/platform/KeyboardHook.h src/platform/KeyboardHook.cpp src/platform/HookClock.h
+    src/platform/DesktopParsers.h src/platform/DesktopParsers.cpp)
+if(WIN32)
+    list(APPEND PLATFORM_SOURCES src/platform/KeyboardHookWin.cpp)
+elseif(APPLE)
+    add_subdirectory(third_party/libuiohook EXCLUDE_FROM_ALL)
+    list(APPEND PLATFORM_SOURCES src/platform/KeyboardHookUiohook.cpp)
+else()
+    # Linux: evdev + xkbcommon (re/crossplatform.md, step 5).
+    file(GLOB LINUX_SOURCES CONFIGURE_DEPENDS src/platform/linux/*.cpp src/platform/linux/*.h)
+    list(APPEND PLATFORM_SOURCES ${LINUX_SOURCES})
+endif()
+add_library(tsplatform STATIC ${PLATFORM_SOURCES})
+target_include_directories(tsplatform PUBLIC src)
+target_link_libraries(tsplatform PUBLIC tscore)
+if(APPLE)
+    target_link_libraries(tsplatform PRIVATE uiohook)
+elseif(UNIX)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(XKBCOMMON REQUIRED IMPORTED_TARGET xkbcommon)
+    target_link_libraries(tsplatform PUBLIC PkgConfig::XKBCOMMON)
+    # Optional: sway's layout names (xkbregistry), X11 sessions (xcb), KDE and systemd-localed (QtDBus).
+    pkg_check_modules(XKBREGISTRY IMPORTED_TARGET xkbregistry)
+    if(XKBREGISTRY_FOUND)
+        target_link_libraries(tsplatform PRIVATE PkgConfig::XKBREGISTRY)
+        target_compile_definitions(tsplatform PRIVATE TS_HAVE_XKBREGISTRY)
+    endif()
+    pkg_check_modules(XKBX11 IMPORTED_TARGET xkbcommon-x11 xcb xcb-xkb)
+    if(XKBX11_FOUND)
+        target_link_libraries(tsplatform PRIVATE PkgConfig::XKBX11)
+        target_compile_definitions(tsplatform PRIVATE TS_HAVE_X11)
+    endif()
+    find_package(Qt6 QUIET COMPONENTS DBus)
+    if(TARGET Qt6::DBus)
+        target_link_libraries(tsplatform PRIVATE Qt6::DBus)
+        target_compile_definitions(tsplatform PRIVATE TS_HAVE_DBUS)
+    endif()
+    message(STATUS "Linux keyboard: xkbregistry ${XKBREGISTRY_FOUND}, X11 ${XKBX11_FOUND}, D-Bus ${Qt6DBus_FOUND}")
+endif()
+
 # --- application ---
 # The windows are a library so that tests can drive them (tests/tst_ui*.cpp, offscreen).
 file(GLOB UI_SOURCES CONFIGURE_DEPENDS
-    src/platform/*.cpp src/platform/*.h
     src/ui/*.cpp src/ui/*.h
     src/export/*.cpp src/export/*.h)
 add_library(tsui STATIC ${UI_SOURCES})
 target_include_directories(tsui PUBLIC src)
-target_link_libraries(tsui PUBLIC tscore Qt6::Widgets uiohook QXlsx::QXlsx)
+target_link_libraries(tsui PUBLIC tscore tsplatform Qt6::Widgets QXlsx::QXlsx)
 
 qt_add_executable(TypingStatistics WIN32 MACOSX_BUNDLE src/main.cpp resources/resources.qrc)
 if(WIN32)
@@ -78,11 +118,17 @@ enable_testing()
 file(GLOB TEST_SOURCES CONFIGURE_DEPENDS tests/tst_*.cpp)
 foreach(src ${TEST_SOURCES})
     get_filename_component(name ${src} NAME_WE)
+    if(name STREQUAL "tst_evdev" AND (WIN32 OR APPLE)) # the Linux backend
+        continue()
+    endif()
     add_executable(${name} ${src})
     target_link_libraries(${name} PRIVATE tscore Qt6::Test)
     if(name MATCHES "^tst_(ui|perf)")
         target_link_libraries(${name} PRIVATE tsui)
         target_sources(${name} PRIVATE resources/resources.qrc)
+    endif()
+    if(name MATCHES "^tst_(platform|evdev)$")
+        target_link_libraries(${name} PRIVATE tsplatform)
     endif()
     target_compile_definitions(${name} PRIVATE TS_GOLDEN_DIR="${CMAKE_SOURCE_DIR}/tests/golden")
     # The performance bench (re/perf.md) needs large recordings and minutes: it is run by hand.

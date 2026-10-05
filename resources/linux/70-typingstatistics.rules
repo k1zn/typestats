@@ -1,0 +1,3 @@
+# Typing statistics reads the keyboards (/dev/input/event*) to record typing in every program, under
+# X11 and Wayland. uaccess gives the access to the user logged in at the seat only, while logged in.
+SUBSYSTEM=="input", KERNEL=="event*", ENV{ID_INPUT_KEYBOARD}=="1", TAG+="uaccess"

@@ -449,6 +449,32 @@ Special thanks to Urikor (for the great site and the hosting), Avtandilina, Dron
         <source>Не удалось перехватить клавиатуру (SetWindowsHookEx: ошибка %1).</source>
         <translation>Could not hook the keyboard (SetWindowsHookEx: error %1).</translation>
     </message>
+    <message>
+        <source>Не удалось начать чтение клавиатур (inotify, eventfd).</source>
+        <translation>Could not start reading the keyboards (inotify, eventfd).</translation>
+    </message>
+    <message>
+        <source>Клавиатуры не найдены (/dev/input/event*). Запись начнётся, когда клавиатура появится.</source>
+        <translation>No keyboards found (/dev/input/event*). Recording starts when a keyboard appears.</translation>
+    </message>
+    <message>
+        <source>Нет доступа к клавиатурам (/dev/input/event*): программа читает нажатия прямо с них, и так работает и в X11, и в Wayland.
+
+Доступ даёт правило udev — один раз, с паролем администратора (если программа установлена пакетом, правило уже есть, нужна только вторая команда или повторный вход в систему):
+
+echo 'SUBSYSTEM=="input", KERNEL=="event*", ENV{ID_INPUT_KEYBOARD}=="1", TAG+="uaccess"' | sudo tee /etc/udev/rules.d/70-typingstatistics.rules
+sudo udevadm control --reload &amp;&amp; sudo udevadm trigger
+
+Доступ получает только тот, кто сейчас вошёл в систему. Запись начнётся сама, перезапускать программу не нужно.</source>
+        <translation>No access to the keyboards (/dev/input/event*): the program reads the keys from them directly, which works under both X11 and Wayland.
+
+The access is given by a udev rule, once, with the administrator's password (if the program was installed from a package, the rule is there already: only the second command or logging in again is needed):
+
+echo 'SUBSYSTEM=="input", KERNEL=="event*", ENV{ID_INPUT_KEYBOARD}=="1", TAG+="uaccess"' | sudo tee /etc/udev/rules.d/70-typingstatistics.rules
+sudo udevadm control --reload &amp;&amp; sudo udevadm trigger
+
+Only the user logged in now gets the access. Recording starts by itself, no restart is needed.</translation>
+    </message>
 </context>
 <context>
     <name>KlavogramWidget</name>

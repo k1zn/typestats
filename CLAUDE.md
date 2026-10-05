@@ -131,12 +131,18 @@ src/cli/tsstat.cpp  консольная утилита: `tsstat [--split MS] [-
                     печатает «Параметр\tЗначение» как ListView2 (для дифф-стенда);
                     `--extra KIND [--avg] [--sort N] [--desc] [--pattern P] [--only S] [--any S] [--exclude S]` — список Form3;
                     `--to-journal out.tsj f.tsf` — записи файла журналом
-src/platform/KeyboardHook.*   сигнал `key(HookEvent{timeUs, flags, ch, chars, firstCh})` в потоке GUI. Windows — свой
-                    WH_KEYBOARD_LL **в потоке GUI** (отметка времени `nowUs()` = steady_clock при входе в колбэк;
+src/platform/       библиотека `tsplatform`. `KeyboardHook.h`: сигналы `key(HookEvent{timeUs, flags, ch, chars, firstCh})`
+                    в потоке GUI, `failed(причина)`, `started()`; статические `toUnicode`/`clearDeadKey`/`capsLock`
+                    (преобразование раскладки), `layoutKeyName` (Tkbd), `foregroundWindow()/foregroundTitle()`
+                    (автокомментарии); `UsLayout` — запасная US-раскладка. Реализации:
+  KeyboardHookWin.cpp  свой WH_KEYBOARD_LL **в потоке GUI** (отметка `hookNowUs()` = steady_clock при входе в колбэк;
                     занятый поток GUI её задерживает), флаги как у 0x404598 (ToUnicodeEx, восстановление мёртвой
-                    клавиши через ToAsciiEx); `toUnicode`/`clearDeadKey`/`capsLock` — для преобразования раскладки;
-                    прочие ОС — libuiohook (без injected/extended/мёртвых клавиш, не проверялось).
-                    `foregroundWindow()/foregroundTitle()` для автокомментариев
+                    клавиши через ToAsciiEx)
+  linux/            evdev + xkbcommon (`re/crossplatform.md`, шаг 5): `EvdevReader` (поток, `/dev/input/event*`, inotify),
+                    `XkbKeyboard` (evdev-событие → HookEvent как у Windows-хука), `LayoutSource` (раскладка и окно:
+                    X11, sway, Hyprland, KDE, GNOME, системная), `KeyboardHookLinux.cpp`
+  KeyboardHookUiohook.cpp  macOS до шага 6 (libuiohook)
+  DesktopParsers.*  разбор ответов окружений Linux (только QtCore, тест на всех ОС — `tst_platform`)
 src/main.cpp        QApplication: светлая схема, стиль windowsvista и шрифт 8 pt на Windows (вид оригинала), переводчик
                     (ключ `Language` = Russian/English, иначе язык системы; `--lang ru|en`), MainWindow, файл из аргумента
 src/ui/

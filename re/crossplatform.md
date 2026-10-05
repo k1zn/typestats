@@ -125,7 +125,55 @@ Super приходят как Win): evdev и CGEventTap видят их рань
 (GNOME/KDE — на одиночный Super; на Mac F8/F9 — медиаклавиши без Fn, если не включено «F1, F2… как стандартные»).
 Настраиваемые хоткеи — не делались (можно позже). Тест `tst_ui::hotkeyNames`.
 
-### 5. Linux: бэкенд evdev (`src/platform/`)
+### 5. Linux: бэкенд evdev (`src/platform/`) — сделано
+Сделано так (без машины с Linux — проверено тестами в Docker; руками — список в конце файла):
+- **Структура:** библиотека `tsplatform` (`src/platform`): `KeyboardHook.h` (pimpl; `UsLayout` — запасная US-раскладка),
+  `KeyboardHookWin.cpp`, `linux/` (`KeyboardHookLinux.cpp`, `EvdevReader`, `XkbKeyboard`, `LayoutSource` +
+  `LayoutSource.cpp`/`WaylandSources.cpp`/`X11Source.cpp`), `DesktopParsers` (чистый разбор ответов окружений, только
+  QtCore, тестируется на всех ОС), `HookClock.h`. Таблицы кодов — в ядре: `Keyboard::scanToVk`, `evdevToScan`,
+  `scanToEvdev`.
+- **`EvdevReader`:** клавиатуры — по `capabilities` в sysfs (буквы, пробел, Enter), не открывая их; `/dev/input/event*`
+  только читаются (без `EVIOCGRAB`), `EVIOCSCLOCKID` = `CLOCK_MONOTONIC`; поток: `poll` по устройствам + inotify
+  (`IN_CREATE`/`IN_ATTRIB`/`IN_DELETE`: новые клавиатуры, появившийся доступ после udev-правила, потерянный доступ —
+  устройство закрывается) + eventfd (остановка). `SYN_DROPPED` — события до `SYN_REPORT` пропускаются. `EV_LED` от
+  окружения синхронизирует Caps/NumLock. Injected — `BUS_VIRTUAL` или устройство в `/devices/virtual/` (uinput).
+- **`XkbKeyboard`:** флаги модификаторов — по зажатым до события (как Windows); символ — `xkb_state_key_get_one_sym`
+  с группой, которую сказало окружение (`setGroup`; −1 — переключает сама keymap); как ToUnicodeEx: Delete → нет
+  символа, Ctrl+буква → 01–1A по VK в любой раскладке, Ctrl+BS → 7F, Ctrl+Enter → 0A, Ctrl+Alt — только символ
+  третьего уровня; мёртвые клавиши и Compose — `xkb_compose` (локаль `LC_ALL`/`LC_CTYPE`/`LANG`, запасная
+  `en_US.UTF-8`): ожидание → DeadKey, chars = −1, символ — то, что раскладка даёт с пробелом; не сложилось → два
+  символа. Автоповтор (value 2) — повторное нажатие.
+- **Источники раскладки и окна** (`LayoutSource::create`, первый ответивший): X11-сессия — xkbcommon-x11 (keymap и
+  группа с сервера, `XkbStateNotify`), окно — `_NET_ACTIVE_WINDOW`/`_NET_WM_NAME`; **sway** — i3-IPC (`GET_INPUTS`,
+  подписка на `input`/`window`; имена раскладок — описания, в XKB-имена через libxkbregistry), окно — `GET_TREE` и
+  события фокуса; **Hyprland** — `j/devices` (RMLVO + `active_keymap`), события `activelayout`/`configreloaded`/
+  `activewindow(v2)` из `.socket2.sock`; **KDE** (Wayland) — D-Bus `org.kde.keyboard /Layouts` (`getLayout`,
+  `layoutChanged`, `layoutListChanged`) + список из `kxkbrc`; **GNOME** (Wayland) — `gsettings get/monitor
+  org.gnome.desktop.input-sources` (`sources`, `xkb-options`, первая из `mru-sources`); иначе **системный** —
+  systemd-localed (D-Bus), `/etc/default/keyboard`, `/etc/vconsole.conf`, `XKB_DEFAULT_*`, `us`. У источников, где
+  переключает окружение, опции `grp:` из keymap убираются, а группа ставится перед каждым нажатием — своё
+  переключение не спорит с окружением. Новый композитор — подкласс `LayoutSource` + строка в `create()`.
+  Окно на KDE/GNOME Wayland неизвестно (0, пустой заголовок): автокомментарий только по паузе.
+- **Права:** нет доступа → `failed` с готовыми командами (правило `resources/linux/70-typingstatistics.rules`); поток
+  продолжает ждать, и после `udevadm trigger` запись начинается сама (`started`).
+- **Зависимости:** `xkbcommon` (обязательно), `xkbregistry`, `xkbcommon-x11`+`xcb`+`xcb-xkb`, `Qt6::DBus` — по
+  возможности (`TS_HAVE_XKBREGISTRY`, `TS_HAVE_X11`, `TS_HAVE_DBUS`). `xcb/xkb.h` не C++ (поле `explicit`) —
+  `#define explicit explicit_` вокруг включения.
+- **libuiohook** на Linux не собирается (на macOS — до шага 6); `tst_ui` на Linux теперь завершается с кодом 0 (№3).
+- **Тесты:** `tst_platform` (все ОС: таблицы кодов, разбор sway/Hyprland/GNOME/KDE/`/etc/default/keyboard`, i3-IPC),
+  `tst_evdev` (Linux: буквы и группы, Caps, управляющие символы, расширенные и цифровой блок с NumLock и без,
+  автоповтор, injected, мёртвые клавиши us(intl), помощники `toUnicode`/`keyName`; **все записи 4 golden-файлов**
+  через перевод дают те же флаги и символы; читатель на FIFO с поддельным sysfs: события, `SYN_DROPPED`, `EV_LED`,
+  горячее подключение виртуальной клавиатуры, ожидание первой клавиатуры).
+- **Найденная разница Windows/XKB:** второе нажатие CapsLock в XKB снимает Caps при *отпускании*, Windows — при
+  нажатии; символ, набранный с зажатым CapsLock, на Linux будет в другом регистре (так его и получит программа).
+- **Ограничения:** AltGr — без поддельного LCtrl, который вставляет Windows (у символов AltGr только бит Alt); VK букв
+  — по позиции US (AZERTY/QWERTZ дадут VK по месту, символы верные); если композитор выключил автоповтор ядра —
+  автоповторов в записи нет; keyd/kanata с `EVIOCGRAB` — все нажатия «injected»; GNOME `mru-sources` — проверить на
+  настоящем GNOME.
+
+<details><summary>План шага 5 (как задумывалось)</summary>
+
 Почему: libuiohook на X11 (XRecord) не видит ввод в родных Wayland-приложениях; без XWayland не работает вовсе;
 у него же найдены проблемы №3, №5–№10 (таблица ниже). Wayland глобальный перехват запрещает протоколом; порталы
 (GlobalShortcuts, InputCapture) для записи всех клавиш не годятся.
@@ -183,6 +231,9 @@ Super приходят как Win): evdev и CGEventTap видят их рань
   перевод (scan → evdev-код → событие) и сравнить флаги/символы с файлом.
 - После: удалить `third_party/libuiohook` и ветку libuiohook в `KeyboardHook.cpp` (на macOS — шаг 6).
 
+
+</details>
+
 ### 6. macOS: свой бэкенд
 Почему: у libuiohook на macOS активный tap (`kCGEventTapOptionDefault`, `darwin/input_hook.c:1179`) и
 `dispatch_sync` в главный поток на каждый символ (`:277`) — пока GUI занят (пересчёт), тормозит клавиатура всей
@@ -231,16 +282,16 @@ Accessibility.
 |---|---|---|---|---|
 | 1 | `third_party/QXlsx/CMakeLists.txt:23` | Linux | `Qt6::GuiPrivate` → нужен `qt6-base-private-dev` | **сделано** (CLAUDE.md) |
 | 2 | `CMakeLists.txt:62` | Linux | `lrelease` не находится вне PATH | **сделано** |
-| 3 | libuiohook `x11/system_properties.c:476` | Linux | без дисплея деструктор `XtCloseDisplay(NULL)` → libXt `exit(1)` (код выхода `tst_ui` = 1); конструктор открывает X до `main` | уйдёт с libuiohook (шаг 5) |
+| 3 | libuiohook `x11/system_properties.c:476` | Linux | без дисплея деструктор `XtCloseDisplay(NULL)` → libXt `exit(1)` (код выхода `tst_ui` = 1); конструктор открывает X до `main` | **сделано** |
 | 4 | `MainWindow.cpp:690`, `KeyboardHook.cpp:352` | Linux, macOS | `failed` не подключён: «Ts: ON», но ничего не пишется | **сделано** |
-| 5 | `KeyboardHook.cpp:347` | X11, macOS | гонка press/typed — теряются символы | шаги 5–6 |
-| 6 | libuiohook `x11/input_helper.c:1644` | X11 | xkb-состояние не следит за сменой раскладки окружением — кириллица латиницей | шаг 5 |
-| 7 | `KeyboardHook.cpp:322` | X11, macOS | флаги модификаторов инвертированы относительно Windows | шаги 5–6 |
-| 8 | libuiohook `keycode_to_unicode` | X11, macOS | Delete → символ 0x7F в тексте | шаги 5–6 |
-| 9 | `KeyboardHook.cpp:245` `vcToVk` | X11, macOS | цифровой блок без NumLock, F13–F24 → vk 0; Pause/NumLock Extended перепутан | шаги 5–6 |
-| 10 | ветка libuiohook | X11, macOS | нет мёртвых клавиш/Compose, нет Injected | шаги 5–6 |
-| 11 | `KeyboardHook.cpp:379` | Linux, macOS | `foregroundWindow/Title` — заглушки | шаги 5–6 |
-| 12 | `KeyboardHook.cpp:389` | Linux, macOS | `layoutKeyName/toUnicode/capsLock` — только US | шаги 5–6 |
+| 5 | `KeyboardHook.cpp:347` | X11, macOS | гонка press/typed — теряются символы | Linux — **сделано** (шаг 5); macOS — шаг 6 |
+| 6 | libuiohook `x11/input_helper.c:1644` | X11 | xkb-состояние не следит за сменой раскладки окружением — кириллица латиницей | **сделано** |
+| 7 | `KeyboardHook.cpp:322` | X11, macOS | флаги модификаторов инвертированы относительно Windows | Linux — **сделано** (шаг 5); macOS — шаг 6 |
+| 8 | libuiohook `keycode_to_unicode` | X11, macOS | Delete → символ 0x7F в тексте | Linux — **сделано** (шаг 5); macOS — шаг 6 |
+| 9 | `KeyboardHook.cpp:245` `vcToVk` | X11, macOS | цифровой блок без NumLock, F13–F24 → vk 0; Pause/NumLock Extended перепутан | Linux — **сделано** (шаг 5); macOS — шаг 6 |
+| 10 | ветка libuiohook | X11, macOS | нет мёртвых клавиш/Compose, нет Injected | Linux — **сделано** (шаг 5); macOS — шаг 6 |
+| 11 | `KeyboardHook.cpp:379` | Linux, macOS | `foregroundWindow/Title` — заглушки | Linux — **сделано** (шаг 5); macOS — шаг 6 |
+| 12 | `KeyboardHook.cpp:389` | Linux, macOS | `layoutKeyName/toUnicode/capsLock` — только US | Linux — **сделано** (шаг 5); macOS — шаг 6 |
 | 13 | libuiohook `darwin/input_hook.c:1179,277` | macOS | активный tap + `dispatch_sync`: лаги системы, таймаут, зависание на выходе | шаг 6 |
 | 14 | `Video.cpp:35` | Linux, macOS | пути видео из Windows-`.tsf` не находятся | снято (видео убрано) |
 | 15 | `NumberFormat.cpp`, `long double` | arm64, MSVC | другие половинки, NaN → UB | **сделано** (Ext80) |
