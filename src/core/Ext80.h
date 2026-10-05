@@ -194,7 +194,22 @@ private:
         return std::uint64_t(truncated());
     }
 
-    // a + b with b's sign replaced by bNeg.
+    // mant + rest / 2^64 (rest: the bits below mant's last, sticky in its lowest bit when more were
+    // lost) rounded to nearest, ties to even.
+    static Ext80 rounded(bool neg, std::uint64_t mant, int exp, std::uint64_t rest)
+    {
+        constexpr std::uint64_t half = std::uint64_t(1) << 63;
+        // Without branches: the rounding of random data is unpredictable.
+        mant += std::uint64_t((rest > half) | ((rest == half) & bool(mant & 1)));
+        if (mant == 0) [[unlikely]] {
+            mant = half;
+            ++exp;
+        }
+        return make(Normal, neg, mant, exp);
+    }
+
+    // a + b with b's sign replaced by bNeg. 64-bit words: x is the larger magnitude, y is shifted right by
+    // the difference of the exponents into y's part above x's last bit and the bits below it (`rest`).
     static Ext80 add(const Ext80 &a, const Ext80 &b, bool bNeg)
     {
         if (a.m_kind != Normal || b.m_kind != Normal) [[unlikely]] {
@@ -209,27 +224,46 @@ private:
                 return a.m_kind == Zero ? make(Zero, a.m_neg && bNeg) : a;
             return make(Normal, bNeg, b.m_mant, b.m_exp);
         }
-        // x: the larger magnitude.
-        const bool aLarger = a.m_exp != b.m_exp ? a.m_exp > b.m_exp : a.m_mant >= b.m_mant;
-        const Ext80 &x = aLarger ? a : b;
-        const Ext80 &y = aLarger ? b : a;
+        // Which is larger and the shift, without branches (they are unpredictable on real data).
+        const bool aLarger = (a.m_exp > b.m_exp) | ((a.m_exp == b.m_exp) & (a.m_mant >= b.m_mant));
+        const std::uint64_t mask = 0 - std::uint64_t(aLarger);
+        const std::uint64_t xm = (a.m_mant & mask) | (b.m_mant & ~mask);
+        const std::uint64_t ym = a.m_mant ^ b.m_mant ^ xm;
+        const int emask = -int(aLarger);
+        const int xe = (a.m_exp & emask) | (b.m_exp & ~emask);
+        const auto d = unsigned(xe - (a.m_exp ^ b.m_exp ^ xe));
         const bool xNeg = aLarger ? a.m_neg : bNeg;
-        const bool yNeg = aLarger ? bNeg : a.m_neg;
-        const int d = x.m_exp - y.m_exp;
-        const u128 big = u128(x.m_mant) << 62;
-        const u128 small = u128(y.m_mant) << 62;
-        u128 shifted = 0;
-        bool sticky = true;
-        if (d < 128) {
-            shifted = small >> d;
-            sticky = d > 0 && (small & ((u128(1) << d) - 1)) != 0;
+        const bool sameSign = a.m_neg == bNeg;
+        std::uint64_t yhi, rest;
+        if (d < 64) [[likely]] {
+            yhi = ym >> d;
+            rest = (ym << 1) << (63 - d); // ym << (64 - d), 0 for d = 0
+        } else {
+            if (sameSign && d > 64)
+                return make(Normal, xNeg, xm, xe); // y is below half of x's last place
+            yhi = 0;
+            rest = d == 64 ? ym : d < 128 ? (ym >> (d - 64)) | std::uint64_t((ym << (128 - d)) != 0) : 1;
         }
-        if (xNeg == yNeg)
-            return pack(xNeg, big + shifted, x.m_exp - 125, sticky);
-        if (big == shifted && !sticky)
-            return Ext80();
-        // The exact difference lies between diff and diff + 1 when bits were lost.
-        return pack(xNeg, big - shifted - (sticky ? 1 : 0), x.m_exp - 125, sticky);
+        if (sameSign) {
+            // A carry (c = 1) shifts the sum right by one; the bit shifted out of `rest` stays as sticky.
+            const std::uint64_t sum = xm + yhi;
+            const auto c = std::uint64_t(sum < xm);
+            return rounded(xNeg, (sum >> c) | (c << 63), xe + int(c), (rest >> c) | (rest & c) | ((sum & c) << 63));
+        }
+        // x - y: a borrow from the bits below; at most one bit of normalization unless d <= 1, when
+        // nothing was lost.
+        std::uint64_t diff = xm - yhi - (rest != 0);
+        std::uint64_t frac = 0 - rest;
+        if (diff == 0) [[unlikely]] {
+            if (frac == 0)
+                return Ext80();
+            const int lead = std::countl_zero(frac);
+            return make(Normal, xNeg, frac << lead, xe - 64 - lead); // d <= 1: exact
+        }
+        const int lead = std::countl_zero(diff);
+        diff = (diff << lead) | ((frac >> 1) >> (63 - lead)); // frac >> (64 - lead), 0 for lead = 0
+        frac <<= lead;
+        return rounded(xNeg, diff, xe - lead, frac);
     }
 
     static Ext80 multiply(const Ext80 &a, const Ext80 &b)
@@ -242,7 +276,11 @@ private:
                 return a.m_kind == Zero || b.m_kind == Zero ? make(NaN, true) : make(Inf, neg);
             return make(Zero, neg);
         }
-        return pack(neg, u128(a.m_mant) * b.m_mant, (a.m_exp - 63) + (b.m_exp - 63), false);
+        // Both significands have the top bit: the product has 127 or 128 bits.
+        const u128 p = u128(a.m_mant) * b.m_mant;
+        const auto hi = std::uint64_t(p >> 64), lo = std::uint64_t(p);
+        const bool top = hi >> 63;
+        return rounded(neg, top ? hi : (hi << 1) | (lo >> 63), a.m_exp + b.m_exp + (top ? 1 : 0), top ? lo : lo << 1);
     }
 
     static Ext80 divide(const Ext80 &a, const Ext80 &b)
@@ -259,14 +297,19 @@ private:
                 return a.m_kind == Zero ? make(NaN, true) : make(Inf, neg);
             return make(Zero, neg);
         }
-        // 64 or 65 quotient bits, then one more from the remainder and whether anything is left.
-        const u128 num = u128(a.m_mant) << 64;
+        // a·2^64 / d has 64 or 65 bits; with the 65th taken out first, one 128-by-64 division whose
+        // quotient fits 64 bits.
         const std::uint64_t d = b.m_mant;
-        const u128 q = num / d;
-        const auto r = std::uint64_t(num - q * d);
-        const bool more = r >= d - r; // 2r >= d
-        const bool rest = more ? r != d - r : r != 0;
-        return pack(neg, (q << 1) | (more ? 1 : 0), a.m_exp - b.m_exp - 65, rest);
+        const bool wide = a.m_mant >= d;
+        const u128 num = u128(wide ? a.m_mant - d : a.m_mant) << 64;
+        const auto q = std::uint64_t(num / d);
+        const auto r = std::uint64_t(num) - q * d; // the remainder, below d
+        if (!wide) {
+            // The next bit and the rest: 2r against d.
+            const std::uint64_t rest = r >= d - r ? (std::uint64_t(1) << 63) | std::uint64_t(r != d - r) : std::uint64_t(r != 0);
+            return rounded(neg, q, a.m_exp - b.m_exp - 1, rest);
+        }
+        return rounded(neg, (q >> 1) | (std::uint64_t(1) << 63), a.m_exp - b.m_exp, (q << 63) | std::uint64_t(r != 0));
     }
 
     static int compare(const Ext80 &a, const Ext80 &b) // -1, 0, 1; 2 when unordered
