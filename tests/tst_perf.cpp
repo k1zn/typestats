@@ -22,6 +22,8 @@
 #include "export/TableExport.h"
 #include "platform/KeyboardHook.h"
 #include "ui/ExtraStatsWindow.h"
+#include "ui/FingerZonesDialog.h"
+#include "ui/SettingsDialog.h"
 #include "ui/StringTableModel.h"
 #include "ui/GraphPanels.h"
 #include "ui/GraphWidget.h"
@@ -594,6 +596,105 @@ private slots:
         log(QStringLiteral("%1	%2	%3").arg(QStringLiteral("startup: KeyboardHook::start (first)"), -40).arg(0, 7).arg(double(e.nsecsElapsed()) / 1e6, 10, 'f', 3));
         hook.stop();
 #endif
+    }
+
+    // Editing a large recording: every edit normalizes the records and recalculates.
+    void editing()
+    {
+        QSettings().setValue(QStringLiteral("JournalOn"), false);
+        for (int n : m_sizes) {
+            MainWindow w;
+            w.resize(1000, 700);
+            w.show();
+            QVERIFY(QTest::qWaitForWindowExposed(&w));
+            QVERIFY(w.openFile(tsf(n)));
+            measure(QStringLiteral("edit: normalizeRecords"), n, [&] { w.normalizeRecords(); });
+            measure(QStringLiteral("edit: delete 1000 chars"), n, [&] {
+                select(w, int(w.m_model.text.size()) / 2, 1000);
+                w.deleteSelection();
+            });
+            measure(QStringLiteral("edit: undo"), n, [&] { w.undo(); });
+            measure(QStringLiteral("edit: remove non-text keys in 1000 chars"), n, [&] {
+                select(w, int(w.m_model.text.size()) / 3, 1000);
+                w.removeNonText();
+            });
+            w.undo();
+            measure(QStringLiteral("edit: copy 1000 chars"), n, [&] {
+                select(w, int(w.m_model.text.size()) / 2, 1000);
+                w.copy(0);
+            });
+            measure(QStringLiteral("edit: copy all, plain"), n, [&] {
+                select(w, 0, int(w.m_model.text.size()));
+                w.copy(0);
+            });
+            measure(QStringLiteral("edit: copy all, with tags"), n, [&] {
+                select(w, 0, int(w.m_model.text.size()));
+                w.copy(2);
+            });
+            measure(QStringLiteral("edit: set a mark (Editing::markRange)"), n, [&] {
+                KeyRecords r = w.m_model.records;
+                Editing::markRange(r, int(r.size()) / 2, int(r.size()) / 2 + 200);
+            });
+        }
+    }
+
+    // An hour of typing (~36000 records at 5 keys a second) into a recording: does the cost of a key grow?
+    void keystrokesHour()
+    {
+        QSettings().setValue(QStringLiteral("JournalOn"), true);
+        for (int n : {m_sizes.first(), m_sizes.last()}) {
+            MainWindow w;
+            QVERIFY(w.openFile(tsf(n)));
+            const int events = 72000;
+            const int window = 12000;
+            QVector<double> t;
+            qint64 now = 1'000'000'000;
+            QStringList medians;
+            double worst = 0;
+            for (int i = 0; i < events; ++i) {
+                const bool down = i % 2 == 0;
+                const quint8 vk = 'A' + (i / 2) % 26;
+                HookEvent e;
+                now += 100'000;
+                e.timeUs = now;
+                e.flags = quint32(vk) << 16 | (vk & 0x7f) | (down ? KeyRecord::HasChar : KeyRecord::KeyUp | KeyRecord::NoChar);
+                e.ch = down ? char16_t(u'a' + (vk - 'A')) : 0;
+                e.chars = down ? 1 : 0;
+                QElapsedTimer timer;
+                timer.start();
+                w.keyEvent(e);
+                t << double(timer.nsecsElapsed()) / 1e3;
+                if (t.size() == window) {
+                    worst = std::max(worst, *std::max_element(t.begin(), t.end()));
+                    std::sort(t.begin(), t.end());
+                    medians << QString::number(t[t.size() / 2], 'f', 1) + QLatin1String("/") + QString::number(t[t.size() * 99 / 100], 'f', 1);
+                    t.clear();
+                }
+            }
+            log(QStringLiteral("%1	%2	median/p99 us per %3 events: %4; worst %5 us")
+                    .arg(QStringLiteral("keyEvent, an hour of typing"), -40).arg(n, 7).arg(window).arg(medians.join(QLatin1String("  "))).arg(worst, 0, 'f', 0));
+            measure(QStringLiteral("recalculate after an hour of typing"), n, [&] { w.recalculate(); });
+        }
+        QSettings().remove(QStringLiteral("JournalOn"));
+        QFile::remove(JournalWriter(QCoreApplication::applicationDirPath()).path());
+    }
+
+    // The auxiliary forms: made and shown once each time (the keyboard picture of Tkbd, Form8).
+    void forms()
+    {
+        MainWindow w;
+        w.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        measure(QStringLiteral("form: Tkbd made + shown + painted"), 0, [&] {
+            FingerZonesDialog d(QStringLiteral("test"), FingerZones::standard(), &w);
+            d.show();
+            d.grab();
+        });
+        measure(QStringLiteral("form: Settings made + shown + painted"), 0, [&] {
+            SettingsDialog d(&w);
+            d.show();
+            d.grab();
+        });
     }
 
     void settings()
