@@ -12,6 +12,9 @@
 - Раскладка на Linux: отслеживать **X11, KDE, GNOME** (sway/Hyprland — по возможности, необязательно).
 - macOS: **свой listen-only `CGEventTap`** вместо libuiohook. libuiohook из проекта убрать совсем.
 - CI на GitHub Actions — делать (remote у репозитория пока нет, файл просто лежит в `.github/`).
+- **Видео из проекта убрано** (2026-10-05): QtMultimedia больше не нужна, кнопки 20/21 всегда выключены
+  (`re/video.md`). Пункты аудита про видео сняты.
+- Раскладка на sway/Hyprland — желательно сразу; если долго — заложить так, чтобы потом только добавить источник.
 
 ## Как проверять под Linux (Docker)
 
@@ -46,7 +49,7 @@ MSYS_NO_PATHCONV=1 docker run --rm -v "C:\Users\kizn\Desktop\typestats:/src:ro" 
 Результат аудита (до исправлений): GCC и Clang собирают всё; `-Wall -Wextra` дают только
 `tests/tst_recorder.cpp:41` (enum и не-enum в `?:`, GCC) и `src/ui/GraphPanels.cpp:247` (неиспользуемый захват
 `this`, Clang). ctest: 9/11; `tst_ui` — все 21 кейс прошли, но код выхода 1 (libuiohook, см. №3);
-`tst_video::paths` падает (№14).
+`tst_video::paths` падал (№14; видео потом убрано).
 
 ## Сделано
 
@@ -66,10 +69,6 @@ NaN/Inf → «NAN»/«INF»/«-INF» (как FloatToStrF). `-ffp-contract=off` �
 ## План (по шагу на коммит)
 
 ### 1. Мелочи
-- `src/core/Video.cpp:35` `resolvePath`: `\` → `/` (формат `.tsf` — виндовый); имя вида `X:/…` или `//…` считать
-  абсолютным на любой ОС; если файла нет — искать файл с тем же именем в папке записи без учёта регистра
-  (`QDir::entryList({name}, QDir::Files)` — фильтр по умолчанию регистронезависим). Тесты: имеющиеся в
-  `tst_video::paths` + `sub\a.avi` + запасной поиск во временной папке (`Video.AVI` по `D:\old\video.avi`).
 - Предупреждения: `tests/tst_recorder.cpp:41` (`(down ? 0u : quint32(KeyRecord::KeyUp))`),
   `src/ui/GraphPanels.cpp:247` (убрать `this` из захвата, если `tr` не нужен — проверить).
 - `CMakeLists.txt`, поиск `lrelease`: `HINTS` на `${QT6_INSTALL_PREFIX}/${QT6_INSTALL_BINS}` и `.../libexec`
@@ -229,7 +228,7 @@ Accessibility.
 | 11 | `KeyboardHook.cpp:379` | Linux, macOS | `foregroundWindow/Title` — заглушки | шаги 5–6 |
 | 12 | `KeyboardHook.cpp:389` | Linux, macOS | `layoutKeyName/toUnicode/capsLock` — только US | шаги 5–6 |
 | 13 | libuiohook `darwin/input_hook.c:1179,277` | macOS | активный tap + `dispatch_sync`: лаги системы, таймаут, зависание на выходе | шаг 6 |
-| 14 | `Video.cpp:35` | Linux, macOS | пути видео из Windows-`.tsf` не находятся | шаг 1 |
+| 14 | `Video.cpp:35` | Linux, macOS | пути видео из Windows-`.tsf` не находятся | снято (видео убрано) |
 | 15 | `NumberFormat.cpp`, `long double` | arm64, MSVC | другие половинки, NaN → UB | **сделано** (Ext80) |
 | 16 | `MainWindow.cpp:117,1421`, `ExtraStatsWindow.cpp:66` | Linux, macOS | ini и журнал в папке exe | шаг 2 |
 | 17 | `main.cpp:35` | Linux, macOS | стиль и шрифт платформы при абсолютной геометрии; тёмная тема KDE | шаг 3 |
@@ -244,7 +243,7 @@ Accessibility.
 кириллицей в именах открываются на Linux; тесты проходят в локали C.UTF-8; импорт реестра закрыт `#ifdef`;
 QSettings — 58 ключей-литералов без пар, различающихся регистром (реестр регистр не различает, INI/plist —
 различают); `char` со знаком/без — ни на что не влияет; экспорт через `QDesktopServices` переносим; FFmpeg-бэкенд
-QtMultimedia открывает несжатый AVI (`tst_ui::video` прошёл в Linux); самоотрисовываемые виджеты не зависят от
+самоотрисовываемые виджеты не зависят от
 палитры и рисуют без промежуточных pixmap (на Retina чётко).
 
 ## Ручные проверки (для пользователя, после шагов 3–6)
@@ -252,9 +251,8 @@ QtMultimedia открывает несжатый AVI (`tst_ui::video` прошё
 - **Linux X11 и Wayland (GNOME, KDE):** запись в терминале, браузере, родных Wayland-программах; RU/EN с
   переключением сочетанием окружения и мышью; быстрый набор 1–2 мин (не теряются ли символы); Delete, цифровой
   блок без NumLock, AltGr, мёртвые клавиши; хоткеи (Super может перехватить окружение); udev-правило и сообщение
-  без него; закрытие во время набора; вид форм, тёмная тема, масштаб 125/150 %; трей; куда пишутся ini и журнал;
-  видео AVI из Windows-записи.
+  без него; закрытие во время набора; вид форм, тёмная тема, масштаб 125/150 %; трей; куда пишутся ini и журнал.
 - **macOS (Intel и arm64):** первый запуск — запрос «Мониторинг ввода», работа после разрешения без перезапуска;
   RU/EN, символы с Option, Delete и Fn+Delete, CapsLock; нет ли лагов клавиатуры в других программах при
   пересчёте большого файла (`re/scripts/gen_big.py`); Cmd+Q во время набора; размеры шрифтов и чёткость; числа
-  golden-файлов против Windows (ListView2, Form3, Form4); запуск из «Загрузок» (ini и журнал пишутся); AVI.
+  golden-файлов против Windows (ListView2, Form3, Form4); запуск из «Загрузок» (ini и журнал пишутся).

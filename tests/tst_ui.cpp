@@ -14,7 +14,6 @@
 #include "ui/TextInputWindow.h"
 #include "ui/SettingsDialog.h"
 #include "ui/TextView.h"
-#include "ui/VideoWindow.h"
 
 #include <QApplication>
 #include <QClipboard>
@@ -53,71 +52,6 @@ class TstUi : public QObject
         c.setPosition(start);
         c.setPosition(start + length, QTextCursor::KeepAnchor);
         w.m_text->setTextCursor(c);
-    }
-
-    // An uncompressed AVI: one frame of each colour, `fps` frames a second.
-    static void writeAvi(const QString &path, const QList<QColor> &frames, int fps, int width, int height)
-    {
-        const quint32 frameSize = quint32(width * 3 * height); // width * 3 is a multiple of 4 here
-        QByteArray movi, index;
-        QDataStream m(&movi, QIODevice::WriteOnly), x(&index, QIODevice::WriteOnly);
-        m.setByteOrder(QDataStream::LittleEndian);
-        x.setByteOrder(QDataStream::LittleEndian);
-        m.writeRawData("movi", 4);
-        for (const QColor &c : frames) {
-            x.writeRawData("00db", 4);
-            x << quint32(0x10) << quint32(movi.size()) << frameSize;
-            m.writeRawData("00db", 4);
-            m << frameSize;
-            for (quint32 i = 0; i < frameSize / 3; ++i)
-                m << quint8(c.blue()) << quint8(c.green()) << quint8(c.red());
-        }
-        QByteArray hdrl;
-        QDataStream h(&hdrl, QIODevice::WriteOnly);
-        h.setByteOrder(QDataStream::LittleEndian);
-        h.writeRawData("hdrl", 4);
-        h.writeRawData("avih", 4);
-        h << quint32(56) << quint32(1000000 / fps) << quint32(0) << quint32(0) << quint32(0x10) << quint32(frames.size())
-          << quint32(0) << quint32(1) << frameSize << quint32(width) << quint32(height) << quint32(0) << quint32(0)
-          << quint32(0) << quint32(0);
-        h.writeRawData("LIST", 4);
-        h << quint32(4 + 8 + 56 + 8 + 40);
-        h.writeRawData("strl", 4);
-        h.writeRawData("strh", 4);
-        h << quint32(56);
-        h.writeRawData("vidsDIB ", 8);
-        h << quint32(0) << quint16(0) << quint16(0) << quint32(0) << quint32(1) << quint32(fps) << quint32(0)
-          << quint32(frames.size()) << frameSize << quint32(0xFFFFFFFF) << quint32(0) << quint16(0) << quint16(0)
-          << quint16(width) << quint16(height);
-        h.writeRawData("strf", 4);
-        h << quint32(40) << quint32(40) << qint32(width) << qint32(height) << quint16(1) << quint16(24) << quint32(0)
-          << frameSize << quint32(0) << quint32(0) << quint32(0) << quint32(0);
-
-        QFile f(path);
-        QVERIFY(f.open(QIODevice::WriteOnly));
-        QDataStream out(&f);
-        out.setByteOrder(QDataStream::LittleEndian);
-        out.writeRawData("RIFF", 4);
-        out << quint32(4 + 8 + hdrl.size() + 8 + movi.size() + 8 + index.size());
-        out.writeRawData("AVI ", 4);
-        out.writeRawData("LIST", 4);
-        out << quint32(hdrl.size());
-        out.writeRawData(hdrl.constData(), int(hdrl.size()));
-        out.writeRawData("LIST", 4);
-        out << quint32(movi.size());
-        out.writeRawData(movi.constData(), int(movi.size()));
-        out.writeRawData("idx1", 4);
-        out << quint32(index.size());
-        out.writeRawData(index.constData(), int(index.size()));
-    }
-
-    // The colour of a frame: which of red, green and blue is on, as "rgb" bits.
-    static int frameColour(const QImage &frame)
-    {
-        if (frame.isNull())
-            return -1;
-        const QColor c = frame.pixelColor(frame.width() / 2, frame.height() / 2);
-        return (c.red() > 128 ? 4 : 0) | (c.green() > 128 ? 2 : 0) | (c.blue() > 128 ? 1 : 0);
     }
 
 private slots:
@@ -281,59 +215,6 @@ private slots:
         QCOMPARE(w.m_model.text, text);
     }
 
-    void video()
-    {
-        if (!VideoWindow::available())
-            QSKIP("built without QtMultimedia (TS_VIDEO=OFF)");
-        // A recording with a video next to it: 4 frames at 10 fps, shifted by 150 ms.
-        QTemporaryDir dir;
-        writeAvi(dir.filePath(QStringLiteral("v.avi")), {Qt::red, Qt::green, Qt::blue, Qt::white}, 10, 32, 16);
-        TsfDocument doc;
-        QCOMPARE(Tsf::read(golden("обыка.tsf"), doc), Tsf::ReadError::None);
-        doc.attachedVideo = QStringLiteral("v.avi");
-        doc.videoTimeShiftMs = 150;
-        QVERIFY(Tsf::write(dir.filePath(QStringLiteral("r.tsf")), doc, true));
-
-        MainWindow w;
-        w.show();
-        QVERIFY(w.openFile(dir.filePath(QStringLiteral("r.tsf"))));
-        QTRY_VERIFY(w.m_videoAttached);
-        QVERIFY(w.m_video->isVisible());
-        QCOMPARE(w.m_video->size(), QSize(32, 16));
-
-        // The frame follows the left edge of the klavogram: 0 + 150 ms is the second frame.
-        w.m_klav->setScrollMs(0.f);
-        w.klavogramMoved();
-        QCOMPARE(w.m_video->positionMs(), qint64(150));
-        QTRY_COMPARE(frameColour(w.m_video->frame()), 2);
-        w.m_klav->setScrollMs(60.f); // 210 ms: the third frame
-        w.klavogramMoved();
-        QTRY_COMPARE(frameColour(w.m_video->frame()), 1);
-        w.m_klav->setScrollMs(5000.f); // past the end: the last frame
-        w.klavogramMoved();
-        QTRY_COMPARE(frameColour(w.m_video->frame()), 7);
-
-        // Detached: the window goes; a file that is not there is not attached.
-        w.m_doc.attachedVideo.clear();
-        w.attachVideo();
-        QVERIFY(!w.m_videoAttached);
-        QVERIFY(!w.m_video->isVisible());
-        w.m_doc.attachedVideo = QStringLiteral("none.avi");
-        w.attachVideo();
-        QTest::qWait(200);
-        QVERIFY(!w.m_videoAttached);
-        w.showVideo();
-        QVERIFY(!w.m_video->isVisible());
-
-        // Attached again, then "Очистить".
-        w.m_doc.attachedVideo = QStringLiteral("v.avi");
-        w.attachVideo();
-        QTRY_VERIFY(w.m_video->isVisible());
-        w.clear();
-        QVERIFY(!w.m_videoAttached);
-        QVERIFY(!w.m_video->isVisible());
-    }
-
     void panelButtons()
     {
         // The buttons of the floating panels only open them and are off while they are open.
@@ -343,6 +224,14 @@ private slots:
         QVERIFY(!w.m_legendButton->isEnabled());
         QVERIFY(!w.m_axisPanel->isVisible());
         QVERIFY(w.m_axisButton->isEnabled());
+        // The video buttons are there and always disabled (no video in the port).
+        int video = 0;
+        for (const QToolButton *b : w.findChildren<QToolButton *>())
+            if (b->toolTip() == QStringLiteral("Видео") || b->toolTip() == QStringLiteral("Свойства видео")) {
+                QVERIFY(!b->isEnabled());
+                ++video;
+            }
+        QCOMPARE(video, 2);
 
         emit w.m_legend->closed(); // the red button
         w.m_legend->hide();

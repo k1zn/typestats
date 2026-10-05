@@ -972,34 +972,4 @@ Special thanks to Urikor (for the great site and the hosting), Avtandilina, Dron
         <translation>max without corrections</translation>
     </message>
 </context>
-<context>
-    <name>VideoPropertiesDialog</name>
-    <message>
-        <source>Свойства видео</source>
-        <translation>Video properties</translation>
-    </message>
-    <message>
-        <source>Прикрепить видео</source>
-        <translation>Attach video</translation>
-    </message>
-    <message>
-        <source>Имя файла</source>
-        <translation>File name</translation>
-    </message>
-    <message>
-        <source>Сдвиг времени, мс</source>
-        <translation>Time shift, ms</translation>
-    </message>
-    <message>
-        <source>OK</source>
-        <translation>OK</translation>
-    </message>
-</context>
-<context>
-    <name>VideoWindow</name>
-    <message>
-        <source>Видео</source>
-        <translation>Video</translation>
-    </message>
-</context>
 </TS>

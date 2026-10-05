@@ -206,8 +206,5 @@
   "Название пресета": "Name of the preset",
   "Удаление пресета": "Deleting a preset",
   "Вы действительно хотите удалить пресет?": "Do you really want to delete the preset?",
-  "Ввод текста": "Text input",
-  "Прикрепить видео": "Attach video",
-  "Имя файла": "File name",
-  "Сдвиг времени, мс": "Time shift, ms"
+  "Ввод текста": "Text input"
 }

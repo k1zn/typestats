@@ -13,7 +13,8 @@ n-граммы и слова, зоны пальцев, оперативная с
 - стек — Qt 6 Widgets + C++;
 - старые `.tsf`/`.tsj` должны открываться (бинарная совместимость);
 - делаем Excel-экспорт (xlsx/csv), копирование с тегами, мультиязычность (ru/en);
-- видео (прикреплённый AVI, синхронный с клавограммой) — последний, необязательный этап через QtMultimedia;
+- видео (прикреплённый AVI, синхронный с клавограммой) было сделано через QtMultimedia и **убрано** (2026-10-05):
+  кнопки 20/21 на месте и всегда выключены; поля `AttachedVideo`/`VideoTimeShift` `.tsf` читаются и пишутся как есть;
 - сознательно выкидываем: «Запускать Ts на одном ядре» и регистрацию `.tsf` в реестре.
 
 `TypeStats.exe` в корне репозитория — оригинал. Не трогать.
@@ -32,8 +33,7 @@ cmake --build build
 cd build && ctest
 ```
 
-Опции CMake: `TS_VIDEO` (ON; OFF — без QtMultimedia, кнопки видео выключены, `tst_ui::video` пропускается),
-`TS_LRELEASE` (путь к `lrelease.exe`, если у Qt нет LinguistTools — статический Qt), `TS_SOFT_EXT80` (OFF; ON —
+Опции CMake: `TS_LRELEASE` (путь к `lrelease.exe`, если у Qt нет LinguistTools — статический Qt), `TS_SOFT_EXT80` (OFF; ON —
 программная 80-битная арифметика и на x86, чтобы проверить её golden-тестами).
 
 **Linux и macOS** — в работе, план и состояние: `re/crossplatform.md` (там же сборка под Linux в Docker).
@@ -53,11 +53,11 @@ cmake --build build-release --target TypingStatistics
 mkdir -p dist/TypingStatistics && cp build-release/TypingStatistics.exe dist/TypingStatistics/
 windeployqt --release --no-translations --no-opengl-sw --no-system-d3d-compiler --no-quick-import --compiler-runtime dist/TypingStatistics/TypingStatistics.exe
 ```
-Затем удалить лишнее: `multimedia/windowsmediaplugin.dll` (работает FFmpeg), `generic/`, `tls/`, `networkinformation/`,
-`iconengines/`, `imageformats/{qgif,qjpeg,qsvg}.dll`, `Qt6Svg.dll` (Qt6Network нужна QtMultimedia). ~54 МБ, zip ~24 МБ.
-Проверено запуском с `PATH` без Qt/MinGW (главное окно и окно видео на AVI).
+Затем удалить лишнее: `generic/`, `tls/`, `networkinformation/`, `iconengines/`, `imageformats/{qgif,qjpeg,qsvg}.dll`,
+`Qt6Svg.dll`, `Qt6Network.dll` (были нужны QtMultimedia). С видео было ~54 МБ, zip ~24 МБ; без него не перемерено.
+Проверено запуском с `PATH` без Qt/MinGW.
 
-**Один exe** (`dist/TypingStatistics-single.exe`, ~15,5 МБ, без видео): статический qtbase 6.8.3 собран из исходников
+**Один exe** (`dist/TypingStatistics-single.exe`, ~15,5 МБ): статический qtbase 6.8.3 собран из исходников
 (`C:\Users\kizn\Qt\src`, сборка `C:\Users\kizn\Qt\sb2`, установка `6.8.3\mingw_64_static_min`). Конфигурация qtbase:
 `-DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Release -DFEATURE_optimize_size=ON -DFEATURE_static_runtime=ON`, выключены
 `opengl dynamicgl dbus sql network printsupport concurrent xml jpeg gif freetype textodfwriter textmarkdownreader
@@ -66,7 +66,7 @@ fontcombobox` (`-DFEATURE_x=OFF`). Грабли: без `dynamicgl=OFF` при `
 `graphicsview` нужен стилю windows11; LTO невозможно (slim-LTO не дружит с `-Wa,-mbig-obj`, а без него GCC 13.1 падает
 с ICE). Программа (PATH — только MinGW/CMake/Ninja, без динамического Qt):
 ```bash
-cmake -S . -B build-static-min -G Ninja -DCMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_PREFIX_PATH=C:/Users/kizn/Qt/6.8.3/mingw_64_static_min -DTS_VIDEO=OFF -DTS_LRELEASE=C:/Users/kizn/Qt/6.8.3/mingw_64/bin/lrelease.exe "-DCMAKE_CXX_FLAGS=-ffunction-sections -fdata-sections" "-DCMAKE_C_FLAGS=-ffunction-sections -fdata-sections" "-DCMAKE_EXE_LINKER_FLAGS=-s -Wl,--gc-sections"
+cmake -S . -B build-static-min -G Ninja -DCMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_PREFIX_PATH=C:/Users/kizn/Qt/6.8.3/mingw_64_static_min -DTS_LRELEASE=C:/Users/kizn/Qt/6.8.3/mingw_64/bin/lrelease.exe "-DCMAKE_CXX_FLAGS=-ffunction-sections -fdata-sections" "-DCMAKE_C_FLAGS=-ffunction-sections -fdata-sections" "-DCMAKE_EXE_LINKER_FLAGS=-s -Wl,--gc-sections"
 cmake --build build-static-min --target TypingStatistics
 ```
 В exe только системные DLL Windows; плагины — qwindows, qmodernwindowsstyle, qico. Вес: Qt Gui/Widgets/Core ~4 МБ
@@ -120,8 +120,6 @@ src/core/      только QtCore, тестируемо
                       тесты на синтетике (руками на живом вводе НЕ проверялось)
   Editing.*           правка и копирование (`re/editing.md`): recordRange (FUN_004254b4), deleteRange, removeNonText,
                       labelStart/markRange/removeLabel, copyText, copyTagged, convertLayout — ГОТОВО, тесты на синтетике
-  Video.*             видео (`re/video.md`): positionMs (время видео по левому краю клавограммы), frameStartMs (начало
-                      кадра, как AVIStreamTimeToSample), resolvePath
   NumberFormat.*      formatFixed(v, decimals, loc): округление половинок от нуля, как FloatToStrF оригинала
                       (QLocale округляет к чётному), NaN/Inf как FloatToStrF — используется всеми списками
   Ext80.h             80-битная x87-арифметика: `Ext` = `long double` там, где он x87 (GCC/Clang на x86), иначе
@@ -140,8 +138,8 @@ src/platform/KeyboardHook.*   сигнал `key(HookEvent{timeUs, flags, ch, cha
 src/main.cpp        QApplication: светлая схема, стиль windowsvista и шрифт 8 pt на Windows (вид оригинала), переводчик
                     (ключ `Language` = Russian/English, иначе язык системы; `--lang ru|en`), MainWindow, файл из аргумента
 src/ui/
-  MainWindow.*        Form1: тулбар по координатам DFM (иконки оригинала; все кнопки подключены, 20/21 выключены
-                      только без `TS_VIDEO`); заголовок «Ts: ON|OFF - Typing statistics v… - файл» (`updateTitle`),
+  MainWindow.*        Form1: тулбар по координатам DFM (иконки оригинала; все кнопки подключены, кроме 20/21 «Видео» —
+                      всегда выключены); заголовок «Ts: ON|OFF - Typing statistics v… - файл» (`updateTitle`),
                       сплиттеры, ListView2 (высота по числу строк + 1, как FUN_00429bbc) / ListView1, «Файл повреждён»,
                       открытие .tsf/.tsj, сохранение (подпись по `m_clean` = g_fileClean; расстановка пальцев в файл и из
                       файла), очистка, «Открыть журнал», опции пересчёта, выделение в тексте → статистика и список клавиш.
@@ -162,7 +160,7 @@ src/ui/
                       SpeedButton2 — Tkbd), трей (`m_tray`, меню, сворачивание в трей), `captureToggled` (отпускания
                       зажатых клавиш, `Ts: ON/OFF`), экспорт (`keyTable`/`extraTable`/`exportTable`), свёрнутый график
                       (`graphPaneResized`, `m_graphFolded`). `showForm(name)` — для `--show NAME` (снимки форм):
-                      settings, extra, hist, hist-fingers, hist-extra, kbd, about, input, video.
+                      settings, extra, hist, hist-fingers, hist-extra, kbd, about, input.
                       «Преобразовать в текущую раскладку» — `convertLayout` (`m_toUnicode` подменяется в тестах).
                       Панели: `showAxisPanel`/`showLegend` только открывают, `updatePanelButtons`, `m_legendOpen`
   GraphWidget.*       PaintBox1 по `re/graph_paint.md`: ось Y (три подписи на линию), 8 серий, строка текста, линейка
@@ -187,10 +185,6 @@ src/ui/
                       однократный перенос реестра оригинала (флаг `RegistryImported`, вызывается из main)
   TextInputWindow.*   Form9 «Ввод текста» (F4; Esc — скрыть, F2 — очистить); набор в нём записывается
   AboutDialog.*       Form7 «О программе» (меню кнопки «Справка»)
-  VideoWindow.*       Form5 «Видео»: QMediaPlayer на паузе + QVideoSink, кадр по позиции (`setPositionMs`), размер окна =
-                      размер кадра, поверх всех; `opened(bool)`. В MainWindow: `attachVideo`/`videoOpened`/`updateVideo`
-                      (из `klavogramMoved`), `m_videoAttached`, `m_fileDir`
-  VideoPropertiesDialog.*  Form6 «Свойства видео» (кнопка 21; `--show video`)
   TextView.*          Memo4: QTextEdit, Arial 16 px, стили TextRun (красный/синий/зелёный/подчёркивание), `setModel`
                       вставляет текст кусками с форматом (не `setPlainText` + `mergeCharFormat`: медленно и берёт формат
                       под курсором), `setVisibleRange` — жёлтая подсветка участка, видимого на клавограмме;
@@ -215,11 +209,9 @@ tests/tst_editing.cpp  Editing на синтетике
 tests/tst_ui.cpp    главное окно без экрана (ctest ставит QT_QPA_PLATFORM=offscreen; настройки — во временный INI):
                     открытие и отрисовка, удалить/отменить/копировать, метки, связка графика с клавограммой и мышь на
                     графике, запись через `keyEvent`, настройки, Form3, Form4, Tkbd, пресеты, выключение перехвата,
-                    экспорт, свёрнутый график, преобразование раскладки, видео (пишет AVI сам), кнопки панелей,
+                    экспорт, свёрнутый график, преобразование раскладки, кнопки панелей (и выключенные кнопки видео),
                     заголовок. Тест — друг окон (`friend class TstUi`). Окна собраны в
                     библиотеку `tsui` (src/ui + src/platform + src/export), ресурсы — в самих exe
-tests/tst_video.cpp Video на синтетике (время по клавограмме с паузой разбиения, кадры, пути); окно видео — в tst_ui
-                    (тест сам пишет несжатый AVI из цветных кадров)
 tests/tst_recorder.cpp Recorder: записи и dt, игнорируемые события, хоткеи, автокомментарии, мёртвые клавиши, оперативная
                     статистика
 tests/tst_orig.cpp  ядро против записанного вывода оригинала (tests/golden/orig/*.json): ListView2, текст, стили,
@@ -433,9 +425,8 @@ python re/scripts/diffstand.py файл --journal                               
    Сознательные отличия: смена языка — после перезапуска (у оригинала так для возврата к встроенному); столбики Form4
    не обрезаются по высоте; кнопка «Дополнительная статистика» в Form4 открывает и Form3; кнопка на панели задач
    прячется только у свёрнутого в трей окна; экспорт пишет файл (xlsx/csv) и открывает его, а не управляет Excel по OLE;
-   подписи Tkbd вне Windows — по US-раскладке; время видео после паузы разбиения — настоящее, а не сжатое
-   (`re/video.md`); «Преобразовать в текущую раскладку» не трогает VK_PACKET.
-   Видео (Form5, Form6, кнопки 20/21) — сделано (`re/video.md`, QtMultimedia).
+   подписи Tkbd вне Windows — по US-раскладке; «Преобразовать в текущую раскладку» не трогает VK_PACKET; видео
+   (Form5, Form6) нет — кнопки 20/21 всегда выключены (`re/video.md` — справка по оригиналу).
    Все обработчики Form1 (`re/vmt_methods.json`) сверены с портом: кнопки и пункты меню перенесены. Кнопки 16/17
    (и N7/N8) только открывают панели и выключены, пока панель открыта; кнопка 4 только показывает Form10
    (переключает — хоткей Ctrl+Alt+O). «Только PCmo» (CheckBox6 Form1) скрыт и в оригинале — не переносится.
@@ -461,7 +452,7 @@ python re/scripts/diffstand.py файл --journal                               
      редактора, строится 33 с на 500k (патология Qt) — вставлять прямо в документ редактора;
    - не проверено руками (пользователь пока не пробовал): запись в чужих окнах, мышь графика и клавограммы, панели,
      трей, Form9 (набор в нём должен записываться), импорт настроек оригинала; «Преобразовать в текущую раскладку» на
-     настоящей раскладке (ToUnicodeEx); видео на настоящей записи экрана (кодек AVI, сдвиг, размер окна).
+     настоящей раскладке (ToUnicodeEx).
 
 ## Технический долг: артефакты оригинала в ядре
 

@@ -6,8 +6,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
-# TS_VIDEO=OFF: no attached video (Form5/Form6), no QtMultimedia - for the minimal static build.
-option(TS_VIDEO "Attached video through QtMultimedia" ON)
 # The core computes in the 80-bit x87 format (src/core/Ext80.h): long double where it is that format,
 # the software Ext80 elsewhere. TS_SOFT_EXT80=ON uses the software one everywhere (to test it).
 option(TS_SOFT_EXT80 "Software 80-bit arithmetic even where long double is x87" OFF)
@@ -19,9 +17,6 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 endif()
 
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Test)
-if(TS_VIDEO)
-    find_package(Qt6 REQUIRED COMPONENTS Multimedia)
-endif()
 # A static Qt has no Linguist tools: TS_LRELEASE then names lrelease.exe of another Qt.
 find_package(Qt6 QUIET COMPONENTS LinguistTools)
 
@@ -52,11 +47,6 @@ file(GLOB UI_SOURCES CONFIGURE_DEPENDS
 add_library(tsui STATIC ${UI_SOURCES})
 target_include_directories(tsui PUBLIC src)
 target_link_libraries(tsui PUBLIC tscore Qt6::Widgets uiohook QXlsx::QXlsx)
-if(TS_VIDEO)
-    target_link_libraries(tsui PUBLIC Qt6::Multimedia)
-else()
-    target_compile_definitions(tsui PUBLIC TS_NO_VIDEO)
-endif()
 
 qt_add_executable(TypingStatistics WIN32 MACOSX_BUNDLE src/main.cpp resources/resources.qrc)
 if(WIN32)
