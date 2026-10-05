@@ -42,7 +42,8 @@ cd build && ctest
 Linux в Docker, список ручных проверок). Linux: нужны `xkbcommon` (обязательно), `xkbregistry`, `xkbcommon-x11` + `xcb-xkb`,
 `Qt6::DBus` (по возможности); `cmake --install` ставит exe, `.desktop`, иконки и udev-правило (`TS_UDEV_RULES_DIR`).
 macOS: `.app` с bundle id `org.typingstatistics.TypingStatistics`, минимум 12.0; здесь не собрать — только CI.
-**CI** — `.github/workflows/ci.yml` (remote у репозитория пока нет): Windows (mingw, zip после windeployqt), Ubuntu
+**CI** — `.github/workflows/ci.yml` (remote у репозитория пока нет): Windows (mingw: тесты на обычном Qt; артефакт — один exe на статическом Qt, который `ci/windows/static-qt.sh` собирает
+~40 мин один раз и кладёт в кэш Actions — кэш живёт 7 дней без обращений), Ubuntu
 (GCC + AppImage через `ci/linux/appimage.sh`; Clang с `TS_SOFT_EXT80=ON`), macOS arm64 и x86_64 (`.dmg`, подпись
 ad-hoc, без нотаризации). AppImage проверяется локально: `ci/linux/appimage.sh <build>` в образе `ci/linux/Dockerfile`.
 QXlsx требует `Qt6::GuiPrivate`: на дистрибутивах нужен пакет приватных заголовков (`qt6-base-private-dev` в
@@ -79,7 +80,8 @@ fontcombobox` (`-DFEATURE_x=OFF`). Грабли: без `dynamicgl=OFF` при `
 cmake -S . -B build-static-min -G Ninja -DCMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_PREFIX_PATH=C:/Users/kizn/Qt/6.8.3/mingw_64_static_min -DTS_LRELEASE=C:/Users/kizn/Qt/6.8.3/mingw_64/bin/lrelease.exe "-DCMAKE_CXX_FLAGS=-ffunction-sections -fdata-sections" "-DCMAKE_C_FLAGS=-ffunction-sections -fdata-sections" "-DCMAKE_EXE_LINKER_FLAGS=-s -Wl,--gc-sections"
 cmake --build build-static-min --target TypingStatistics
 ```
-В exe только системные DLL Windows; плагины — qwindows, qmodernwindowsstyle, qico. Вес: Qt Gui/Widgets/Core ~4 МБ
+CI собирает так же (`ci/windows/static-qt.sh` — та же конфигурация qtbase плюс явные `FEATURE_system_*=OFF`).
+Предупреждения `-Wall -Wextra` включает сам CMakeLists — только для своих целей, не для QXlsx. В exe только системные DLL Windows; плагины — qwindows, qmodernwindowsstyle, qico. Вес: Qt Gui/Widgets/Core ~4 МБ
 каждый, libstdc++ 0,9, HarfBuzz 0,7, QXlsx 0,7.
 
 **Сторонние библиотеки (vendored):**

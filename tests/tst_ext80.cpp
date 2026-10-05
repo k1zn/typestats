@@ -40,7 +40,7 @@ constexpr bool kHardware = false;
 #endif
 
 // Numbers that make rounding hard: full 64-bit significands, ties, wide exponent gaps.
-double randomDouble(QRandomGenerator &rnd)
+[[maybe_unused]] double randomDouble(QRandomGenerator &rnd) // the x87 comparison only
 {
     switch (rnd.bounded(6)) {
     case 0: return (rnd.generateDouble() - 0.5) * std::pow(10.0, rnd.bounded(-8, 12));

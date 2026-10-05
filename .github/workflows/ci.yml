@@ -17,6 +17,7 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v7
+      # The shared Qt: tests (the static one has no offscreen platform) and lrelease; MinGW 13.1.
       - uses: jurplel/install-qt-action@v4
         with:
           version: ${{ env.QT_VERSION }}
@@ -27,22 +28,39 @@ jobs:
       - name: MinGW of Qt first in PATH
         run: echo "$IQTA_TOOLS/mingw1310_64/bin" >> "$GITHUB_PATH"
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ "-DCMAKE_CXX_FLAGS=-Wall -Wextra"
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++
       - name: Build
         run: cmake --build build
       - name: Test
         run: ctest --test-dir build --output-on-failure
-      - name: Package
+      # The single exe: a static qtbase, built once (~40 min) and then taken from the cache.
+      - name: Static Qt from the cache
+        id: static-qt
+        uses: actions/cache@v4
+        with:
+          path: C:/qt-static
+          key: qt-static-${{ env.QT_VERSION }}-mingw1310-${{ hashFiles('ci/windows/static-qt.sh') }}
+      - name: Static Qt
+        if: steps.static-qt.outputs.cache-hit != 'true'
+        run: bash ci/windows/static-qt.sh C:/qt-static
+      - name: Single exe
         run: |
-          mkdir -p dist/TypingStatistics
-          cp build/TypingStatistics.exe dist/TypingStatistics/
-          windeployqt --release --no-translations --no-opengl-sw --no-system-d3d-compiler --no-quick-import --compiler-runtime dist/TypingStatistics/TypingStatistics.exe
-          cd dist/TypingStatistics
-          rm -rf generic tls networkinformation iconengines imageformats/qgif.dll imageformats/qjpeg.dll imageformats/qsvg.dll Qt6Svg.dll Qt6Network.dll
+          lrelease="$(cygpath -m "$QT_ROOT_DIR")/bin/lrelease.exe"
+          # Only the static Qt: no trace of the shared one in the environment.
+          env -u Qt6_DIR -u QT_PLUGIN_PATH -u CMAKE_PREFIX_PATH \
+            cmake -S . -B build-static -G Ninja -DCMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ \
+              -DCMAKE_PREFIX_PATH=C:/qt-static -DQt6_DIR=C:/qt-static/lib/cmake/Qt6 -DTS_LRELEASE="$lrelease" \
+              "-DCMAKE_CXX_FLAGS=-ffunction-sections -fdata-sections" "-DCMAKE_C_FLAGS=-ffunction-sections -fdata-sections" \
+              "-DCMAKE_EXE_LINKER_FLAGS=-s -Wl,--gc-sections"
+          cmake --build build-static --target TypingStatistics
+          ls -l build-static/TypingStatistics.exe
+          # Only DLLs of Windows itself.
+          objdump -p build-static/TypingStatistics.exe | grep "DLL Name" | tee dlls.txt
+          if grep -iE "qt6|libstdc|libgcc|libwinpthread" dlls.txt; then echo "not a single exe"; exit 1; fi
       - uses: actions/upload-artifact@v7
         with:
-          name: TypingStatistics-windows-x64
-          path: dist/TypingStatistics
+          path: build-static/TypingStatistics.exe
+          archive: false
 
   linux:
     runs-on: ubuntu-24.04
@@ -77,7 +95,7 @@ jobs:
           arch: linux_gcc_64
           cache: true
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=${{ matrix.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} "-DCMAKE_CXX_FLAGS=-Wall -Wextra" -DCMAKE_INSTALL_PREFIX=/usr -DTS_UDEV_RULES_DIR=/usr/lib/udev/rules.d ${{ matrix.options }}
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=${{ matrix.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} -DCMAKE_INSTALL_PREFIX=/usr -DTS_UDEV_RULES_DIR=/usr/lib/udev/rules.d ${{ matrix.options }}
       - name: Build
         run: cmake --build build
       - name: Test
@@ -113,7 +131,7 @@ jobs:
           cache: true
       - uses: lukka/get-cmake@latest
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }} "-DCMAKE_CXX_FLAGS=-Wall -Wextra"
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }}
       - name: Build
         run: cmake --build build
       - name: Test

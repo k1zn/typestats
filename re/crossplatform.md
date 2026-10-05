@@ -314,7 +314,8 @@ Accessibility.
 ### 7. CI и упаковка — сделано (CI ни разу не запускался: remote нет)
 Сделано так:
 - **`.github/workflows/ci.yml`:** Windows (`windows-latest`, Qt 6.8.3 `win64_mingw` + `tools_mingw1310` из
-  `jurplel/install-qt-action`, MinGW Qt — первым в PATH; Release, ctest, windeployqt и чистка как в CLAUDE.md → артефакт);
+  `jurplel/install-qt-action`, MinGW Qt — первым в PATH; Release, ctest; артефакт — один exe на статическом qtbase
+  (`ci/windows/static-qt.sh`, ~40 мин при промахе кэша `actions/cache`, проверка `objdump`: только DLL Windows));
   Ubuntu 24.04 (Qt 6.8.3 `linux_gcc_64`; apt: xkbcommon, xkbregistry, xcb-xkb, GL, xkb-data, fonts-liberation): GCC +
   AppImage и Clang с `TS_SOFT_EXT80=ON`; macOS `macos-15` (arm64, программная Ext80) и `macos-15-intel` (x86_64,
   аппаратная) — Qt `clang_64`, ctest, `macdeployqt`, подпись ad-hoc, `.dmg`. Везде `-Wall -Wextra`, ctest с

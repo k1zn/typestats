@@ -26,6 +26,11 @@ find_package(Qt6 QUIET COMPONENTS LinguistTools)
 set(BUILD_SHARED_LIBS OFF)
 add_subdirectory(third_party/QXlsx EXCLUDE_FROM_ALL)
 
+# Warnings for our own code (the targets below), not for the third-party code above.
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    add_compile_options(-Wall -Wextra)
+endif()
+
 # --- core (Qt Core only, unit-testable) ---
 file(GLOB CORE_SOURCES CONFIGURE_DEPENDS src/core/*.cpp src/core/*.h)
 add_library(tscore STATIC ${CORE_SOURCES})
@@ -158,14 +163,16 @@ foreach(src ${TEST_SOURCES})
         continue()
     endif()
     add_executable(${name} ${src})
-    target_link_libraries(${name} PRIVATE tscore Qt6::Test)
+    # One library each (they bring tscore along): the macOS linker warns of a library given twice.
     if(name MATCHES "^tst_(ui|perf)")
         target_link_libraries(${name} PRIVATE tsui)
         target_sources(${name} PRIVATE resources/resources.qrc)
-    endif()
-    if(name MATCHES "^tst_(platform|evdev)$")
+    elseif(name MATCHES "^tst_(platform|evdev)$")
         target_link_libraries(${name} PRIVATE tsplatform)
+    else()
+        target_link_libraries(${name} PRIVATE tscore)
     endif()
+    target_link_libraries(${name} PRIVATE Qt6::Test)
     target_compile_definitions(${name} PRIVATE TS_GOLDEN_DIR="${CMAKE_SOURCE_DIR}/tests/golden")
     # The performance bench (re/perf.md) needs large recordings and minutes: it is run by hand.
     if(name STREQUAL "tst_perf")
