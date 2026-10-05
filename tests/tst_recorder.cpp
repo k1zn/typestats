@@ -38,7 +38,7 @@ private slots:
         auto add = [&records](quint8 vk, bool down) {
             KeyRecord r;
             r.dtUs = 1000;
-            r.flags = quint32(vk) << 16 | (vk & 0x7F) | (down ? 0 : KeyRecord::KeyUp);
+            r.flags = quint32(vk) << 16 | (vk & 0x7F) | (down ? 0u : quint32(KeyRecord::KeyUp));
             records.append(r);
         };
         add(0xA0, true);

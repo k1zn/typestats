@@ -59,7 +59,9 @@ file(GLOB TS_FILES CONFIGURE_DEPENDS i18n/*.ts)
 if(TS_FILES AND TARGET Qt6::lrelease)
     qt_add_translations(TypingStatistics TS_FILES ${TS_FILES} RESOURCE_PREFIX /i18n)
 elseif(TS_FILES)
-    find_program(TS_LRELEASE NAMES lrelease lrelease-qt6 REQUIRED)
+    # Distributions keep Qt's tools out of PATH (Debian: /usr/lib/qt6/bin).
+    find_program(TS_LRELEASE NAMES lrelease lrelease-qt6 REQUIRED
+                 HINTS "${QT6_INSTALL_PREFIX}/${QT6_INSTALL_BINS}" "${QT6_INSTALL_PREFIX}/${QT6_INSTALL_LIBEXECS}")
     set(QM_FILES)
     foreach(ts ${TS_FILES})
         get_filename_component(base ${ts} NAME_WE)

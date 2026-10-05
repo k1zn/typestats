@@ -18,25 +18,13 @@
 
 ## Как проверять под Linux (Docker)
 
-WSL нет; Docker Desktop есть (`docker desktop start`). Образ Debian trixie (Qt 6.8.2, GCC 14, Clang 19).
-Файлы — в scratchpad, не в репозитории; при работе над CI их стоит перенести в `ci/`.
-
-```dockerfile
-FROM debian:trixie
-ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential clang cmake ninja-build pkg-config ca-certificates \
-    qt6-base-dev qt6-base-private-dev qt6-base-dev-tools qt6-multimedia-dev qt6-tools-dev qt6-tools-dev-tools \
-    qt6-l10n-tools libgl-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb-xkb-dev libx11-dev libx11-xcb-dev \
-    libxtst-dev libxinerama-dev libxkbfile-dev libxt-dev xkb-data \
-    gstreamer1.0-libav fonts-liberation fonts-dejavu-core xvfb xauth \
-    && rm -rf /var/lib/apt/lists/*
-```
-(X-пакеты `libxtst/libxinerama/libxkbfile/libxt` нужны, пока в дереве libuiohook; после его удаления — убрать.)
+WSL нет; Docker Desktop есть (`docker desktop start`). Образ Debian trixie (Qt 6.8.2, GCC 14, Clang 19):
+`ci/linux/Dockerfile`. Пока в дереве libuiohook (до шага 5), ему нужны ещё `libx11-dev libx11-xcb-dev libxtst-dev
+libxinerama-dev libxkbfile-dev libxt-dev` — отдельный образ поверх (`FROM tsport-linux` + эти пакеты).
 
 Сборка и тесты (репозиторий подключается только на чтение, сборка — в `/work` на томе):
 ```bash
-docker build -t tsport-linux .
+docker build -t tsport-linux ci/linux
 MSYS_NO_PATHCONV=1 docker run --rm -v "C:\Users\kizn\Desktop\typestats:/src:ro" -v "<scratch>\work:/work" tsport-linux bash -c '
   cmake -S /src -B /work/build-gcc -G Ninja -DCMAKE_BUILD_TYPE=Debug "-DCMAKE_CXX_FLAGS=-Wall -Wextra" &&
   cmake --build /work/build-gcc -- -k 0 && cd /work/build-gcc && QT_QPA_PLATFORM=offscreen ctest --output-on-failure'
@@ -68,7 +56,7 @@ NaN/Inf → «NAN»/«INF»/«-INF» (как FloatToStrF). `-ffp-contract=off` �
 
 ## План (по шагу на коммит)
 
-### 1. Мелочи
+### 1. Мелочи — сделано
 - Предупреждения: `tests/tst_recorder.cpp:41` (`(down ? 0u : quint32(KeyRecord::KeyUp))`),
   `src/ui/GraphPanels.cpp:247` (убрать `this` из захвата, если `tr` не нужен — проверить).
 - `CMakeLists.txt`, поиск `lrelease`: `HINTS` на `${QT6_INSTALL_PREFIX}/${QT6_INSTALL_BINS}` и `.../libexec`
@@ -215,8 +203,8 @@ Accessibility.
 
 | № | Где | ОС | Что | Статус |
 |---|---|---|---|---|
-| 1 | `third_party/QXlsx/CMakeLists.txt:23` | Linux | `Qt6::GuiPrivate` → нужен `qt6-base-private-dev` | шаг 1 (документ) |
-| 2 | `CMakeLists.txt:62` | Linux | `lrelease` не находится вне PATH | шаг 1 |
+| 1 | `third_party/QXlsx/CMakeLists.txt:23` | Linux | `Qt6::GuiPrivate` → нужен `qt6-base-private-dev` | **сделано** (CLAUDE.md) |
+| 2 | `CMakeLists.txt:62` | Linux | `lrelease` не находится вне PATH | **сделано** |
 | 3 | libuiohook `x11/system_properties.c:476` | Linux | без дисплея деструктор `XtCloseDisplay(NULL)` → libXt `exit(1)` (код выхода `tst_ui` = 1); конструктор открывает X до `main` | уйдёт с libuiohook (шаг 5) |
 | 4 | `MainWindow.cpp:690`, `KeyboardHook.cpp:352` | Linux, macOS | `failed` не подключён: «Ts: ON», но ничего не пишется | шаг 4 |
 | 5 | `KeyboardHook.cpp:347` | X11, macOS | гонка press/typed — теряются символы | шаги 5–6 |
@@ -237,7 +225,7 @@ Accessibility.
 | 20 | `MainWindow.cpp:531`, `LiveStatsWindow.cpp:86` | Wayland, GNOME | трей, свёрнутое состояние, позиции, «поверх всех» | шаг 3 |
 | 21 | `CMakeLists.txt:49` | macOS | `.app` без bundle id, иконки, plist; нет `install()` для Linux | шаги 6–7 |
 | 22 | libuiohook `CMakeLists.txt:223` | macOS | `CMAKE_OSX_DEPLOYMENT_TARGET 10.5` | уйдёт с libuiohook |
-| 23 | `tst_recorder.cpp:41`, `GraphPanels.cpp:247` | все | предупреждения `-Wall -Wextra` | шаг 1 |
+| 23 | `tst_recorder.cpp:41`, `GraphPanels.cpp:247` | все | предупреждения `-Wall -Wextra` | **сделано** |
 
 Проверено и в порядке: `.tsf` пишется с явным CRLF через свой cp1251 в двоичном режиме, `.tsj` — двоичный; golden с
 кириллицей в именах открываются на Linux; тесты проходят в локали C.UTF-8; импорт реестра закрыт `#ifdef`;

@@ -244,7 +244,7 @@ GraphWidget::AxisSettings AxisPanel::settings() const
 
 void AxisPanel::setSettings(const GraphWidget::AxisSettings &s)
 {
-    auto set = [this](QComboBox *box, int v) {
+    auto set = [](QComboBox *box, int v) {
         const QSignalBlocker b(box);
         box->setEditText(v < 0 ? tr("Авто") : QString::number(v));
     };

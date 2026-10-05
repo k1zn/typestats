@@ -37,6 +37,8 @@ cd build && ctest
 программная 80-битная арифметика и на x86, чтобы проверить её golden-тестами).
 
 **Linux и macOS** — в работе, план и состояние: `re/crossplatform.md` (там же сборка под Linux в Docker).
+QXlsx требует `Qt6::GuiPrivate`: на дистрибутивах нужен пакет приватных заголовков (`qt6-base-private-dev` в
+Debian/Ubuntu, `qt6-qtbase-private-devel` в Fedora). `lrelease` ищется и в `bin`/`libexec` Qt (у Debian — вне PATH).
 
 Нюансы:
 - В Git Bash тесты ничего не печатают в консоль. Чтобы увидеть результат по кейсам:
