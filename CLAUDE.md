@@ -75,7 +75,6 @@ cmake --build build-static-min --target TypingStatistics
 каждый, libstdc++ 0,9, HarfBuzz 0,7, QXlsx 0,7.
 
 **Сторонние библиотеки (vendored):**
-- `third_party/libuiohook` (LGPL-3) — глобальный хук;
 - `third_party/QXlsx` (MIT). В его `CMakeLists.txt` закомментирован `include(CPackConfig)`.
 
 ## Структура
@@ -141,7 +140,8 @@ src/platform/       библиотека `tsplatform`. `KeyboardHook.h`: сиг�
   linux/            evdev + xkbcommon (`re/crossplatform.md`, шаг 5): `EvdevReader` (поток, `/dev/input/event*`, inotify),
                     `XkbKeyboard` (evdev-событие → HookEvent как у Windows-хука), `LayoutSource` (раскладка и окно:
                     X11, sway, Hyprland, KDE, GNOME, системная), `KeyboardHookLinux.cpp`
-  KeyboardHookUiohook.cpp  macOS до шага 6 (libuiohook)
+  mac/KeyboardHookMac.cpp  listen-only CGEventTap в своём потоке, символы — `UCKeyTranslate` текущего источника
+                    ввода, окно — `CGWindowListCopyWindowInfo` (шаг 6; проверяет только CI и ручной запуск)
   DesktopParsers.*  разбор ответов окружений Linux (только QtCore, тест на всех ОС — `tst_platform`)
 src/main.cpp        QApplication: светлая схема, стиль windowsvista и шрифт 8 pt на Windows (вид оригинала), переводчик
                     (ключ `Language` = Russian/English, иначе язык системы; `--lang ru|en`), MainWindow, файл из аргумента

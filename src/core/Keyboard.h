@@ -29,4 +29,10 @@ quint8 scanToVk(ScanCode scan, bool numLock);
 std::optional<ScanCode> evdevToScan(int code);
 int scanToEvdev(ScanCode scan); // -1 for none
 
+// macOS virtual key codes (kVK_*, Carbon's Events.h) of an ANSI keyboard and the scan codes of the keys
+// in their places: Command is Win, Option is Alt, Help is Insert, keypad Clear is NumLock; Fn has none.
+// ISO keyboards swap kVK_ISO_Section and kVK_ANSI_Grave (the hook swaps them back).
+std::optional<ScanCode> macToScan(int keycode);
+int scanToMac(ScanCode scan); // -1 for none
+
 }

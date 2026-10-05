@@ -15,7 +15,8 @@ Q_DECLARE_METATYPE(HookEvent)
 // characters from ToUnicodeEx with the layout of the focused window.
 // Linux (linux/KeyboardHookLinux.cpp): the keyboards of /dev/input read in a thread, the characters
 // from xkbcommon with the layout the desktop has on (re/crossplatform.md, step 5).
-// macOS: libuiohook for now (KeyboardHookUiohook.cpp).
+// macOS (mac/KeyboardHookMac.cpp): a listen-only event tap in a thread, the characters from
+// UCKeyTranslate with the current input source (step 6).
 class KeyboardHook : public QObject
 {
     Q_OBJECT

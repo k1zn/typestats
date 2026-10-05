@@ -1,4 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
+# macOS: the oldest system Qt 6.8 runs on; CGPreflightListenEventAccess needs 10.15.
+set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum macOS version")
 project(TypingStatistics VERSION 1.44 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -44,8 +46,8 @@ set(PLATFORM_SOURCES
 if(WIN32)
     list(APPEND PLATFORM_SOURCES src/platform/KeyboardHookWin.cpp)
 elseif(APPLE)
-    add_subdirectory(third_party/libuiohook EXCLUDE_FROM_ALL)
-    list(APPEND PLATFORM_SOURCES src/platform/KeyboardHookUiohook.cpp)
+    # macOS: a listen-only event tap (re/crossplatform.md, step 6).
+    list(APPEND PLATFORM_SOURCES src/platform/mac/KeyboardHookMac.cpp)
 else()
     # Linux: evdev + xkbcommon (re/crossplatform.md, step 5).
     file(GLOB LINUX_SOURCES CONFIGURE_DEPENDS src/platform/linux/*.cpp src/platform/linux/*.h)
@@ -55,7 +57,7 @@ add_library(tsplatform STATIC ${PLATFORM_SOURCES})
 target_include_directories(tsplatform PUBLIC src)
 target_link_libraries(tsplatform PUBLIC tscore)
 if(APPLE)
-    target_link_libraries(tsplatform PRIVATE uiohook)
+    target_link_libraries(tsplatform PRIVATE "-framework ApplicationServices" "-framework Carbon" "-framework CoreFoundation")
 elseif(UNIX)
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(XKBCOMMON REQUIRED IMPORTED_TARGET xkbcommon)
@@ -91,6 +93,19 @@ target_link_libraries(tsui PUBLIC tscore tsplatform Qt6::Widgets QXlsx::QXlsx)
 qt_add_executable(TypingStatistics WIN32 MACOSX_BUNDLE src/main.cpp resources/resources.qrc)
 if(WIN32)
     target_sources(TypingStatistics PRIVATE resources/app.rc) # the icon of the .exe
+elseif(APPLE)
+    # A fixed bundle id: the Input Monitoring permission is kept for it across builds.
+    set(ICNS resources/macos/app.icns)
+    set_source_files_properties(${ICNS} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+    target_sources(TypingStatistics PRIVATE ${ICNS})
+    set_target_properties(TypingStatistics PROPERTIES
+        MACOSX_BUNDLE_INFO_PLIST ${CMAKE_SOURCE_DIR}/resources/macos/Info.plist.in
+        MACOSX_BUNDLE_GUI_IDENTIFIER org.typingstatistics.TypingStatistics
+        MACOSX_BUNDLE_BUNDLE_NAME "Typing statistics"
+        MACOSX_BUNDLE_ICON_FILE app.icns
+        MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
+        MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
+        MACOSX_BUNDLE_COPYRIGHT "Typing statistics: Igor V. Filimonov, 2016. Qt port.")
 endif()
 target_compile_definitions(TypingStatistics PRIVATE TS_VERSION="${PROJECT_VERSION}")
 target_link_libraries(TypingStatistics PRIVATE tsui)

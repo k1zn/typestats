@@ -73,6 +73,31 @@ private slots:
         QCOMPARE(Keyboard::scanToEvdev({0x7F, true}), -1);
     }
 
+    void macCodes()
+    {
+        QCOMPARE(Keyboard::macToScan(0x00), (ScanCode{0x1E, false}));  // kVK_ANSI_A
+        QCOMPARE(Keyboard::macToScan(0x37), (ScanCode{0x5B, true}));   // kVK_Command: LWin
+        QCOMPARE(Keyboard::macToScan(0x36), (ScanCode{0x5C, true}));   // kVK_RightCommand
+        QCOMPARE(Keyboard::macToScan(0x3A), (ScanCode{0x38, false}));  // kVK_Option: LAlt
+        QCOMPARE(Keyboard::macToScan(0x3D), (ScanCode{0x38, true}));   // kVK_RightOption
+        QCOMPARE(Keyboard::macToScan(0x3B), (ScanCode{0x1D, false}));  // kVK_Control
+        QCOMPARE(Keyboard::macToScan(0x33), (ScanCode{0x0E, false}));  // kVK_Delete: BackSpace
+        QCOMPARE(Keyboard::macToScan(0x75), (ScanCode{0x53, true}));   // kVK_ForwardDelete
+        QCOMPARE(Keyboard::macToScan(0x24), (ScanCode{0x1C, false}));  // kVK_Return
+        QCOMPARE(Keyboard::macToScan(0x4C), (ScanCode{0x1C, true}));   // kVK_ANSI_KeypadEnter
+        QCOMPARE(Keyboard::macToScan(0x32), (ScanCode{0x29, false}));  // kVK_ANSI_Grave
+        QCOMPARE(Keyboard::macToScan(0x0A), (ScanCode{0x56, false}));  // kVK_ISO_Section
+        QCOMPARE(Keyboard::macToScan(0x7E), (ScanCode{0x48, true}));   // kVK_UpArrow
+        QVERIFY(!Keyboard::macToScan(0x3F));                           // kVK_Function
+        // Both ways, and every key of the US main block has its Mac key.
+        for (int code = 0; code < 128; ++code)
+            if (const auto scan = Keyboard::macToScan(code))
+                QCOMPARE(Keyboard::scanToMac(*scan), code);
+        for (int scan = 0x01; scan <= 0x39; ++scan)
+            if (scan != 0x37) // keypad *, elsewhere on a Mac
+                QVERIFY2(Keyboard::scanToMac({quint8(scan), false}) >= 0, qPrintable(QString::number(scan, 16)));
+    }
+
     void names()
     {
         const Desktop::XkbNames n = Desktop::namesFromIds({QStringLiteral("us"), QStringLiteral("ru+phonetic")}, QStringLiteral("grp:alt_shift_toggle"));

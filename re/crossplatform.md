@@ -19,8 +19,7 @@
 ## Как проверять под Linux (Docker)
 
 WSL нет; Docker Desktop есть (`docker desktop start`). Образ Debian trixie (Qt 6.8.2, GCC 14, Clang 19):
-`ci/linux/Dockerfile`. Пока в дереве libuiohook (до шага 5), ему нужны ещё `libx11-dev libx11-xcb-dev libxtst-dev
-libxinerama-dev libxkbfile-dev libxt-dev` — отдельный образ поверх (`FROM tsport-linux` + эти пакеты).
+`ci/linux/Dockerfile`.
 
 Сборка и тесты (репозиторий подключается только на чтение, сборка — в `/work` на томе):
 ```bash
@@ -244,7 +243,41 @@ Super приходят как Win): evdev и CGEventTap видят их рань
 пропускает строку `Platform=` — по разбору (`Values[]`, незнакомая строка не данные), запуском оригинала не проверено.
 Тесты: `tst_tsf::platform`, `tst_recalc` (имена и текст), `tst_ui::opensAndPaints`.
 
-### 6. macOS: свой бэкенд
+### 6. macOS: свой бэкенд — сделано (собирает и проверяет только CI и ручной запуск)
+Сделано так (`src/platform/mac/KeyboardHookMac.cpp`, только C API — без Objective-C):
+- **Tap:** `CGEventTapCreate(kCGSessionEventTap, kCGHeadInsertEventTap, kCGEventTapOptionListenOnly, keyDown|keyUp|
+  flagsChanged)` в своём потоке (QoS user-interactive) со своим `CFRunLoop`; отключённый системой tap
+  (`DisabledByTimeout`/`ByUserInput`) включается снова. Остановка — флаг + `CFRunLoopStop`, цикл крутится короткими
+  `CFRunLoopRunInMode` по 0,25 с (остановка до входа в цикл не теряется), `join`. Событие собирается целиком в потоке
+  tap и уходит в поток GUI очередью — GUI не тормозит клавиатуру системы.
+- **Разрешение** «Мониторинг ввода»: `CGPreflightListenEventAccess`; нет — `CGRequestListenEventAccess` (диалог
+  системы, один раз), `failed` с инструкцией и проверка раз в 2 с; разрешили — запись начинается сама (`started`).
+- **Время** — `hookNowUs()` в колбэке (`steady_clock`).
+- **Коды:** `Keyboard::macToScan`/`scanToMac` в ядре (тест на всех ОС — `tst_platform::macCodes`): Command → Win,
+  Option → Alt, Help → Insert, Clear → NumLock, Fn — пропуск; ISO-клавиатура (`KBGetLayoutType`) — `§` и `` ` ``
+  меняются местами. VK — `scanToVk(scan, numLock = true)` (цифровой блок Mac всегда печатает цифры).
+- **Модификаторы** — `flagsChanged` по битам устройства (`NX_DEVICE*KEYMASK`); флаги — по зажатым до события, как
+  Windows. CapsLock — одно событие на переключение → нажатие и отпускание сразу.
+- **Injected:** `kCGEventSourceStateID` ≠ `kCGEventSourceStateHIDSystemState`.
+- **Символы:** `UCKeyTranslate` по данным текущего источника ввода (`kTISPropertyUnicodeKeyLayoutData`); TIS читается
+  в главном потоке (и тип клавиатуры `LMGetKbdType`), обновляется по `kTISNotifySelectedKeyboardInputSourceChanged`,
+  в поток tap — копия под мьютексом. Option участвует в символе (å, мёртвые клавиши), Command — нет. С Ctrl — символ
+  по VK, как ToUnicodeEx (как на Linux). Мёртвые клавиши — `deadKeyState`: ожидание → DeadKey, chars = −1, символ — с
+  `kUCKeyTranslateNoDeadKeysMask`; не сложилось → два символа. Управляющие (стрелки, F-клавиши, Forward Delete 0x7F,
+  Clear) — без символа, Enter цифрового блока 0x03 → 0x0D.
+- **Окно:** `CGWindowListCopyWindowInfo`, первое окно слоя 0; заголовок — имя программы (+ `kCGWindowName`, если
+  система его даёт: без «Записи экрана» не даёт, разрешение не просим); кэш 200 мс.
+- **`layoutKeyName`/`toUnicode`/`capsLock`** — тем же `UCKeyTranslate`; Caps —
+  `CGEventSourceFlagsState(HIDSystemState)`.
+- **Сборка:** `CMAKE_OSX_DEPLOYMENT_TARGET` 12.0 (минимум Qt 6.8), bundle id `org.typingstatistics.TypingStatistics`
+  (разрешение TCC привязано к нему), `resources/macos/Info.plist.in`, `app.icns` (из `app.png`). Фреймворки
+  ApplicationServices, Carbon, CoreFoundation. **libuiohook удалён** из `third_party` вместе с
+  `KeyboardHookUiohook.cpp`.
+- **Не проверено ничем, кроме чтения кода:** что `CGEventTapCreate` без разрешения возвращает NULL (а не «немой» tap),
+  значение `kCGEventSourceStateID` у событий других программ, перестановка ISO-клавиш, мёртвые клавиши, имя окна.
+
+<details><summary>План шага 6 (как задумывалось)</summary>
+
 Почему: у libuiohook на macOS активный tap (`kCGEventTapOptionDefault`, `darwin/input_hook.c:1179`) и
 `dispatch_sync` в главный поток на каждый символ (`:277`) — пока GUI занят (пересчёт), тормозит клавиатура всей
 системы, через ~1 с tap отключается по таймауту; `stop()` с `join` в главном потоке может зависнуть. Требует
@@ -276,6 +309,8 @@ Accessibility.
   UCKeyTranslate), CoreFoundation.
 - Здесь macOS не собрать: код писать предельно аккуратно, собирает CI (`macos-14` arm64, `macos-13` Intel).
 
+</details>
+
 ### 7. CI и упаковка
 - `.github/workflows/ci.yml`: матрица `windows-latest` (Qt 6.8.3 mingw через `jurplel/install-qt-action`, MinGW
   из того же действия), `ubuntu-24.04` (Qt 6.8.3 gcc_64 из install-qt-action — в нём есть приватные заголовки и
@@ -294,15 +329,15 @@ Accessibility.
 | 2 | `CMakeLists.txt:62` | Linux | `lrelease` не находится вне PATH | **сделано** |
 | 3 | libuiohook `x11/system_properties.c:476` | Linux | без дисплея деструктор `XtCloseDisplay(NULL)` → libXt `exit(1)` (код выхода `tst_ui` = 1); конструктор открывает X до `main` | **сделано** |
 | 4 | `MainWindow.cpp:690`, `KeyboardHook.cpp:352` | Linux, macOS | `failed` не подключён: «Ts: ON», но ничего не пишется | **сделано** |
-| 5 | `KeyboardHook.cpp:347` | X11, macOS | гонка press/typed — теряются символы | Linux — **сделано** (шаг 5); macOS — шаг 6 |
+| 5 | `KeyboardHook.cpp:347` | X11, macOS | гонка press/typed — теряются символы | **сделано** (шаги 5, 6) |
 | 6 | libuiohook `x11/input_helper.c:1644` | X11 | xkb-состояние не следит за сменой раскладки окружением — кириллица латиницей | **сделано** |
-| 7 | `KeyboardHook.cpp:322` | X11, macOS | флаги модификаторов инвертированы относительно Windows | Linux — **сделано** (шаг 5); macOS — шаг 6 |
-| 8 | libuiohook `keycode_to_unicode` | X11, macOS | Delete → символ 0x7F в тексте | Linux — **сделано** (шаг 5); macOS — шаг 6 |
-| 9 | `KeyboardHook.cpp:245` `vcToVk` | X11, macOS | цифровой блок без NumLock, F13–F24 → vk 0; Pause/NumLock Extended перепутан | Linux — **сделано** (шаг 5); macOS — шаг 6 |
-| 10 | ветка libuiohook | X11, macOS | нет мёртвых клавиш/Compose, нет Injected | Linux — **сделано** (шаг 5); macOS — шаг 6 |
-| 11 | `KeyboardHook.cpp:379` | Linux, macOS | `foregroundWindow/Title` — заглушки | Linux — **сделано** (шаг 5); macOS — шаг 6 |
-| 12 | `KeyboardHook.cpp:389` | Linux, macOS | `layoutKeyName/toUnicode/capsLock` — только US | Linux — **сделано** (шаг 5); macOS — шаг 6 |
-| 13 | libuiohook `darwin/input_hook.c:1179,277` | macOS | активный tap + `dispatch_sync`: лаги системы, таймаут, зависание на выходе | шаг 6 |
+| 7 | `KeyboardHook.cpp:322` | X11, macOS | флаги модификаторов инвертированы относительно Windows | **сделано** (шаги 5, 6) |
+| 8 | libuiohook `keycode_to_unicode` | X11, macOS | Delete → символ 0x7F в тексте | **сделано** (шаги 5, 6) |
+| 9 | `KeyboardHook.cpp:245` `vcToVk` | X11, macOS | цифровой блок без NumLock, F13–F24 → vk 0; Pause/NumLock Extended перепутан | **сделано** (шаги 5, 6) |
+| 10 | ветка libuiohook | X11, macOS | нет мёртвых клавиш/Compose, нет Injected | **сделано** (шаги 5, 6) |
+| 11 | `KeyboardHook.cpp:379` | Linux, macOS | `foregroundWindow/Title` — заглушки | **сделано** (шаги 5, 6) |
+| 12 | `KeyboardHook.cpp:389` | Linux, macOS | `layoutKeyName/toUnicode/capsLock` — только US | **сделано** (шаги 5, 6) |
+| 13 | libuiohook `darwin/input_hook.c:1179,277` | macOS | активный tap + `dispatch_sync`: лаги системы, таймаут, зависание на выходе | **сделано** (шаг 6) |
 | 14 | `Video.cpp:35` | Linux, macOS | пути видео из Windows-`.tsf` не находятся | снято (видео убрано) |
 | 15 | `NumberFormat.cpp`, `long double` | arm64, MSVC | другие половинки, NaN → UB | **сделано** (Ext80) |
 | 16 | `MainWindow.cpp:117,1421`, `ExtraStatsWindow.cpp:66` | Linux, macOS | ini и журнал в папке exe | **сделано** |
@@ -310,8 +345,8 @@ Accessibility.
 | 18 | `GraphWidget.cpp:93,213,589`, `HistogramWindow.cpp:60`, `KlavogramWidget.cpp:64,73` | macOS | шрифты в pt мельче на 25 % | **сделано** |
 | 19 | Arial/Courier New | Linux | без `fonts-liberation` — DejaVu шире | шаг 3 (выбор семейства); зависимость пакета — шаг 7 |
 | 20 | `MainWindow.cpp:531`, `LiveStatsWindow.cpp:86` | Wayland, GNOME | трей, свёрнутое состояние, позиции, «поверх всех» | трей — **сделано**; остальное — ограничение Wayland |
-| 21 | `CMakeLists.txt:49` | macOS | `.app` без bundle id, иконки, plist; нет `install()` для Linux | шаги 6–7 |
-| 22 | libuiohook `CMakeLists.txt:223` | macOS | `CMAKE_OSX_DEPLOYMENT_TARGET 10.5` | уйдёт с libuiohook |
+| 21 | `CMakeLists.txt:49` | macOS | `.app` без bundle id, иконки, plist; нет `install()` для Linux | macOS — **сделано** (шаг 6); Linux — шаг 7 |
+| 22 | libuiohook `CMakeLists.txt:223` | macOS | `CMAKE_OSX_DEPLOYMENT_TARGET 10.5` | **снято** (libuiohook удалён) |
 | 23 | `tst_recorder.cpp:41`, `GraphPanels.cpp:247` | все | предупреждения `-Wall -Wextra` | **сделано** |
 
 Проверено и в порядке: `.tsf` пишется с явным CRLF через свой cp1251 в двоичном режиме, `.tsj` — двоичный; golden с

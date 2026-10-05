@@ -94,7 +94,8 @@ count > 1:  sumTime > 1000 → speed = (count − 1 − pauses) · 6e7 / sumTime
 ## Порт
 
 - Windows: собственный WH_KEYBOARD_LL в потоке GUI, сборка `flags` как выше (включая восстановление мёртвой клавиши
-  через `ToAsciiEx`). Прочие платформы: libuiohook; модификаторы — по нажатым клавишам, символ — из события
-  `TYPED`; флагов injected/extended и мёртвых клавиш нет.
+  через `ToAsciiEx`). Linux — evdev + xkbcommon, macOS — listen-only CGEventTap + `UCKeyTranslate`
+  (`re/crossplatform.md`, шаги 5–6): те же флаги (модификаторы — по зажатым до события, extended, injected,
+  мёртвые клавиши), символы — как дал бы ToUnicodeEx.
 - `dt` — 32 бита мкс: пауза длиннее 71 минуты у оригинала переполняется, порт ограничивает её `0xFFFFFFFF`.
 - «Своё окно» — любое активное окно самого приложения.
