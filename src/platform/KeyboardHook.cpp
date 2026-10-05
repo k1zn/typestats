@@ -148,8 +148,10 @@ bool KeyboardHook::start()
     g_hook = this;
     g_handle = SetWindowsHookExW(WH_KEYBOARD_LL, hookProc, GetModuleHandleW(nullptr), 0);
     m_running = g_handle != nullptr;
-    if (!m_running)
-        emit failed(QStringLiteral("SetWindowsHookEx error %1").arg(GetLastError()));
+    if (m_running)
+        emit started();
+    else
+        emit failed(tr("Не удалось перехватить клавиатуру (SetWindowsHookEx: ошибка %1).").arg(GetLastError()));
     return m_running;
 }
 

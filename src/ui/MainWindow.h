@@ -10,6 +10,7 @@
 #include "platform/KeyboardHook.h"
 
 #include <QElapsedTimer>
+#include <QPointer>
 #include <QWidget>
 
 class AxisPanel;
@@ -23,6 +24,7 @@ class QCheckBox;
 class QComboBox;
 class QLabel;
 class QMenu;
+class QMessageBox;
 class QScrollBar;
 class QSpinBox;
 class QSplitter;
@@ -73,6 +75,9 @@ private:
     void updateHistograms();
     void showHistograms();
     void captureToggled(bool on);
+    void hookFailed(const QString &reason);
+    void hookStarted();
+    void showHookError();
     void showTextInput();
     void showHelpMenu();
     void selectPreset(const QString &name);
@@ -187,6 +192,8 @@ private:
     QToolButton *m_helpButton = nullptr;
 
     KeyboardHook m_hook;
+    QString m_hookError;                     // why the hook does not run; empty when it does (or was not started)
+    QPointer<QMessageBox> m_hookErrorBox;
     Recorder m_recorder;
     JournalWriter m_journal;
     bool m_journalFailed = false; // the journal could not be written: said once

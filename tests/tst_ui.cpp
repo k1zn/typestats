@@ -138,6 +138,31 @@ private slots:
         QVERIFY(w.windowTitle().startsWith(QStringLiteral("Ts: ON - ")));
     }
 
+    void hookFailure()
+    {
+        // The hook could not start: "Ts: OFF", the reason once; it stays off until the hook starts by itself.
+        MainWindow w;
+        QVERIFY(w.m_capture->isChecked());
+        emit w.m_hook.failed(QStringLiteral("no access"));
+        QVERIFY(!w.m_capture->isChecked());
+        QVERIFY(w.windowTitle().startsWith(QStringLiteral("Ts: OFF - ")));
+        QCOMPARE(w.findChildren<QMessageBox *>().size(), 1);
+        QCOMPARE(w.findChild<QMessageBox *>()->text(), QStringLiteral("no access"));
+        w.m_capture->setChecked(true); // the user tries: the reason again, the same box
+        QVERIFY(!w.m_capture->isChecked());
+        QCOMPARE(w.findChildren<QMessageBox *>().size(), 1);
+        QVERIFY(w.windowTitle().startsWith(QStringLiteral("Ts: OFF - ")));
+
+        emit w.m_hook.started(); // the access was granted
+        QVERIFY(w.m_capture->isChecked());
+        QVERIFY(w.windowTitle().startsWith(QStringLiteral("Ts: ON - ")));
+        QTRY_COMPARE(w.findChildren<QMessageBox *>().size(), 0);
+        // Switched off by the user: a start of the hook does not switch it on.
+        w.m_capture->setChecked(false);
+        emit w.m_hook.started();
+        QVERIFY(!w.m_capture->isChecked());
+    }
+
     void klavogramCursor()
     {
         // The cursor mode sticks to the nearest key event: the same one as a search from the first record.

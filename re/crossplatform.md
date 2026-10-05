@@ -105,7 +105,12 @@ Translocation), на Linux `/usr/bin` или AppImage. Журнал при эт�
 - Проверка: снимки под Xvfb в Docker (`QT_QPA_PLATFORM=xcb`, `xvfb-run`, `grab()` окна → PNG) против
   `re/ui_reference/` и снимков Windows-версии. На Linux нужен `fonts-liberation` (иначе DejaVu шире).
 
-### 4. Ошибка запуска хука видна
+### 4. Ошибка запуска хука видна — сделано
+Сделано так: у `KeyboardHook` сигналы `failed(причина для пользователя)` и `started()` (хук может запуститься позже сам,
+когда дадут доступ — это делают бэкенды шагов 5–6). `MainWindow::hookFailed`: «Вкл» снимается (заголовок и трей —
+«Ts: OFF»), причина — немодальным сообщением с выделяемым текстом; попытка включить «Вкл» вручную снова показывает его
+и оставляет выключенным; `hookStarted` включает обратно, только если выключила ошибка. Тест `tst_ui::hookFailure`.
+
 `KeyboardHook::failed` ни к чему не подключён (`MainWindow.cpp:690`), а `m_running = true` ставится до результата.
 Нужно: при ошибке — «Ts: OFF» в заголовке и трее, кнопка перехвата отжата, одно сообщение с причиной и что делать
 (Linux: нет доступа к `/dev/input` → как поставить udev-правило; macOS: разрешение «Мониторинг ввода»); на macOS —
@@ -218,7 +223,7 @@ Accessibility.
 | 1 | `third_party/QXlsx/CMakeLists.txt:23` | Linux | `Qt6::GuiPrivate` → нужен `qt6-base-private-dev` | **сделано** (CLAUDE.md) |
 | 2 | `CMakeLists.txt:62` | Linux | `lrelease` не находится вне PATH | **сделано** |
 | 3 | libuiohook `x11/system_properties.c:476` | Linux | без дисплея деструктор `XtCloseDisplay(NULL)` → libXt `exit(1)` (код выхода `tst_ui` = 1); конструктор открывает X до `main` | уйдёт с libuiohook (шаг 5) |
-| 4 | `MainWindow.cpp:690`, `KeyboardHook.cpp:352` | Linux, macOS | `failed` не подключён: «Ts: ON», но ничего не пишется | шаг 4 |
+| 4 | `MainWindow.cpp:690`, `KeyboardHook.cpp:352` | Linux, macOS | `failed` не подключён: «Ts: ON», но ничего не пишется | **сделано** |
 | 5 | `KeyboardHook.cpp:347` | X11, macOS | гонка press/typed — теряются символы | шаги 5–6 |
 | 6 | libuiohook `x11/input_helper.c:1644` | X11 | xkb-состояние не следит за сменой раскладки окружением — кириллица латиницей | шаг 5 |
 | 7 | `KeyboardHook.cpp:322` | X11, macOS | флаги модификаторов инвертированы относительно Windows | шаги 5–6 |

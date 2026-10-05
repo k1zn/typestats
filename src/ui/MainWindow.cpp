@@ -233,6 +233,8 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_hist, &HistogramWindow::extraRequested, this, &MainWindow::showExtraStats);
     connect(m_extra, &ExtraStatsWindow::rowsChanged, this, [this] { m_hist->setExtraRows(m_extra->rows()); });
     connect(&m_hook, &KeyboardHook::key, this, &MainWindow::keyEvent);
+    connect(&m_hook, &KeyboardHook::failed, this, &MainWindow::hookFailed);
+    connect(&m_hook, &KeyboardHook::started, this, &MainWindow::hookStarted);
     auto *timer = new QTimer(this);
     connect(timer, &QTimer::timeout, this, &MainWindow::tick);
     timer->start(100);
@@ -552,8 +554,45 @@ void MainWindow::updateTitle()
     setWindowTitle(title);
 }
 
+void MainWindow::hookFailed(const QString &reason)
+{
+    // Nothing can be recorded: "Ts: OFF", and the reason once (the hook may start by itself later).
+    m_hookError = reason;
+    m_capture->setChecked(false);
+    showHookError();
+}
+
+void MainWindow::hookStarted()
+{
+    if (m_hookError.isEmpty())
+        return;
+    m_hookError.clear();
+    m_capture->setChecked(true);
+    if (m_hookErrorBox)
+        m_hookErrorBox->close();
+}
+
+void MainWindow::showHookError()
+{
+    if (m_hookErrorBox) {
+        m_hookErrorBox->raise();
+        return;
+    }
+    m_hookErrorBox = new QMessageBox(QMessageBox::Warning, appTitle(), m_hookError, QMessageBox::Ok, this);
+    m_hookErrorBox->setAttribute(Qt::WA_DeleteOnClose);
+    m_hookErrorBox->setTextInteractionFlags(Qt::TextSelectableByMouse); // the commands can be copied
+    m_hookErrorBox->open();
+}
+
 void MainWindow::captureToggled(bool on)
 {
+    if (on && !m_hookError.isEmpty()) {
+        // Switched on while the hook does not work: it stays off.
+        const QSignalBlocker b(m_capture);
+        m_capture->setChecked(false);
+        showHookError();
+        return;
+    }
     m_tray->setToolTip(on ? QStringLiteral("Ts: ON") : QStringLiteral("Ts: OFF"));
     updateTitle();
     const QIcon icon = QApplication::windowIcon();

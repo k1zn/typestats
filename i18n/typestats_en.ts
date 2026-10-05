@@ -444,6 +444,13 @@ Special thanks to Urikor (for the great site and the hosting), Avtandilina, Dron
     </message>
 </context>
 <context>
+    <name>KeyboardHook</name>
+    <message>
+        <source>Не удалось перехватить клавиатуру (SetWindowsHookEx: ошибка %1).</source>
+        <translation>Could not hook the keyboard (SetWindowsHookEx: error %1).</translation>
+    </message>
+</context>
+<context>
     <name>KlavogramWidget</name>
     <message>
         <source>зн/мин</source>

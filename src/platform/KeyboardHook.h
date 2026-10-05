@@ -22,6 +22,8 @@ public:
     explicit KeyboardHook(QObject *parent = nullptr);
     ~KeyboardHook() override;
 
+    // Starts the capture; false (and failed()) when it cannot start now. The hook may still start
+    // by itself later (the access is granted): then started() comes.
     bool start();
     void stop();
     bool isRunning() const { return m_running; }
@@ -45,7 +47,9 @@ public:
 
 signals:
     void key(const HookEvent &e);
+    // The capture is not running: the reason and what to do, for the user.
     void failed(const QString &reason);
+    void started();
 
 private:
     void flushPending();
