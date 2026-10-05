@@ -64,7 +64,12 @@ NaN/Inf → «NAN»/«INF»/«-INF» (как FloatToStrF). `-ffp-contract=off` �
 - QXlsx требует `Qt6::GuiPrivate`: на дистрибутивах нужен `qt6-base-private-dev` (Fedora
   `qt6-qtbase-private-devel`) — записать в CLAUDE.md, раздел «Сборка».
 
-### 2. Файлы программы не рядом с exe
+### 2. Файлы программы не рядом с exe — сделано
+Сделано так: `src/ui/AppPaths` (`dataDir()`, `file(name)` с переносом старой копии из папки exe, `setDataDir` для
+тестов); на Windows папка exe проверяется пробным `QTemporaryFile`. Журнал не переносится. Ошибка записи журнала —
+немодальное сообщение один раз (`m_journalFailed`). `IniFile::save` пишет cp1251, если текст в нём представим, иначе
+UTF-8. Тесты: `tst_ui::dataFiles`, `tst_ui::journalFailure`, `tst_zones::iniSavedAsAnsi`.
+
 `FingerZones.ini` (`MainWindow.cpp:117`), `ExStats.ini` (`ExtraStatsWindow.cpp:66`), журнал (`MainWindow.cpp:118`,
 `:1421`) пишутся в `applicationDirPath`: на macOS это внутри `.app` (только чтение, ломает подпись, App
 Translocation), на Linux `/usr/bin` или AppImage. Журнал при этом молча не пишется (`append` → false не
@@ -218,7 +223,7 @@ Accessibility.
 | 13 | libuiohook `darwin/input_hook.c:1179,277` | macOS | активный tap + `dispatch_sync`: лаги системы, таймаут, зависание на выходе | шаг 6 |
 | 14 | `Video.cpp:35` | Linux, macOS | пути видео из Windows-`.tsf` не находятся | снято (видео убрано) |
 | 15 | `NumberFormat.cpp`, `long double` | arm64, MSVC | другие половинки, NaN → UB | **сделано** (Ext80) |
-| 16 | `MainWindow.cpp:117,1421`, `ExtraStatsWindow.cpp:66` | Linux, macOS | ini и журнал в папке exe | шаг 2 |
+| 16 | `MainWindow.cpp:117,1421`, `ExtraStatsWindow.cpp:66` | Linux, macOS | ini и журнал в папке exe | **сделано** |
 | 17 | `main.cpp:35` | Linux, macOS | стиль и шрифт платформы при абсолютной геометрии; тёмная тема KDE | шаг 3 |
 | 18 | `GraphWidget.cpp:93,213,589`, `HistogramWindow.cpp:60`, `KlavogramWidget.cpp:64,73` | macOS | шрифты в pt мельче на 25 % | шаг 3 |
 | 19 | Arial/Courier New | Linux | без `fonts-liberation` — DejaVu шире | шаги 3, 7 |

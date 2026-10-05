@@ -70,6 +70,32 @@ private slots:
         }
     }
 
+    void iniSavedAsAnsi()
+    {
+        // Written as the original reads it (cp1251); UTF-8 only when cp1251 has no place for a character.
+        QTemporaryDir dir;
+        const QString path = dir.filePath(QStringLiteral("z.ini"));
+        IniFile ini;
+        ini.parse(QStringLiteral("[Моя схема]\nFinger0=1E\n"));
+        QVERIFY(ini.save(path));
+        QFile f(path);
+        QVERIFY(f.open(QIODevice::ReadOnly));
+        const QByteArray bytes = f.readAll();
+        f.close();
+        QCOMPARE(bytes, Cp1251::encode(ini.toString()));
+        IniFile back;
+        QVERIFY(back.load(path));
+        QCOMPARE(back.sections(), QStringList{QStringLiteral("Моя схема")});
+
+        ini.parse(QStringLiteral("[日本]\nFinger0=1E\n"));
+        QVERIFY(ini.save(path));
+        QVERIFY(f.open(QIODevice::ReadOnly));
+        QCOMPARE(f.readAll(), ini.toString().toUtf8());
+        f.close();
+        QVERIFY(back.load(path));
+        QCOMPARE(back.sections(), QStringList{QStringLiteral("日本")});
+    }
+
     void schemes()
     {
         QTemporaryDir dir;

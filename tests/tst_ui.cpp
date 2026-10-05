@@ -2,6 +2,7 @@
 // recording, editing, copying, the graph and its link with the klavogram.
 
 #include "core/Editing.h"
+#include "ui/AppPaths.h"
 #include "ui/ExtraStatsWindow.h"
 #include "ui/FingerZonesDialog.h"
 #include "ui/GraphPanels.h"
@@ -39,6 +40,7 @@
 #include <QTextCursor>
 #include <QComboBox>
 #include <QToolButton>
+#include <QMessageBox>
 
 class TstUi : public QObject
 {
@@ -63,6 +65,55 @@ private slots:
         QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, m_settings.path());
         QCoreApplication::setOrganizationName(QStringLiteral("TypingStatisticsTest"));
         QCoreApplication::setApplicationName(QStringLiteral("tst_ui"));
+        AppPaths::setDataDir(m_settings.path()); // FingerZones.ini, ExStats.ini, journals
+    }
+
+    void dataFiles()
+    {
+        // The files of the program are in its data folder; an older copy next to the program is taken over.
+        QTemporaryDir data;
+        AppPaths::setDataDir(data.path());
+        const QString name = QStringLiteral("tst_ui-%1.ini").arg(QCoreApplication::applicationPid());
+        QFile old(QDir(QCoreApplication::applicationDirPath()).filePath(name));
+        QVERIFY(old.open(QIODevice::WriteOnly));
+        old.write("[a]\r\n");
+        old.close();
+        const QString path = AppPaths::file(name);
+        QCOMPARE(path, QDir(data.path()).filePath(name));
+        QVERIFY(QFile::exists(path));
+        QVERIFY(old.remove());
+        AppPaths::setDataDir(m_settings.path());
+    }
+
+    void journalFailure()
+    {
+        // A journal that cannot be written is said once, without stopping the recording.
+        QTemporaryDir data;
+        const QString notDir = QDir(data.path()).filePath(QStringLiteral("file"));
+        QFile f(notDir);
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.close();
+        AppPaths::setDataDir(notDir);
+        QSettings().setValue(QStringLiteral("JournalOn"), true);
+        {
+            MainWindow w;
+            w.applySettings();
+            if (QApplication::activeWindow())
+                QSKIP("the test window got the focus");
+            HookEvent e;
+            e.flags = quint32('A') << 16 | 0x1E | KeyRecord::HasChar;
+            e.ch = u'a';
+            e.chars = 1;
+            w.keyEvent(e);
+            QVERIFY(w.m_journalFailed);
+            QCOMPARE(w.findChildren<QMessageBox *>().size(), 1);
+            e.timeUs = 100000;
+            w.keyEvent(e);
+            QCOMPARE(w.findChildren<QMessageBox *>().size(), 1);
+            QCOMPARE(w.m_doc.records.size(), 2);
+        }
+        QSettings().remove(QStringLiteral("JournalOn"));
+        AppPaths::setDataDir(m_settings.path());
     }
 
     void opensAndPaints()

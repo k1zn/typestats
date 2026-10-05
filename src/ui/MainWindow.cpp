@@ -8,6 +8,7 @@
 #include "HistogramWindow.h"
 #include "KlavogramWidget.h"
 #include "ExtraStatsWindow.h"
+#include "AppPaths.h"
 #include "LiveStatsWindow.h"
 #include "SettingsDialog.h"
 #include "TextView.h"
@@ -27,7 +28,6 @@
 #include <QCloseEvent>
 #include <QDateTime>
 #include <QComboBox>
-#include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFrame>
@@ -112,8 +112,7 @@ QFrame *bevel(QWidget *parent, int x, int y, int w, int h, QFrame::Shape shape)
 } // namespace
 
 MainWindow::MainWindow(QWidget *parent)
-    : QWidget(parent), m_schemes(QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("FingerZones.ini"))),
-      m_journal(QCoreApplication::applicationDirPath())
+    : QWidget(parent), m_schemes(AppPaths::file(QStringLiteral("FingerZones.ini"))), m_journal(AppPaths::dataDir())
 {
     updateTitle();
     setMinimumWidth(220);
@@ -856,8 +855,13 @@ void MainWindow::keyEvent(const HookEvent &e)
     if (out.liveReset)
         m_liveTicks = 10; // shown at the next tick
     if (out.recorded) {
-        if (m_journalOn)
-            m_journal.append(m_doc.records.last());
+        if (m_journalOn && !m_journal.append(m_doc.records.last()) && !m_journalFailed) {
+            m_journalFailed = true; // said once
+            auto *box = new QMessageBox(QMessageBox::Warning, appTitle(),
+                                        tr("Не удалось записать журнал %1").arg(m_journal.path()), QMessageBox::Ok, this);
+            box->setAttribute(Qt::WA_DeleteOnClose);
+            box->open(); // not exec(): this is the hook
+        }
         m_needRecalc = true;
         m_lastKey.start();
     }
@@ -1356,7 +1360,7 @@ void MainWindow::open()
 void MainWindow::openJournal()
 {
     // This month's journal, as the original's button does.
-    const QString path = JournalWriter(QCoreApplication::applicationDirPath()).path();
+    const QString path = JournalWriter(AppPaths::dataDir()).path();
     if (QFileInfo::exists(path))
         openFile(path);
     else

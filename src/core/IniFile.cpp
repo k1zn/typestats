@@ -30,7 +30,10 @@ bool IniFile::save(const QString &path) const
     QFile f(path);
     if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
         return false;
-    return f.write(toString().toUtf8()) >= 0;
+    // The original reads INI files as ANSI: cp1251 unless some character has no place in it.
+    const QString text = toString();
+    const QByteArray ansi = Cp1251::encode(text);
+    return f.write(Cp1251::decode(ansi) == text ? ansi : text.toUtf8()) >= 0;
 }
 
 void IniFile::parse(const QString &text)

@@ -189,6 +189,7 @@ private:
     KeyboardHook m_hook;
     Recorder m_recorder;
     JournalWriter m_journal;
+    bool m_journalFailed = false; // the journal could not be written: said once
     LiveStatsWindow *m_live = nullptr;
     ExtraStatsWindow *m_extra = nullptr;
     HistogramWindow *m_hist = nullptr;

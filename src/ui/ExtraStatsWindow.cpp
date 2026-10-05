@@ -1,13 +1,12 @@
 #include "ExtraStatsWindow.h"
 
+#include "AppPaths.h"
 #include "StringTableModel.h"
 
 #include <QApplication>
 #include <QCheckBox>
 #include <QClipboard>
 #include <QComboBox>
-#include <QCoreApplication>
-#include <QDir>
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -63,7 +62,7 @@ QTableView *reportView(StringTableModel *model)
 ExtraStatsWindow::ExtraStatsWindow(QWidget *parent)
     : QWidget(parent, Qt::Window | Qt::CustomizeWindowHint | Qt::WindowTitleHint | Qt::WindowSystemMenuHint
                           | Qt::WindowCloseButtonHint),
-      m_templates(QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("ExStats.ini")))
+      m_templates(AppPaths::file(QStringLiteral("ExStats.ini")))
 {
     setWindowTitle(tr("Дополнительная статистика"));
     setMinimumSize(216, 412); // Constraints of the form, less its frame
