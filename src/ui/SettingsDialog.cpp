@@ -12,6 +12,7 @@
 #include <QPushButton>
 #include <QSettings>
 #include <QSpinBox>
+#include <QSystemTrayIcon>
 
 namespace {
 
@@ -74,6 +75,10 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent)
     m_copyNext = checkBox(tags, tr("Выделять цветом следующий символ"), 8, 48, "CopyBlock3", true);
 
     m_tray = checkBox(this, tr("Сворачивать в трей"), 8, 216, "MinimizeToTray", false);
+    if (!QSystemTrayIcon::isSystemTrayAvailable()) { // GNOME without the AppIndicator extension
+        m_tray->setEnabled(false);
+        m_tray->setToolTip(tr("Системный трей недоступен"));
+    }
     m_journal = checkBox(this, tr("Вести журнал"), 8, 232, "JournalOn", false);
     m_autoComments = checkBox(this, tr("Автокомментарии"), 8, 248, "AutoComments", false);
     m_autoMinimize = checkBox(this, tr("Сворачивать при старте"), 8, 264, "AutoMinimize", false);

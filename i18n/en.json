@@ -206,5 +206,7 @@
   "Название пресета": "Name of the preset",
   "Удаление пресета": "Deleting a preset",
   "Вы действительно хотите удалить пресет?": "Do you really want to delete the preset?",
-  "Ввод текста": "Text input"
+  "Ввод текста": "Text input",
+  "Не удалось записать журнал %1": "Could not write the journal %1",
+  "Системный трей недоступен": "The system tray is not available"
 }

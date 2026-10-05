@@ -1,5 +1,7 @@
 #include "TextView.h"
 
+#include "Look.h"
+
 #include <QAbstractTextDocumentLayout>
 #include <QContextMenuEvent>
 #include <QScrollBar>
@@ -38,7 +40,7 @@ void TextView::setFontSize(int points)
 {
     // The size the original gets at 96 dpi: 12 pt is 16 px.
     QFont f = font();
-    f.setPixelSize(qRound(points * 96.0 / 72.0));
+    f.setPixelSize(Look::pointsToPixels(points));
     setFont(f);
 }
 

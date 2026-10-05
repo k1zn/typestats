@@ -782,6 +782,10 @@ Special thanks to Urikor (for the great site and the hosting), Avtandilina, Dron
         <source>Кол-во</source>
         <translation>Count</translation>
     </message>
+    <message>
+        <source>Не удалось записать журнал %1</source>
+        <translation>Could not write the journal %1</translation>
+    </message>
 </context>
 <context>
     <name>SettingsDialog</name>
@@ -876,6 +880,10 @@ Special thanks to Urikor (for the great site and the hosting), Avtandilina, Dron
     <message>
         <source>Отмена</source>
         <translation>Cancel</translation>
+    </message>
+    <message>
+        <source>Системный трей недоступен</source>
+        <translation>The system tray is not available</translation>
     </message>
 </context>
 <context>

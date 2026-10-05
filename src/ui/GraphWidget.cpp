@@ -1,5 +1,6 @@
 #include "GraphWidget.h"
 
+#include "Look.h"
 #include "core/NumberFormat.h"
 
 #include <QMouseEvent>
@@ -90,7 +91,7 @@ GraphWidget::GraphWidget(QWidget *parent) : QWidget(parent)
     setContextMenuPolicy(Qt::PreventContextMenu);
     m_axisWidth = int(float(fontMetrics().horizontalAdvance(QLatin1Char('0'))) * 5.5f);
     for (int k = 0; k < int(m_charWidth.size()); ++k)
-        m_charWidth[k] = QFontMetrics(QFont(kStripFont, k + 8)).horizontalAdvance(QLatin1Char('1'));
+        m_charWidth[k] = QFontMetrics(Look::pointFont(kStripFont, k + 8)).horizontalAdvance(QLatin1Char('1'));
     m_scale[Arrhythmia] = {0.25, -100.0};
 }
 
@@ -210,7 +211,7 @@ void GraphWidget::setAxisSettings(const AxisSettings &s)
 
 int GraphWidget::stripHeight() const
 {
-    return QFontMetrics(QFont(kStripFont, 18)).height();
+    return QFontMetrics(Look::pointFont(kStripFont, 18)).height();
 }
 
 QRect GraphWidget::graphRect() const
@@ -586,7 +587,7 @@ void GraphWidget::drawStrip(QPainter &p, const QRect &g, int stripFont)
         return;
     const int w = g.width();
     const int half = m_charWidth[stripFont - 8] / 2;
-    const QFont f(kStripFont, stripFont);
+    const QFont f = Look::pointFont(kStripFont, stripFont);
     const QFontMetrics fm(f);
     p.setFont(f);
     for (int i = firstIndex(); i < m_model->size(); ++i) {

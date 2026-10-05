@@ -1,5 +1,6 @@
 #include "FingerZonesDialog.h"
 
+#include "Look.h"
 #include "Texts.h"
 #include "platform/KeyboardHook.h"
 
@@ -87,7 +88,8 @@ protected:
         p.setPen(Qt::black);
         p.setBrush(Qt::white);
         p.drawRect(rect().adjusted(0, 0, -1, -1));
-        const QFont big(QStringLiteral("Times New Roman"), 16), small(QStringLiteral("Times New Roman"), 10);
+        const QFont big = Look::pointFont(QStringLiteral("Times New Roman"), 16),
+                    small = Look::pointFont(QStringLiteral("Times New Roman"), 10);
         auto roundRect = [&p](const QRect &r, int pen) {
             p.setPen(QPen(Qt::black, pen));
             p.drawRoundedRect(r, kCorner / 2.0, kCorner / 2.0);
@@ -159,7 +161,7 @@ protected:
         QPainter p(this);
         const QStringList names = Texts::histogramNames().fingers;
         const float rowHeight = float(height()) / 9.0f;
-        QFont font(QStringLiteral("Courier New"), 10);
+        QFont font = Look::pointFont(QStringLiteral("Courier New"), 10);
         for (int i = 0; i < 9; ++i) {
             const int top = int(float(i) * rowHeight), bottom = int(float(i + 1) * rowHeight + 1.0f);
             p.setPen(Qt::black);

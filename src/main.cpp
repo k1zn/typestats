@@ -1,3 +1,4 @@
+#include "ui/Look.h"
 #include "ui/MainWindow.h"
 #include "ui/Presets.h"
 #include "ui/Texts.h"
@@ -5,7 +6,6 @@
 #include <QApplication>
 #include <QIcon>
 #include <QSettings>
-#include <QStyleHints>
 #include <QTimer>
 #include <QTranslator>
 
@@ -30,13 +30,9 @@ int main(int argc, char *argv[])
     if (language != QLatin1String("Russian") && translator.load(QStringLiteral(":/i18n/typestats_en.qm")))
         app.installTranslator(&translator);
 
-    // The look of the original: a classic light window with compact native controls and the
-    // 8 pt dialog font its layout was made for.
-    QGuiApplication::styleHints()->setColorScheme(Qt::ColorScheme::Light);
-#ifdef Q_OS_WIN
-    QApplication::setStyle(QStringLiteral("windowsvista"));
-    QApplication::setFont(QFont(QStringLiteral("Microsoft Sans Serif"), 8));
-#endif
+    // The look of the original: a classic light window with compact controls and the 8 pt dialog font
+    // its layout was made for.
+    Look::apply();
 
     MainWindow w;
     w.show();

@@ -1,5 +1,7 @@
 #include "TextInputWindow.h"
 
+#include "Look.h"
+
 #include <QKeyEvent>
 #include <QSettings>
 #include <QTextEdit>
@@ -28,7 +30,7 @@ void TextInputWindow::clear()
 void TextInputWindow::setFontSize(int points)
 {
     QFont f = m_edit->font();
-    f.setPixelSize(qRound(points * 96.0 / 72.0));
+    f.setPixelSize(Look::pointsToPixels(points));
     m_edit->setFont(f);
 }
 

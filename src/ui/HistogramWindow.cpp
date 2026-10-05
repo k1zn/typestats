@@ -1,5 +1,6 @@
 #include "HistogramWindow.h"
 
+#include "Look.h"
 #include "Texts.h"
 #include "core/NumberFormat.h"
 
@@ -57,9 +58,9 @@ HistogramWidget::HistogramWidget(QWidget *parent) : QWidget(parent)
 {
     setContextMenuPolicy(Qt::PreventContextMenu);
     m_axisWidth = int(float(QFontMetrics(font()).horizontalAdvance(QLatin1Char('0'))) * 5.5f);
-    m_stripHeight = QFontMetrics(QFont(kLabelFont, 18)).height();
+    m_stripHeight = QFontMetrics(Look::pointFont(kLabelFont, 18)).height();
     for (int k = 0; k < 4; ++k)
-        m_charWidth[k] = QFontMetrics(QFont(kLabelFont, k + 8)).horizontalAdvance(QLatin1Char('1'));
+        m_charWidth[k] = QFontMetrics(Look::pointFont(kLabelFont, k + 8)).horizontalAdvance(QLatin1Char('1'));
 }
 
 QRect HistogramWidget::plotRect() const
@@ -239,7 +240,7 @@ void HistogramWidget::paintEvent(QPaintEvent *)
 
     // The labels, each centred under its bar; one that would run into the previous one is left out.
     if (labelFont > 0) {
-        const QFont f(kLabelFont, labelFont);
+        const QFont f = Look::pointFont(kLabelFont, labelFont);
         const QFontMetrics lfm(f);
         p.setFont(f);
         p.setClipRect(QRect(m_axisWidth, h + 1, w, height() - h - 1));

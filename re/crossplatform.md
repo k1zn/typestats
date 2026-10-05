@@ -82,7 +82,14 @@ Translocation), на Linux `/usr/bin` или AppImage. Журнал при эт�
 - По пути (не ОС): `IniFile::save` пишет UTF-8, а оригинал читает INI как ANSI — кириллические имена схем в общем
   `FingerZones.ini` у оригинала станут кракозябрами. Решить: писать cp1251, если всё кодируется.
 
-### 3. Вид вне Windows (`src/main.cpp:35`)
+### 3. Вид вне Windows (`src/main.cpp:35`) — сделано
+Сделано так: `src/ui/Look` — `apply()` (Windows: windowsvista + MS Sans Serif 8 pt, как было; иначе Fusion, светлая
+палитра системных цветов Windows, шрифт 11 px из списка семейств) и `pointFont`/`pointsToPixels` для всех шрифтов в
+пунктах. Снимки Windows до/после совпали (кроме подсветки кнопки под курсором). Снимки под Xvfb в Docker — тест-снимок
+`tst_ui_lsnap.cpp` (как `re/scripts/tst_ui_snap.cpp`, но с `Look::apply()`, формами settings/about/kbd/input и
+`QT_QPA_PLATFORM=xcb xvfb-run`): формы не обрезаны, шрифты Liberation. «Сворачивать в трей» выключено, если трея нет.
+Ограничения Wayland (свёрнутое состояние, `raise`, позиции окон, «поверх всех») — не лечатся, только записаны здесь.
+
 Геометрия форм — абсолютные пиксели из DFM (`setGeometry`/`setFixedSize` в About, Form2, Form8, панелях,
 тулбаре, Form3) под шрифт MS Sans Serif 8 pt @96 dpi; на Linux/macOS стиль платформы и шрифт 10–13 pt обрезают
 подписи, тёмная тема KDE (Breeze) игнорирует `setColorScheme(Light)`.
@@ -224,10 +231,10 @@ Accessibility.
 | 14 | `Video.cpp:35` | Linux, macOS | пути видео из Windows-`.tsf` не находятся | снято (видео убрано) |
 | 15 | `NumberFormat.cpp`, `long double` | arm64, MSVC | другие половинки, NaN → UB | **сделано** (Ext80) |
 | 16 | `MainWindow.cpp:117,1421`, `ExtraStatsWindow.cpp:66` | Linux, macOS | ini и журнал в папке exe | **сделано** |
-| 17 | `main.cpp:35` | Linux, macOS | стиль и шрифт платформы при абсолютной геометрии; тёмная тема KDE | шаг 3 |
-| 18 | `GraphWidget.cpp:93,213,589`, `HistogramWindow.cpp:60`, `KlavogramWidget.cpp:64,73` | macOS | шрифты в pt мельче на 25 % | шаг 3 |
-| 19 | Arial/Courier New | Linux | без `fonts-liberation` — DejaVu шире | шаги 3, 7 |
-| 20 | `MainWindow.cpp:531`, `LiveStatsWindow.cpp:86` | Wayland, GNOME | трей, свёрнутое состояние, позиции, «поверх всех» | шаг 3 |
+| 17 | `main.cpp:35` | Linux, macOS | стиль и шрифт платформы при абсолютной геометрии; тёмная тема KDE | **сделано** |
+| 18 | `GraphWidget.cpp:93,213,589`, `HistogramWindow.cpp:60`, `KlavogramWidget.cpp:64,73` | macOS | шрифты в pt мельче на 25 % | **сделано** |
+| 19 | Arial/Courier New | Linux | без `fonts-liberation` — DejaVu шире | шаг 3 (выбор семейства); зависимость пакета — шаг 7 |
+| 20 | `MainWindow.cpp:531`, `LiveStatsWindow.cpp:86` | Wayland, GNOME | трей, свёрнутое состояние, позиции, «поверх всех» | трей — **сделано**; остальное — ограничение Wayland |
 | 21 | `CMakeLists.txt:49` | macOS | `.app` без bundle id, иконки, plist; нет `install()` для Linux | шаги 6–7 |
 | 22 | libuiohook `CMakeLists.txt:223` | macOS | `CMAKE_OSX_DEPLOYMENT_TARGET 10.5` | уйдёт с libuiohook |
 | 23 | `tst_recorder.cpp:41`, `GraphPanels.cpp:247` | все | предупреждения `-Wall -Wextra` | **сделано** |

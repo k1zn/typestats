@@ -1,5 +1,6 @@
 #include "KlavogramWidget.h"
 
+#include "Look.h"
 #include "core/KeyList.h"
 #include "core/KeyName.h"
 #include "core/MainStats.h"
@@ -61,7 +62,7 @@ qint64 xOf(const KlavRecord &r, float scrollMs, float zoom)
 
 } // namespace
 
-KlavogramWidget::KlavogramWidget(QWidget *parent) : QWidget(parent), m_font(QStringLiteral("Arial"), 9)
+KlavogramWidget::KlavogramWidget(QWidget *parent) : QWidget(parent), m_font(Look::pointFont(QStringLiteral("Arial"), 9))
 {
     setMinimumHeight(20);
     setMouseTracking(true); // the cursor of the cursor mode follows the mouse
@@ -70,7 +71,7 @@ KlavogramWidget::KlavogramWidget(QWidget *parent) : QWidget(parent), m_font(QStr
 
 void KlavogramWidget::setFontSize(int points)
 {
-    m_font.setPointSize(points);
+    m_font.setPixelSize(Look::pointsToPixels(points));
     update();
 }
 
