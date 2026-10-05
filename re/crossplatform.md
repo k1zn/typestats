@@ -40,7 +40,7 @@ MSYS_NO_PATHCONV=1 docker run --rm -v "C:\Users\kizn\Desktop\typestats:/src:ro" 
 
 ## Сделано
 
-**Ext80** (коммит d840649): `src/core/Ext80.h` — программная 80-битная x87-арифметика (64-битная мантисса,
+**Ext80** (коммит bf707a4): `src/core/Ext80.h` — программная 80-битная x87-арифметика (64-битная мантисса,
 округление к чётному), `using Ext = long double` там, где он x87 (GCC/Clang на x86), иначе `Ext80`. Опция CMake
 `TS_SOFT_EXT80=ON` включает `Ext80` везде (для проверки). Все `long double`/`0.001L` в ядре и окнах заменены на
 `Ext`/`kExtMilli`/`kExtCenti`. `tst_ext80` сверяет с аппаратурой 3,4 млн операций; с `TS_SOFT_EXT80` `tst_orig`
