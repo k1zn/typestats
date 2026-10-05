@@ -100,6 +100,14 @@ jobs:
         run: cmake --build build
       - name: Test
         run: QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure
+      # TEMPORARY (re/perf.md, audit 2026-10-06): the bench on the runner; removed after the measurements.
+      - name: Perf (temporary)
+        if: matrix.name == 'clang-soft-ext80'
+        run: |
+          python3 re/scripts/gen_big.py "$RUNNER_TEMP/tsperf" --sizes 500000
+          cmake --build build --target tst_perf
+          TS_PERF_DIR="$RUNNER_TEMP/tsperf" TS_PERF_SIZES=500000 QT_QPA_PLATFORM=offscreen ./build/tst_perf core window > /dev/null || true
+          cat "$RUNNER_TEMP/tsperf/perf.txt"
       - name: AppImage
         if: matrix.package
         run: bash ci/linux/appimage.sh build
@@ -136,6 +144,13 @@ jobs:
         run: cmake --build build
       - name: Test
         run: QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure
+      # TEMPORARY (re/perf.md, audit 2026-10-06): the bench on the runner; removed after the measurements.
+      - name: Perf (temporary)
+        run: |
+          python3 re/scripts/gen_big.py "$RUNNER_TEMP/tsperf" --sizes 500000
+          cmake --build build --target tst_perf
+          TS_PERF_DIR="$RUNNER_TEMP/tsperf" TS_PERF_SIZES=500000 QT_QPA_PLATFORM=offscreen ./build/tst_perf core window convertLayout macPath > /dev/null || true
+          cat "$RUNNER_TEMP/tsperf/perf.txt"
       - name: Package
         run: |
           macdeployqt build/TypingStatistics.app

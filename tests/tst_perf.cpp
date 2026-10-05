@@ -47,6 +47,7 @@
 #include <QTest>
 #include <QTextCursor>
 #include <QTextDocument>
+#include <QThread>
 
 #include <algorithm>
 
@@ -562,6 +563,62 @@ private slots:
             }, 3);
         }
         // The event on its way to the GUI thread: a queued call with the event, as KeyboardHookLinux does.
+        class Sink : public QObject
+        {
+        public:
+            int got = 0;
+        } sink;
+        measure(QStringLiteral("queued event to GUI x10000"), 10000, [&] {
+            for (int i = 0; i < 10000; ++i) {
+                HookEvent e;
+                e.timeUs = i;
+                QMetaObject::invokeMethod(&sink, [&sink, e] { sink.got += int(e.timeUs & 1); }, Qt::QueuedConnection);
+            }
+            QCoreApplication::sendPostedEvents(&sink);
+        });
+    }
+#endif
+
+#ifdef Q_OS_MACOS
+    // The macOS hook without a keyboard (the tap needs the permission and real keys): the parts of its callback -
+    // the layout data (mutex + CFRetain) and UCKeyTranslate, the queued call to the GUI thread - and the front
+    // window, asked by every key in the GUI thread (CGWindowListCopyWindowInfo, cached for 200 ms).
+    void macPath()
+    {
+        log(QStringLiteral("# layout: key 0x1E is \"%1\"").arg(KeyboardHook::layoutKeyName(0x1E)));
+        measure(QStringLiteral("KeyboardHook::toUnicode x100000"), 100000, [&] {
+            char16_t out[2];
+            for (int i = 0; i < 100000; ++i)
+                KeyboardHook::toUnicode(quint8(0x10 + i % 40), i % 5 == 0, false, out);
+            KeyboardHook::clearDeadKey();
+        });
+        measure(QStringLiteral("KeyboardHook::layoutKeyName x110 (Tkbd)"), 110, [&] {
+            for (int i = 0; i < 110; ++i)
+                KeyboardHook::layoutKeyName(quint8(1 + i), nullptr);
+        });
+        measure(QStringLiteral("KeyboardHook::capsLock x10000"), 10000, [&] {
+            int on = 0;
+            for (int i = 0; i < 10000; ++i)
+                on += KeyboardHook::capsLock();
+            Q_UNUSED(on);
+        });
+        // The cache lives 200 ms: a call after 250 ms asks the window server.
+        QVector<double> cold;
+        for (int i = 0; i < 5; ++i) {
+            QThread::msleep(250);
+            QElapsedTimer e;
+            e.start();
+            KeyboardHook::foregroundWindow();
+            cold << double(e.nsecsElapsed()) / 1e6;
+        }
+        std::sort(cold.begin(), cold.end());
+        log(QStringLiteral("%1\t%2\t%3\t%4\t%5").arg(QStringLiteral("foregroundWindow, uncached (call only)"), -40).arg(0, 7)
+                .arg(cold[2], 10, 'f', 3).arg(cold.first(), 10, 'f', 3).arg(cold.last(), 10, 'f', 3));
+        measure(QStringLiteral("foregroundWindow, cached x10000"), 10000, [&] {
+            for (int i = 0; i < 10000; ++i)
+                KeyboardHook::foregroundWindow();
+        });
+        log(QStringLiteral("# front window: \"%1\"").arg(KeyboardHook::foregroundTitle()));
         class Sink : public QObject
         {
         public:
