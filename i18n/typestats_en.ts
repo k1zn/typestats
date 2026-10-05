@@ -24,66 +24,14 @@
         <translation>Igor V. Filimonov</translation>
     </message>
     <message>
-        <source>Заходите к нам на</source>
-        <translation>Visit our</translation>
-    </message>
-    <message>
-        <source>сайт</source>
-        <translation>site</translation>
-    </message>
-    <message>
-        <source>Заглядывайте на</source>
-        <translation>Drop in at the</translation>
-    </message>
-    <message>
-        <source>форум</source>
-        <translation>forum</translation>
-    </message>
-    <message>
-        <source>Пишите</source>
-        <translation>Write</translation>
-    </message>
-    <message>
-        <source>письма</source>
-        <translation>letters</translation>
-    </message>
-    <message>
-        <source>Набирайте</source>
-        <translation>Type</translation>
-    </message>
-    <message>
-        <source>вслепую</source>
-        <translation>by touch</translation>
-    </message>
-    <message>
-        <source>Надеюсь, Typing statistics Вам в этом поможет</source>
-        <translation>I hope Typing statistics will help you with that</translation>
-    </message>
-    <message>
-        <source>Набирайте вслепую</source>
-        <translation>Type by touch</translation>
-    </message>
-    <message>
-        <source>Будьте</source>
-        <translation>Be</translation>
-    </message>
-    <message>
-        <source>счастливы</source>
-        <translation>happy</translation>
-    </message>
-    <message>
-        <source>Счастье складывается из мелочей...</source>
-        <translation>Happiness is made of small things...</translation>
-    </message>
-    <message>
-        <source>Будьте счастливы!</source>
-        <translation>Be happy!</translation>
-    </message>
-    <message>
         <source>Эта программа была придумана и реализована в результате дебатов на форуме urikor.net. Так что всем участвовавшим (и участвующим по сию пору) форумчанам - Спасибо! Без вас этой программы не было бы.
 Отдельное спасибо - Юрикору (за отличный сайт и предоставленный хостинг), Автандилине, Dron'у, Nestor'у, Валерию Марусяку за поддержку и советы.</source>
         <translation>This program was conceived and made as a result of the debates on the urikor.net forum. So thanks to everyone who took part (and still does)! Without you there would be no such program.
 Special thanks to Urikor (for the great site and the hosting), Avtandilina, Dron, Nestor and Valery Marusyak for their support and advice.</translation>
+    </message>
+    <message>
+        <source>&lt;b&gt;Typing statistics v%1&lt;/b&gt;&lt;br&gt;ремейк на Qt 6 для Windows, Linux и macOS&lt;br&gt;&lt;br&gt;Оригинал (2008–2016):&lt;br&gt;Игорь В. Филимонов&lt;br&gt;&lt;br&gt;Ремейк (2026):&lt;br&gt;Erik (k1zn)</source>
+        <translation>&lt;b&gt;Typing statistics v%1&lt;/b&gt;&lt;br&gt;a Qt 6 remake for Windows, Linux and macOS&lt;br&gt;&lt;br&gt;Original (2008–2016):&lt;br&gt;Igor V. Filimonov&lt;br&gt;&lt;br&gt;Remake (2026):&lt;br&gt;Erik (k1zn)</translation>
     </message>
 </context>
 <context>
@@ -474,6 +422,14 @@ echo 'SUBSYSTEM=="input", KERNEL=="event*", ENV{ID_INPUT_KEYBOARD}=="1", TAG+="u
 sudo udevadm control --reload &amp;&amp; sudo udevadm trigger
 
 Only the user logged in now gets the access. Recording starts by itself, no restart is needed.</translation>
+    </message>
+    <message>
+        <source>Нет разрешения на чтение клавиатуры.
+
+Откройте «Системные настройки» → «Конфиденциальность и безопасность» → «Мониторинг ввода» и включите Typing statistics. Запись начнётся сама; если нет — перезапустите программу.</source>
+        <translation>No permission to read the keyboard.
+
+Open System Settings → Privacy &amp; Security → Input Monitoring and turn on Typing statistics. Recording will start by itself; if it does not, restart the program.</translation>
     </message>
 </context>
 <context>
