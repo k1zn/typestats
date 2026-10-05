@@ -528,6 +528,22 @@ private slots:
         QVERIFY(x->rows().size() < words);
         select(w, 0, 0);
         QCOMPARE(int(x->rows().size()), words);
+        // The whole text comes back from where the selection put it, the same as made anew (and sorted).
+        for (int round = 0; round < 3; ++round) {
+            const auto fresh = ExtraStats::rows(
+                ExtraStats::collect(w.m_model, x->m_fingers, 0, int(w.m_model.size()), ExtraStats::Words,
+                                    x->m_template->currentText(), x->filter()),
+                false, x->m_sort.mode, x->m_sort.descending);
+            QCOMPARE(x->rows().size(), fresh.size());
+            for (int i = 0; i < fresh.size(); ++i) {
+                QCOMPARE(x->rows().at(i).text, fresh.at(i).text);
+                QCOMPARE(x->rows().at(i).speed, fresh.at(i).speed);
+                QCOMPARE(x->rows().at(i).value, fresh.at(i).value);
+            }
+            select(w, 0, 40 + round);
+            QVERIFY(x->rows().size() < words);
+            select(w, 0, 0);
+        }
 
         // Locked: the source may change, the list stays; a kind is computed at once.
         x->m_lock->setChecked(true);

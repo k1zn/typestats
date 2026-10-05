@@ -98,6 +98,18 @@ private:
         bool operator==(const Sorted &) const = default;
     };
     Sorted m_sorted;
+    // The previous result, kept for the next source: a selection and a click that drops it alternate
+    // between two sources (a selection and the whole text), and the whole text is not collected anew.
+    struct Stash
+    {
+        Collected key;
+        int occVersion = 0;
+        QVector<ExtraStats::Occurrence> occ;
+        QVector<ExtraStats::Row> rows;
+        Sorted sorted;
+    };
+    std::optional<Stash> m_stash;
+    int m_versions = 0; // the last occVersion given
 
     QVector<ExtraStats::Occurrence> m_occ;   // everything found
     QVector<ExtraStats::Row> m_rows;         // the upper list

@@ -27,6 +27,7 @@
 #include "ui/GraphWidget.h"
 #include "ui/HistogramWindow.h"
 #include "ui/KlavogramWidget.h"
+#include "ui/Look.h"
 #include "ui/MainWindow.h"
 #include "ui/Presets.h"
 #include "ui/TextView.h"
@@ -108,6 +109,10 @@ class TstPerf : public QObject
         PROCESS_MEMORY_COUNTERS_EX pmc{};
         if (GetProcessMemoryInfo(GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS *>(&pmc), sizeof pmc))
             return qint64(pmc.PrivateUsage);
+#elif defined(Q_OS_LINUX)
+        QFile f(QStringLiteral("/proc/self/statm")); // pages: size resident ...
+        if (f.open(QIODevice::ReadOnly))
+            return f.readAll().split(' ').value(1).toLongLong() * 4096;
 #endif
         return 0;
     }
@@ -570,6 +575,26 @@ private slots:
         });
     }
 #endif
+
+    // What main() does before the window: the look, the first start of the platform's keyboard side. Once each:
+    // the second time everything is cached.
+    void startup()
+    {
+        QElapsedTimer e;
+        e.start();
+        Look::apply();
+        log(QStringLiteral("%1	%2	%3").arg(QStringLiteral("startup: Look::apply (first)"), -40).arg(0, 7).arg(double(e.nsecsElapsed()) / 1e6, 10, 'f', 3));
+        e.restart();
+        Presets::importFromOriginal();
+        log(QStringLiteral("%1	%2	%3").arg(QStringLiteral("startup: Presets::importFromOriginal"), -40).arg(0, 7).arg(double(e.nsecsElapsed()) / 1e6, 10, 'f', 3));
+#ifdef Q_OS_LINUX
+        e.restart();
+        KeyboardHook hook;
+        hook.start(); // the desktop's side (layout source, keymap) is made here, in the GUI thread
+        log(QStringLiteral("%1	%2	%3").arg(QStringLiteral("startup: KeyboardHook::start (first)"), -40).arg(0, 7).arg(double(e.nsecsElapsed()) / 1e6, 10, 'f', 3));
+        hook.stop();
+#endif
+    }
 
     void settings()
     {

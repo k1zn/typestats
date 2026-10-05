@@ -237,11 +237,32 @@ void ExtraStatsWindow::computeNow()
     m_dirty = false;
     const Collected source{m_model, m_model ? m_model->serial : 0, m_fingers, m_b, m_e, kind(), m_template->currentText(), filter()};
     if (source != m_collected) {
-        m_occ.clear();
-        if (m_model && m_model->size() > 0)
-            m_occ = ExtraStats::collect(*m_model, m_fingers, m_b, m_e, source.kind, source.pattern, source.filter);
-        m_collected = source;
-        ++m_occVersion;
+        const std::optional<Collected> previous = m_collected;
+        if (m_stash && m_stash->key == source) {
+            // Back to the result before this one: the two change places.
+            if (previous)
+                m_stash->key = *previous;
+            std::swap(m_occVersion, m_stash->occVersion);
+            m_occ.swap(m_stash->occ);
+            m_rows.swap(m_stash->rows);
+            std::swap(m_sorted, m_stash->sorted);
+            m_collected = source;
+            if (!previous || previous->serial != source.serial)
+                m_stash.reset();
+        } else {
+            // Kept only for the same model: the one of an older recalculation is of no use.
+            if (previous && previous->serial == source.serial)
+                m_stash = Stash{*previous, m_occVersion, std::move(m_occ), std::move(m_rows), m_sorted};
+            else
+                m_stash.reset();
+            m_occ.clear();
+            if (m_model && m_model->size() > 0)
+                m_occ = ExtraStats::collect(*m_model, m_fingers, m_b, m_e, source.kind, source.pattern, source.filter);
+            m_collected = source;
+            m_occVersion = ++m_versions;
+            m_rows.clear();
+            m_sorted = {};
+        }
     }
     showRows();
 }
