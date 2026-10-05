@@ -9,13 +9,22 @@ prefix=$(cygpath -m "$1" 2>/dev/null || echo "$1")
 version=${QT_VERSION:-6.8.3}
 work=$(cygpath -m "${RUNNER_TEMP:-${TMPDIR:-/tmp}}" 2>/dev/null || echo "${RUNNER_TEMP:-/tmp}")/qtbase-static
 archive=qtbase-everywhere-src-$version.tar.xz
-path=official_releases/qt/${version%.*}/$version/submodules/$archive
+dir=qt/${version%.*}/$version/submodules
 
 mkdir -p "$work"
 cd "$work"
+# The current release is in official_releases, older ones only in archive.
 if [ ! -f "$archive" ]; then
-    curl -fL --retry 3 -o "$archive" "https://download.qt.io/$path" ||
-        curl -fL --retry 3 -o "$archive" "https://mirrors.ocf.berkeley.edu/qt/$path"
+    for site in https://download.qt.io https://mirrors.ocf.berkeley.edu/qt; do
+        for kind in official_releases archive; do
+            if curl -fsSL --retry 3 -o md5sums.txt "$site/$kind/$dir/md5sums.txt" &&
+               curl -fL --retry 3 -o "$archive" "$site/$kind/$dir/$archive"; then
+                break 2
+            fi
+            rm -f "$archive" md5sums.txt
+        done
+    done
+    grep " $archive\$" md5sums.txt | md5sum -c -
 fi
 rm -rf "qtbase-everywhere-src-$version" build
 tar xf "$archive"
