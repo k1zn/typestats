@@ -1,0 +1,132 @@
+# Builds, tests and packages the port on Windows, Linux and macOS (re/crossplatform.md, step 7).
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+env:
+  QT_VERSION: 6.8.3
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: win64_mingw
+          tools: tools_mingw1310
+          cache: true
+      - uses: lukka/get-cmake@latest
+      - name: MinGW of Qt first in PATH
+        run: echo "$IQTA_TOOLS/mingw1310_64/bin" >> "$GITHUB_PATH"
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ "-DCMAKE_CXX_FLAGS=-Wall -Wextra"
+      - name: Build
+        run: cmake --build build
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+      - name: Package
+        run: |
+          mkdir -p dist/TypingStatistics
+          cp build/TypingStatistics.exe dist/TypingStatistics/
+          windeployqt --release --no-translations --no-opengl-sw --no-system-d3d-compiler --no-quick-import --compiler-runtime dist/TypingStatistics/TypingStatistics.exe
+          cd dist/TypingStatistics
+          rm -rf generic tls networkinformation iconengines imageformats/qgif.dll imageformats/qjpeg.dll imageformats/qsvg.dll Qt6Svg.dll Qt6Network.dll
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TypingStatistics-windows-x64
+          path: dist/TypingStatistics
+
+  linux:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # GCC with the hardware 80-bit long double, and the package.
+          - name: gcc
+            cc: gcc
+            cxx: g++
+            options: ""
+            package: true
+          # Clang and the software 80-bit arithmetic of arm64 (tst_orig, tst_hist, tst_ext80 stay bit-exact).
+          - name: clang-soft-ext80
+            cc: clang
+            cxx: clang++
+            options: -DTS_SOFT_EXT80=ON
+            package: false
+    name: linux (${{ matrix.name }})
+    steps:
+      - uses: actions/checkout@v4
+      - name: Packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ninja-build libgl-dev libegl-dev \
+            libxkbcommon-dev libxkbcommon-x11-dev libxkbregistry-dev libxcb1-dev libxcb-xkb-dev xkb-data \
+            fonts-liberation libxcb-cursor0 libfuse2
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: linux_gcc_64
+          cache: true
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=${{ matrix.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} "-DCMAKE_CXX_FLAGS=-Wall -Wextra" -DCMAKE_INSTALL_PREFIX=/usr -DTS_UDEV_RULES_DIR=/usr/lib/udev/rules.d ${{ matrix.options }}
+      - name: Build
+        run: cmake --build build
+      - name: Test
+        run: QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure
+      - name: AppImage
+        if: matrix.package
+        run: bash ci/linux/appimage.sh build
+      - uses: actions/upload-artifact@v4
+        if: matrix.package
+        with:
+          name: TypingStatistics-linux-x86_64
+          path: |
+            build/TypingStatistics-*.AppImage
+            resources/linux/70-typingstatistics.rules
+
+  macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15        # arm64: the software 80-bit arithmetic
+            arch: arm64
+          - runner: macos-15-intel  # x86_64: long double is x87
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
+    name: macos (${{ matrix.arch }})
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: clang_64
+          cache: true
+      - uses: lukka/get-cmake@latest
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }} "-DCMAKE_CXX_FLAGS=-Wall -Wextra"
+      - name: Build
+        run: cmake --build build
+      - name: Test
+        run: QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure
+      - name: Package
+        run: |
+          macdeployqt build/TypingStatistics.app
+          # Ad-hoc signature (arm64 runs only signed code). Not notarized: the first start is
+          # "Open" from the context menu, or `xattr -dr com.apple.quarantine`.
+          codesign --force --deep --sign - build/TypingStatistics.app
+          hdiutil create -volname "Typing statistics" -srcfolder build/TypingStatistics.app -ov -format UDZO \
+            build/TypingStatistics-macos-${{ matrix.arch }}.dmg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TypingStatistics-macos-${{ matrix.arch }}
+          path: build/TypingStatistics-macos-${{ matrix.arch }}.dmg

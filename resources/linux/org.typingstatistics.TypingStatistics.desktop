@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Typing statistics
+GenericName=Typing analyzer
+GenericName[ru]=Анализатор набора
+Comment=Records typing in every program and analyzes speed, rhythm and errors
+Comment[ru]=Записывает набор во всех программах и анализирует скорость, ритм и ошибки
+Exec=TypingStatistics %f
+Icon=org.typingstatistics.TypingStatistics
+Terminal=false
+Categories=Utility;Education;
+Keywords=typing;keyboard;speed;statistics;
+Keywords[ru]=набор;клавиатура;скорость;статистика;

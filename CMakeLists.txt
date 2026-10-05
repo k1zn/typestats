@@ -110,6 +110,27 @@ endif()
 target_compile_definitions(TypingStatistics PRIVATE TS_VERSION="${PROJECT_VERSION}")
 target_link_libraries(TypingStatistics PRIVATE tsui)
 
+# --- installation ---
+# Linux: the program, its menu entry and icon, and the udev rule that gives the logged-in user the
+# keyboards (re/crossplatform.md, step 5). The rule goes to the system's rules directory, wherever the
+# prefix is (TS_UDEV_RULES_DIR overrides it, packagers set it to their staging tree).
+if(UNIX AND NOT APPLE)
+    include(GNUInstallDirs)
+    set(TS_UDEV_RULES_DIR "/usr/lib/udev/rules.d" CACHE PATH "Where the udev rule is installed")
+    set(TS_APP_ID org.typingstatistics.TypingStatistics)
+    install(TARGETS TypingStatistics RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    install(FILES resources/linux/${TS_APP_ID}.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+    install(FILES resources/icons/app.png DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/32x32/apps
+            RENAME ${TS_APP_ID}.png)
+    install(FILES resources/linux/app-256.png DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps
+            RENAME ${TS_APP_ID}.png)
+    install(FILES resources/linux/70-typingstatistics.rules DESTINATION ${TS_UDEV_RULES_DIR})
+elseif(APPLE)
+    install(TARGETS TypingStatistics BUNDLE DESTINATION .)
+elseif(WIN32)
+    install(TARGETS TypingStatistics RUNTIME DESTINATION .)
+endif()
+
 file(GLOB TS_FILES CONFIGURE_DEPENDS i18n/*.ts)
 if(TS_FILES AND TARGET Qt6::lrelease)
     qt_add_translations(TypingStatistics TS_FILES ${TS_FILES} RESOURCE_PREFIX /i18n)

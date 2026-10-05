@@ -36,7 +36,13 @@ cd build && ctest
 Опции CMake: `TS_LRELEASE` (путь к `lrelease.exe`, если у Qt нет LinguistTools — статический Qt), `TS_SOFT_EXT80` (OFF; ON —
 программная 80-битная арифметика и на x86, чтобы проверить её golden-тестами).
 
-**Linux и macOS** — в работе, план и состояние: `re/crossplatform.md` (там же сборка под Linux в Docker).
+**Linux и macOS** — сделано, ждёт ручной проверки: `re/crossplatform.md` (решения, устройство бэкендов, сборка под
+Linux в Docker, список ручных проверок). Linux: нужны `xkbcommon` (обязательно), `xkbregistry`, `xkbcommon-x11` + `xcb-xkb`,
+`Qt6::DBus` (по возможности); `cmake --install` ставит exe, `.desktop`, иконки и udev-правило (`TS_UDEV_RULES_DIR`).
+macOS: `.app` с bundle id `org.typingstatistics.TypingStatistics`, минимум 12.0; здесь не собрать — только CI.
+**CI** — `.github/workflows/ci.yml` (remote у репозитория пока нет): Windows (mingw, zip после windeployqt), Ubuntu
+(GCC + AppImage через `ci/linux/appimage.sh`; Clang с `TS_SOFT_EXT80=ON`), macOS arm64 и x86_64 (`.dmg`, подпись
+ad-hoc, без нотаризации). AppImage проверяется локально: `ci/linux/appimage.sh <build>` в образе `ci/linux/Dockerfile`.
 QXlsx требует `Qt6::GuiPrivate`: на дистрибутивах нужен пакет приватных заголовков (`qt6-base-private-dev` в
 Debian/Ubuntu, `qt6-qtbase-private-devel` в Fedora). `lrelease` ищется и в `bin`/`libexec` Qt (у Debian — вне PATH).
 
@@ -179,6 +185,10 @@ src/ui/
   GraphPanels.*       FloatingPanel (заголовок-перетаскивание, красная кнопка), LegendPanel (Panel2), AxisPanel (Panel9)
   FilePropertiesDialog.*  Form2 «Свойства файла» (автор, дата, описание) — перед сохранением
   LiveStatsWindow.*   Form10 «Оперативная статистика»: скорость (цвет — радуга FUN_0042a17c), % ошибок, строка состояния
+  Look.*              вид оригинала везде: Windows — родной стиль и 8 pt; иначе Fusion со светлой палитрой и шрифтом того
+                      же размера в пикселях (`pointFont`: macOS считает 72 dpi)
+  AppPaths.*          каталог файлов программы (ini, журнал): папка exe на Windows, если в неё можно писать, иначе —
+                      каталог данных пользователя
   Texts.*             переводимые подписи для ядра (StatsUnits, названия строк ListView2, `histogramNames()`), список
                       языков и `currentLanguage()`
   SettingsDialog.*    Form8 «Настройки» (`re/settings.md`): читает/пишет QSettings; язык — после перезапуска
@@ -206,6 +216,8 @@ src/export/TableExport.*  таблица → .xlsx (QXlsx, с диаграммо
 i18n/               `typestats_en.ts` (исходные строки русские), `en.json` (словарь), `update.py`: lupdate + заполнение .ts
                     из словаря, печатает непереведённое. После новых `tr()`: `source env.sh && python i18n/update.py`
 resources/icons/    оригинальные иконки кнопок (<Form>_<SpeedButtonN>.png) + app.ico/png; resources.qrc
+resources/linux/    udev-правило (uaccess), `.desktop`, иконка 256 px; resources/macos/ — Info.plist.in, app.icns
+ci/linux/           Dockerfile (Debian trixie: сборка и тесты под Linux), appimage.sh; .github/workflows/ci.yml — CI
 tests/tst_tsf.cpp   юнит-тесты + golden: подпись и побайтовый round-trip 4 реальных файлов; крайние случаи разбора
                     (семантика sscanf и TStrings::Values)
 tests/tst_recalc.cpp  KeyName, разметка BS/Ctrl+BS, нормализация, текст/фрагменты, статистика на синтетике, golden-прогон
@@ -226,6 +238,9 @@ tests/tst_orig.cpp  ядро против записанного вывода о
                     выделения, ListView1 — 4 файла × 5 наборов опций; серии графиков — 824; Form3 (ключ `extra`) и
                     Form4 (ключ `hist`) — 824 и обыка (обыка — при «Только текст» = 1 и = 0).
                     Сверка float — побитная на всех платформах (через `Ext`)
+tests/tst_platform.cpp  все ОС: таблицы кодов (scan↔VK, evdev, Mac), разбор ответов sway/Hyprland/GNOME/KDE, i3-IPC
+tests/tst_evdev.cpp только Linux: XkbKeyboard (символы, флаги, группы, мёртвые клавиши, golden-записи через перевод),
+                    EvdevReader на FIFO с поддельным sysfs
 tests/tst_ext80.cpp Ext80 против аппаратного x87: 3,4 млн операций побитно (на x86; иначе только самопроверки)
 tests/tst_perf.cpp  стенд производительности (не в ctest; `re/perf.md`)
 tests/golden/       реальные .tsf пользователя с рабочего стола (801, 824, обыка, цифры13зн)
@@ -443,8 +458,8 @@ python re/scripts/diffstand.py файл --journal                               
    (60 с у оригинала) и бит `0x40000000`; `dt` расходятся на 0,2–2,7 мс — у программы, чей хук стоит в цепочке вторым
    (запущенной раньше), отметка позже.
    **СЛЕДУЮЩЕЕ**:
-   - **кроссплатформенность** (Linux X11/Wayland, macOS): аудит сделан, Ext80 сделан, дальше — по шагам
-     `re/crossplatform.md` (мелочи, пути файлов, вид вне Windows, ошибки хука, бэкенд evdev, бэкенд CGEventTap, CI);
+   - **кроссплатформенность** (Linux X11/Wayland, macOS) — все шаги `re/crossplatform.md` сделаны (2026-10-05);
+     осталось: ручные проверки пользователя (список там же), первый прогон CI (когда появится remote) и правки по ним;
    - хук в отдельном потоке (свой цикл сообщений, высокий приоритет, отметка QPC в колбэке, событие — в поток GUI
      очередью): время нажатий не зависит от загрузки GUI, а долгий пересчёт не превышает `LowLevelHooksTimeout`
      (иначе Windows молча снимает хук). Предложено пользователю, не сделано;

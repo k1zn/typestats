@@ -311,7 +311,27 @@ Accessibility.
 
 </details>
 
-### 7. CI и упаковка
+### 7. CI и упаковка — сделано (CI ни разу не запускался: remote нет)
+Сделано так:
+- **`.github/workflows/ci.yml`:** Windows (`windows-latest`, Qt 6.8.3 `win64_mingw` + `tools_mingw1310` из
+  `jurplel/install-qt-action`, MinGW Qt — первым в PATH; Release, ctest, windeployqt и чистка как в CLAUDE.md → артефакт);
+  Ubuntu 24.04 (Qt 6.8.3 `linux_gcc_64`; apt: xkbcommon, xkbregistry, xcb-xkb, GL, xkb-data, fonts-liberation): GCC +
+  AppImage и Clang с `TS_SOFT_EXT80=ON`; macOS `macos-15` (arm64, программная Ext80) и `macos-15-intel` (x86_64,
+  аппаратная) — Qt `clang_64`, ctest, `macdeployqt`, подпись ad-hoc, `.dmg`. Везде `-Wall -Wextra`, ctest с
+  `QT_QPA_PLATFORM=offscreen`. Если раннер `macos-15-intel` уберут — заменить на сборку x86_64 на arm64-раннере
+  (`CMAKE_OSX_ARCHITECTURES=x86_64`, тесты под Rosetta).
+- **Linux `install()`:** exe → `bin`, `.desktop` (`org.typingstatistics.TypingStatistics`, он же
+  `setDesktopFileName` — Wayland берёт по нему иконку окна), иконки 32 и 256 (увеличение без сглаживания: у оригинала
+  только 32×32), udev-правило → `TS_UDEV_RULES_DIR` (`/usr/lib/udev/rules.d`). Пакетам дистрибутивов этого достаточно.
+- **AppImage** (`ci/linux/appimage.sh <build>`): `cmake --install` в AppDir, linuxdeploy + linuxdeploy-plugin-qt.
+  Правила udev в AppImage нет (нужен root): без доступа программа сама показывает команды установки. Платформенный
+  плагин — xcb (на Wayland работает через XWayland; запись от этого не зависит — она через evdev).
+- **macOS `.dmg`:** не нотаризован — первый запуск через «Открыть» в контекстном меню или
+  `xattr -dr com.apple.quarantine`. Подпись ad-hoc меняется с каждой сборкой: macOS может снова спросить «Мониторинг
+  ввода» после обновления (у разрешения TCC — подпись программы; постоянная нужна Developer ID).
+
+<details><summary>План шага 7 (как задумывалось)</summary>
+
 - `.github/workflows/ci.yml`: матрица `windows-latest` (Qt 6.8.3 mingw через `jurplel/install-qt-action`, MinGW
   из того же действия), `ubuntu-24.04` (Qt 6.8.3 gcc_64 из install-qt-action — в нём есть приватные заголовки и
   QtDBus; apt: `libxkbcommon-dev libxkbcommon-x11-dev libxcb-xkb-dev libgl-dev xkb-data fonts-liberation`),
@@ -320,6 +340,8 @@ Accessibility.
 - Linux `install()`: exe, `.desktop`, иконка, udev-правило. Перенести Dockerfile из этого файла в `ci/`.
 - Обновить CLAUDE.md: «Сборка» (Linux/macOS, зависимости), «Структура» (Ext80, AppPaths, бэкенды, tst_ext80,
   tst_evdev), «Технический долг» п. 1 — закрыт, этот файл — в «Следующие шаги».
+
+</details>
 
 ## Таблица аудита (статус)
 
@@ -343,9 +365,9 @@ Accessibility.
 | 16 | `MainWindow.cpp:117,1421`, `ExtraStatsWindow.cpp:66` | Linux, macOS | ini и журнал в папке exe | **сделано** |
 | 17 | `main.cpp:35` | Linux, macOS | стиль и шрифт платформы при абсолютной геометрии; тёмная тема KDE | **сделано** |
 | 18 | `GraphWidget.cpp:93,213,589`, `HistogramWindow.cpp:60`, `KlavogramWidget.cpp:64,73` | macOS | шрифты в pt мельче на 25 % | **сделано** |
-| 19 | Arial/Courier New | Linux | без `fonts-liberation` — DejaVu шире | шаг 3 (выбор семейства); зависимость пакета — шаг 7 |
+| 19 | Arial/Courier New | Linux | без `fonts-liberation` — DejaVu шире | **сделано** (шаг 3; AppImage шрифты не несёт — `fonts-liberation` в списке проверок) |
 | 20 | `MainWindow.cpp:531`, `LiveStatsWindow.cpp:86` | Wayland, GNOME | трей, свёрнутое состояние, позиции, «поверх всех» | трей — **сделано**; остальное — ограничение Wayland |
-| 21 | `CMakeLists.txt:49` | macOS | `.app` без bundle id, иконки, plist; нет `install()` для Linux | macOS — **сделано** (шаг 6); Linux — шаг 7 |
+| 21 | `CMakeLists.txt:49` | macOS | `.app` без bundle id, иконки, plist; нет `install()` для Linux | **сделано** (шаги 6, 7) |
 | 22 | libuiohook `CMakeLists.txt:223` | macOS | `CMAKE_OSX_DEPLOYMENT_TARGET 10.5` | **снято** (libuiohook удалён) |
 | 23 | `tst_recorder.cpp:41`, `GraphPanels.cpp:247` | все | предупреждения `-Wall -Wextra` | **сделано** |
 
@@ -356,8 +378,12 @@ QSettings — 58 ключей-литералов без пар, различаю
 самоотрисовываемые виджеты не зависят от
 палитры и рисуют без промежуточных pixmap (на Retina чётко).
 
-## Ручные проверки (для пользователя, после шагов 3–6)
+## Ручные проверки (для пользователя)
 
+- **Установка на Linux:** AppImage из CI или `cmake --install`; без udev-правила — сообщение с командами, после них
+  запись начинается без перезапуска; иконка в меню и на окне (Wayland); шрифты с `fonts-liberation` и без.
+- **sway и Hyprland:** раскладки из конфига (`input * xkb_layout us,ru` / `kb_layout = us,ru`), переключение — символы
+  в записи по текущей раскладке; автокомментарий при смене окна (заголовок окна приходит от композитора).
 - **Linux X11 и Wayland (GNOME, KDE):** запись в терминале, браузере, родных Wayland-программах; RU/EN с
   переключением сочетанием окружения и мышью; быстрый набор 1–2 мин (не теряются ли символы); Delete, цифровой
   блок без NumLock, AltGr, мёртвые клавиши; хоткеи (Super может перехватить окружение); udev-правило и сообщение

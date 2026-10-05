@@ -8,3 +8,5 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl-dev libxkbcommon-dev libxkbcommon-x11-dev libxkbregistry-dev libxcb1-dev libxcb-xkb-dev xkb-data libx11-data \
     fonts-liberation fonts-dejavu-core xvfb xauth \
     && rm -rf /var/lib/apt/lists/*
+# ci/linux/appimage.sh: downloads linuxdeploy.
+RUN apt-get update && apt-get install -y --no-install-recommends curl file && rm -rf /var/lib/apt/lists/*

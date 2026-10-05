@@ -16,6 +16,8 @@ int main(int argc, char *argv[])
     QApplication::setApplicationName(QStringLiteral("TypingStatistics"));
     QApplication::setApplicationVersion(QStringLiteral(TS_VERSION));
     QApplication::setWindowIcon(QIcon(QStringLiteral(":/icons/app.png")));
+    // Wayland finds the window's icon and name by the menu entry (resources/linux/*.desktop).
+    QGuiApplication::setDesktopFileName(QStringLiteral("org.typingstatistics.TypingStatistics"));
 
     // The source texts are Russian, as in the original; "Language" (its preset key) picks a translation.
     // Without the key the system language decides. `--lang ru|en` overrides both.
