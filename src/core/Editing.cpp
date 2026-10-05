@@ -1,5 +1,7 @@
 #include "Editing.h"
 
+#include <array>
+
 #include "KeyName.h"
 
 #include <algorithm>
@@ -259,6 +261,16 @@ void convertLayout(KeyRecords &recs, int from, int to, const ToUnicode &toUnicod
 {
     bool leftShift = false, rightShift = false;
     int dead = -1; // the dead key waiting for the next character
+    // What the layout gives for a key depends only on the key, Shift and Caps Lock while no dead key waits
+    // (the layout's own call is slow: ~4 us on Windows), so those answers are asked once. A call that
+    // leaves a dead key behind is never remembered, and the call after it is always made.
+    struct Known
+    {
+        bool set = false;
+        int n = 0;
+        char16_t out[2] = {};
+    };
+    std::array<Known, 1024> known;
     for (int i = from; i < to; ++i) {
         KeyRecord &r = recs[i];
         const quint8 vk = r.vk();
@@ -281,7 +293,18 @@ void convertLayout(KeyRecords &recs, int from, int to, const ToUnicode &toUnicod
         r.flags &= ~quint32(KeyRecord::DeadKey);
         r.ch = 0;
         char16_t out[2] = {};
-        const int n = toUnicode(r.scan(), leftShift || rightShift, caps, out);
+        const bool shift = leftShift || rightShift;
+        Known &k = known[size_t(r.scan()) | size_t(shift) << 8 | size_t(caps) << 9];
+        int n;
+        if (dead < 0 && k.set) {
+            n = k.n;
+            out[0] = k.out[0];
+            out[1] = k.out[1];
+        } else {
+            n = toUnicode(r.scan(), shift, caps, out);
+            if (dead < 0 && n >= 0)
+                k = {true, n, {out[0], out[1]}};
+        }
         if (n != 0)
             r.ch = out[n > 0 ? n - 1 : 0];
         if (n > 1 && dead >= 0) { // the accent did not combine: it is typed on its own

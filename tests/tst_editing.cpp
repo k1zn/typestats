@@ -203,6 +203,85 @@ private slots:
         QCOMPARE(last[0].ch, u'`');
         deadPending = false;
     }
+
+    // The answers for a key are asked once, but the result is that of asking every time (a dead key included).
+    void convertLayoutRemembersAnswers()
+    {
+        bool pending = false;
+        int calls = 0;
+        auto layout = [&](quint8 scan, bool shift, bool caps, char16_t out[2]) {
+            ++calls;
+            if (scan == 0x29) {
+                out[0] = u'`';
+                pending = true;
+                return -1;
+            }
+            if (scan == 0x01)
+                return 0;
+            const char16_t c = char16_t((shift != caps ? u'A' : u'a') + scan % 20);
+            if (pending) {
+                pending = false;
+                out[0] = u'`';
+                out[1] = c;
+                return 2;
+            }
+            out[0] = c;
+            return 1;
+        };
+        KeyRecords recs;
+        quint32 seed = 7;
+        for (int i = 0; i < 2000; ++i) {
+            seed = seed * 1664525u + 1013904223u;
+            const quint8 pick = quint8(seed >> 24) % 9;
+            const quint8 scan = pick == 0 ? 0x29 : pick == 1 ? 0x01 : quint8(0x10 + pick);
+            KeyRecord r = press(0x41, u'x');
+            r.flags = (r.flags & ~quint32(KeyRecord::ScanMask)) | scan;
+            recs << r;
+            if (pick == 8) { // Shift / Caps around
+                KeyRecord c = press(Vk::Capital, 0);
+                c.flags = (c.flags & ~quint32(KeyRecord::ScanMask)) | 0x3A;
+                recs << c;
+            }
+        }
+        KeyRecords asked = recs;
+        // The reference: every record asks.
+        {
+            bool leftShift = false;
+            bool caps = false;
+            int dead = -1;
+            pending = false;
+            for (int i = 0; i < asked.size(); ++i) {
+                KeyRecord &r = asked[i];
+                if (r.vk() == Vk::Capital)
+                    caps = !caps;
+                r.flags &= ~quint32(KeyRecord::DeadKey);
+                r.ch = 0;
+                char16_t out[2] = {};
+                const int n = layout(r.scan(), leftShift, caps, out);
+                if (n != 0)
+                    r.ch = out[n > 0 ? n - 1 : 0];
+                if (n > 1 && dead >= 0) {
+                    asked[dead].flags &= ~quint32(KeyRecord::DeadKey);
+                    asked[dead].ch = out[0];
+                }
+                dead = -1;
+                if (n < 0) {
+                    r.flags |= KeyRecord::DeadKey;
+                    dead = i;
+                }
+            }
+        }
+        const int askedCalls = calls;
+        calls = 0;
+        pending = false;
+        Editing::convertLayout(recs, 0, recs.size(), layout, false);
+        QCOMPARE(recs.size(), asked.size());
+        for (int i = 0; i < recs.size(); ++i) {
+            QCOMPARE(recs[i].ch, asked[i].ch);
+            QCOMPARE(recs[i].flags, asked[i].flags);
+        }
+        QVERIFY(calls < askedCalls);
+    }
 };
 
 QTEST_APPLESS_MAIN(TstEditing)

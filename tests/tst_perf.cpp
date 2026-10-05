@@ -8,6 +8,7 @@
 // TS_PERF_SIZES=10000,100000 limits the sizes. Every scenario runs several times; the median, the
 // minimum and the maximum go to $TS_PERF_DIR/perf.txt (appended) and to the test log.
 
+#include "core/Editing.h"
 #include "core/ExtraStats.h"
 #include "core/FingerZones.h"
 #include "core/Graphs.h"
@@ -19,6 +20,7 @@
 #include "core/TsfFile.h"
 #include "core/Cp1251.h"
 #include "export/TableExport.h"
+#include "platform/KeyboardHook.h"
 #include "ui/ExtraStatsWindow.h"
 #include "ui/StringTableModel.h"
 #include "ui/GraphPanels.h"
@@ -44,6 +46,11 @@
 #include <QTextDocument>
 
 #include <algorithm>
+
+#ifdef Q_OS_LINUX
+#include "platform/linux/XkbKeyboard.h"
+#include <xkbcommon/xkbcommon.h>
+#endif
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -445,6 +452,124 @@ private slots:
         QSettings().remove(QStringLiteral("JournalOn"));
         QFile::remove(JournalWriter(QCoreApplication::applicationDirPath()).path());
     }
+
+
+    // "Преобразовать в текущую раскладку" over the whole recording: the layout of the system per record.
+    void convertLayout()
+    {
+        for (int n : m_sizes) {
+            TsfDocument doc;
+            Tsf::read(tsf(n), doc);
+            measure(QStringLiteral("convertLayout all, KeyboardHook::toUnicode"), n, [&] {
+                KeyRecords r = doc.records;
+                Editing::convertLayout(r, 0, int(r.size()), &KeyboardHook::toUnicode, false);
+                KeyboardHook::clearDeadKey();
+            }, 3);
+            measure(QStringLiteral("convertLayout all, UsLayout"), n, [&] {
+                KeyRecords r = doc.records;
+                Editing::convertLayout(r, 0, int(r.size()), &UsLayout::toUnicode, false);
+            });
+        }
+    }
+
+#ifdef Q_OS_LINUX
+    // The Linux hook without a keyboard: XkbKeyboard on synthetic evdev events (what EvdevReader's thread
+    // does per event), the keymaps, the helpers of the keyboard picture and of "convert the layout".
+    void xkbPath()
+    {
+        auto names = [](const char *layout, const char *variant = "", const char *options = "") {
+            Desktop::XkbNames x;
+            x.layout = QLatin1String(layout);
+            x.variant = QLatin1String(variant);
+            x.options = QLatin1String(options);
+            return x;
+        };
+        for (const auto &[label, n] : {std::pair{"us", names("us")}, {"us,ru grp:alt_shift", names("us,ru", ",", "grp:alt_shift_toggle")},
+                                       {"us intl", names("us", "intl")}}) {
+            measure(QStringLiteral("xkb compile keymap %1").arg(QLatin1String(label)), 0, [&] {
+                xkb_keymap_unref(XkbKeyboard::compile(n));
+            }, 5);
+        }
+        measure(QStringLiteral("XkbKeyboard() (compose table)"), 0, [&] { XkbKeyboard k; }, 5);
+
+        for (const auto &[label, n, group, intl] : {std::tuple{"us", names("us"), 0, false}, {"ru (group 1)", names("us,ru"), 1, false},
+                                                      {"us intl (dead keys)", names("us", "intl"), 0, true}}) {
+            XkbKeyboard k;
+            QVERIFY(k.setKeymap(n));
+            k.setGroup(group);
+            const int events = 200000;
+            QVector<double> t;
+            t.reserve(events);
+            qint64 now = 0;
+            // Letters with Shift now and then, a dead key + a vowel for the intl layout, Space, Backspace.
+            const int keys[] = {16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 30, 31, 32, 33, 34, 35, 36, 37, 38, 44, 45, 46, 47, 48, 49, 50, 57, 14};
+            int i = 0;
+            std::optional<HookEvent> last;
+            for (; i < events; ++i) {
+                const int round = i / 2;
+                const bool down = i % 2 == 0;
+                int code = keys[round % std::size(keys)];
+                if (intl && round % 7 == 3)
+                    code = 40; // apostrophe: dead acute
+                now += 90'000;
+                QElapsedTimer timer;
+                timer.start();
+                if (down && round % 11 == 0)
+                    k.event(42, 1, now, false); // LeftShift
+                last = k.event(code, down ? 1 : 0, now, false);
+                if (!down && round % 11 == 0)
+                    k.event(42, 0, now, false);
+                t << double(timer.nsecsElapsed()) / 1e3;
+            }
+            std::sort(t.begin(), t.end());
+            log(QStringLiteral("%1	%2	median %3 us	p99 %4 us	max %5 us")
+                    .arg(QStringLiteral("XkbKeyboard::event %1").arg(QLatin1String(label)), -40)
+                    .arg(events, 7)
+                    .arg(t[t.size() / 2], 0, 'f', 2)
+                    .arg(t[t.size() * 99 / 100], 0, 'f', 2)
+                    .arg(t.last(), 0, 'f', 2));
+            Q_UNUSED(last);
+        }
+
+        XkbKeyboard k;
+        QVERIFY(k.setKeymap(names("us,ru")));
+        k.setGroup(1);
+        measure(QStringLiteral("XkbKeyboard::toUnicode x100000"), 100000, [&] {
+            char16_t out[2];
+            for (int i = 0; i < 100000; ++i)
+                k.toUnicode({quint8(0x10 + i % 40), false}, i % 5 == 0, false, out);
+        });
+        measure(QStringLiteral("XkbKeyboard::keyName x110 (Tkbd)"), 110, [&] {
+            for (int i = 0; i < 110; ++i)
+                k.keyName(quint8(1 + i), nullptr);
+        });
+        for (int n : m_sizes) {
+            TsfDocument doc;
+            Tsf::read(tsf(n), doc);
+            measure(QStringLiteral("convertLayout all, XkbKeyboard"), n, [&] {
+                KeyRecords r = doc.records;
+                Editing::convertLayout(r, 0, int(r.size()),
+                                       [&](quint8 scan, bool shift, bool caps, char16_t out[2]) { return k.toUnicode({scan, false}, shift, caps, out); },
+                                       false);
+                k.clearDeadKey();
+            }, 3);
+        }
+        // The event on its way to the GUI thread: a queued call with the event, as KeyboardHookLinux does.
+        class Sink : public QObject
+        {
+        public:
+            int got = 0;
+        } sink;
+        measure(QStringLiteral("queued event to GUI x10000"), 10000, [&] {
+            for (int i = 0; i < 10000; ++i) {
+                HookEvent e;
+                e.timeUs = i;
+                QMetaObject::invokeMethod(&sink, [&sink, e] { sink.got += int(e.timeUs & 1); }, Qt::QueuedConnection);
+            }
+            QCoreApplication::sendPostedEvents(&sink);
+        });
+    }
+#endif
 
     void settings()
     {
