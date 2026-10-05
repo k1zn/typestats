@@ -124,18 +124,31 @@ private slots:
         RecorderSettings s;
         s.autoComments = true;
         Recorder::Context c;
-        c.foregroundWindow = 7;
+        quint64 window = 7;
+        int windowAsked = 0;
+        c.foregroundWindow = [&] { ++windowAsked; return window; };
         int asked = 0;
         c.comment = [&asked] { return QStringLiteral("comment %1").arg(++asked); };
         rec.handle(key(0, 'A', true, u'a'), s, c, recs);      // a new window
         rec.handle(key(100, 'A', false), s, c, recs);
         rec.handle(key(11000, 'B', true, u'b'), s, c, recs);  // after more than 10 s
-        c.foregroundWindow = 8;
+        window = 8;
         rec.handle(key(11100, 'B', false), s, c, recs);       // another window
         QCOMPARE(recs[0].comment, QStringLiteral("comment 1"));
         QVERIFY(recs[1].comment.isEmpty());
         QCOMPARE(recs[2].comment, QStringLiteral("comment 2"));
         QCOMPARE(recs[3].comment, QStringLiteral("comment 3"));
+        QCOMPARE(windowAsked, 4);
+
+        // Without auto comments the window is not asked for (but LCtrl+RCtrl still asks: it is remembered).
+        s.autoComments = false;
+        rec.handle(key(11200, 'C', true, u'c'), s, c, recs);
+        rec.handle(key(11300, 'C', false), s, c, recs);
+        QCOMPARE(windowAsked, 4);
+        rec.handle(key(11400, Vk::LControl, true, 0, 0x1D), s, c, recs);
+        rec.handle(key(11500, Vk::RControl, true, 0, 0x1D), s, c, recs);
+        QCOMPARE(windowAsked, 5);
+        QCOMPARE(recs.last().comment, QStringLiteral("comment 4"));
     }
 
     void deadKeys()

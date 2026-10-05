@@ -44,7 +44,9 @@ public:
     struct Context
     {
         bool ownWindow = false;        // the program's own window has the focus: nothing is recorded
-        quint64 foregroundWindow = 0;  // identifies the active window
+        // Identifies the active window; asked only when a comment may be due (on macOS it is a list of all
+        // the windows of the screen).
+        std::function<quint64()> foregroundWindow;
         std::function<QString()> comment; // text of an auto comment, asked for only when one is due
     };
     struct Outcome

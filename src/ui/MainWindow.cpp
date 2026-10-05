@@ -875,7 +875,7 @@ void MainWindow::keyEvent(const HookEvent &e)
     const QWidget *active = QApplication::activeWindow();
     const quint32 vk = (e.flags >> 16) & 0xFF;
     c.ownWindow = active != nullptr && (active != m_input || vk == 0x1B || vk == 0x71);
-    c.foregroundWindow = KeyboardHook::foregroundWindow();
+    c.foregroundWindow = &KeyboardHook::foregroundWindow;
     c.comment = [] {
         // Date and time as the system writes them, then the title of the window typed into.
         const QLocale system = QLocale::system();

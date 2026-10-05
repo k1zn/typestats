@@ -125,11 +125,13 @@ Recorder::Outcome Recorder::handle(const HookEvent &e, const RecorderSettings &s
         out.toggleLive = true;
 
     QString comment;
-    if ((s.autoComments && (m_dtUs > 10'000'000 || c.foregroundWindow != m_foreground))
-        || (m_lctrl && vk == Vk::RControl)) {
-        m_foreground = c.foregroundWindow;
-        if (c.comment)
-            comment = c.comment();
+    if (const bool manual = m_lctrl && vk == Vk::RControl; s.autoComments || manual) {
+        const quint64 window = c.foregroundWindow ? c.foregroundWindow() : 0;
+        if ((s.autoComments && (m_dtUs > 10'000'000 || window != m_foreground)) || manual) {
+            m_foreground = window;
+            if (c.comment)
+                comment = c.comment();
+        }
     }
 
     // The release of a recorded press always gets through; everything else only while capturing.
