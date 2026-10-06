@@ -462,16 +462,21 @@ private slots:
 #ifdef Q_OS_WIN
         KeyboardHook hook;
         QSignalSpy started(&hook, &KeyboardHook::started);
+        qInfo("start");
         if (!hook.start())
             QSKIP("the system did not allow the hook here");
         QVERIFY(hook.isRunning());
         QCOMPARE(started.size(), 1);
+        qInfo("stop");
         hook.stop();
         QVERIFY(!hook.isRunning());
+        qInfo("start again");
         QVERIFY(hook.start());
         QCOMPARE(started.size(), 2);
+        qInfo("stop again");
         hook.stop();
-        QVERIFY(hook.start()); // the destructor stops it
+        qInfo("start, and the destructor stops it");
+        QVERIFY(hook.start());
 #else
         QSKIP("the Windows hook");
 #endif

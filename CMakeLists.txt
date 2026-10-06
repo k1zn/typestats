@@ -189,6 +189,8 @@ foreach(src ${TEST_SOURCES})
         continue()
     endif()
     add_test(NAME ${name} COMMAND ${name})
+    # A hang fails with its output (the last test function run) instead of holding CI for its whole limit.
+    set_tests_properties(${name} PROPERTIES TIMEOUT 300)
     if(name MATCHES "^tst_ui")
         set_tests_properties(${name} PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
     endif()
