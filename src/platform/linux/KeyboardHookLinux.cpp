@@ -90,7 +90,7 @@ bool KeyboardHook::start()
     EvdevReader::Status status;
     if (!reader->start(&status)) {
         stop();
-        emit failed(tr("Не удалось начать чтение клавиатур (inotify, eventfd)."));
+        emit failed(tr("Не удалось начать запись нажатий. Перезапустите программу."));
         return false;
     }
     if (status.open > 0) {
@@ -100,17 +100,14 @@ bool KeyboardHook::start()
     }
     // The reader waits: a keyboard may come, or the access may be granted (then started()).
     if (status.keyboards == 0)
-        emit failed(tr("Клавиатуры не найдены (/dev/input/event*). Запись начнётся, когда клавиатура появится."));
+        emit failed(tr("Клавиатура не найдена. Запись начнётся, как только вы её подключите."));
     else
-        emit failed(tr("Нет доступа к клавиатурам (/dev/input/event*): программа читает нажатия прямо с них, "
-                       "и так работает и в X11, и в Wayland.\n\n"
-                       "Доступ даёт правило udev — один раз, с паролем администратора (если программа установлена "
-                       "пакетом, правило уже есть, нужна только вторая команда или повторный вход в систему):\n\n"
+        emit failed(tr("Программе нужно разрешение видеть нажатия клавиш.\n\n"
+                       "Откройте терминал, вставьте туда эти две строки и введите свой пароль:\n\n"
                        "echo 'SUBSYSTEM==\"input\", KERNEL==\"event*\", ENV{ID_INPUT_KEYBOARD}==\"1\", TAG+=\"uaccess\"' "
                        "| sudo tee /etc/udev/rules.d/70-typingstatistics.rules\n"
                        "sudo udevadm control --reload && sudo udevadm trigger\n\n"
-                       "Доступ получает только тот, кто сейчас вошёл в систему. Запись начнётся сама, перезапускать "
-                       "программу не нужно."));
+                       "Это нужно один раз. Запись начнётся сама."));
     return false;
 }
 

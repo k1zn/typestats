@@ -204,7 +204,7 @@ bool KeyboardHook::start()
     if (result.error != 0) {
         m_impl->thread.join();
         g_target = nullptr;
-        emit failed(tr("Не удалось перехватить клавиатуру (SetWindowsHookEx: ошибка %1).").arg(result.error));
+        emit failed(tr("Не удалось начать запись нажатий (ошибка %1). Перезапустите программу.").arg(result.error));
         return false;
     }
     m_impl->threadId = result.threadId;
