@@ -11,7 +11,8 @@ Q_DECLARE_METATYPE(HookEvent)
 // The system-wide keyboard hook. Events come with the record flags the original's hook builds
 // (re/recording.md) and are delivered in the GUI thread.
 //
-// Windows (KeyboardHookWin.cpp): a low-level keyboard hook of its own in the GUI thread, the
+// Windows (KeyboardHookWin.cpp): a low-level keyboard hook in a thread of its own (the time of a key
+// does not depend on how busy the GUI is, and a long GUI task does not make Windows drop the hook), the
 // characters from ToUnicodeEx with the layout of the focused window.
 // Linux (linux/KeyboardHookLinux.cpp): the keyboards of /dev/input read in a thread, the characters
 // from xkbcommon with the layout the desktop has on (re/crossplatform.md, step 5).
@@ -33,6 +34,9 @@ public:
     // The active window of the system: a value that changes with it, and the title of its top-level window.
     static quint64 foregroundWindow();
     static QString foregroundTitle();
+    // The title of the top-level window of `window` (a value of foregroundWindow()); outside Windows the
+    // windows have no such ids: the title of the active window.
+    static QString windowTitle(quint64 window);
     // Name of the key with this scan code in the current keyboard layout, as the text shows it
     // (the original's 0x448fe8); `dead` tells a dead key. Without layout access: the US layout.
     static QString layoutKeyName(quint8 scan, bool *dead = nullptr);

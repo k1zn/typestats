@@ -140,13 +140,16 @@ src/cli/tsstat.cpp  консольная утилита: `tsstat [--split MS] [-
                     печатает «Параметр\tЗначение» как ListView2 (для дифф-стенда);
                     `--extra KIND [--avg] [--sort N] [--desc] [--pattern P] [--only S] [--any S] [--exclude S]` — список Form3;
                     `--to-journal out.tsj f.tsf` — записи файла журналом
-src/platform/       библиотека `tsplatform`. `KeyboardHook.h`: сигналы `key(HookEvent{timeUs, flags, ch, chars, firstCh})`
-                    в потоке GUI, `failed(причина)`, `started()`; статические `toUnicode`/`clearDeadKey`/`capsLock`
-                    (преобразование раскладки), `layoutKeyName` (Tkbd), `foregroundWindow()/foregroundTitle()`
-                    (автокомментарии); `UsLayout` — запасная US-раскладка. Реализации:
-  KeyboardHookWin.cpp  свой WH_KEYBOARD_LL **в потоке GUI** (отметка `hookNowUs()` = steady_clock при входе в колбэк;
-                    занятый поток GUI её задерживает), флаги как у 0x404598 (ToUnicodeEx, восстановление мёртвой
-                    клавиши через ToAsciiEx)
+src/platform/       библиотека `tsplatform`. `KeyboardHook.h`: сигналы `key(HookEvent{timeUs, flags, ch, chars, firstCh,
+                    window, ownWindow})` в потоке GUI, `failed(причина)`, `started()`; статические `toUnicode`/`clearDeadKey`/
+                    `capsLock` (преобразование раскладки), `layoutKeyName` (Tkbd), `foregroundWindow()/foregroundTitle()/
+                    windowTitle(id)` (автокомментарии); `UsLayout` — запасная US-раскладка. Реализации:
+  KeyboardHookWin.cpp  свой WH_KEYBOARD_LL **в своём потоке** (цикл сообщений, `THREAD_PRIORITY_TIME_CRITICAL`; отметка
+                    `hookNowUs()` = steady_clock при входе в колбэк, занятость GUI на неё не влияет), событие — в GUI
+                    очередью (`Impl::deliver`, события прежнего `start()` отбрасываются). В событии — окно переднего плана
+                    и «окно этой программы» на момент нажатия (`keyEvent` решает по ним, а не по активному окну сейчас).
+                    Флаги как у 0x404598 (ToUnicodeEx, восстановление мёртвой клавиши через ToAsciiEx); вызовы
+                    ToUnicodeEx/ToAsciiEx хука и статических функций — под одним мьютексом (состояние мёртвой клавиши общее)
   linux/            evdev + xkbcommon (`re/crossplatform.md`, шаг 5): `EvdevReader` (поток, `/dev/input/event*`, inotify),
                     `XkbKeyboard` (evdev-событие → HookEvent как у Windows-хука), `LayoutSource` (раскладка и окно:
                     X11, sway, Hyprland, KDE, GNOME, системная), `KeyboardHookLinux.cpp`
@@ -467,9 +470,9 @@ python re/scripts/diffstand.py файл --journal                               
    **СЛЕДУЮЩЕЕ**:
    - **кроссплатформенность** (Linux X11/Wayland, macOS) — все шаги `re/crossplatform.md` сделаны (2026-10-05);
      осталось: ручные проверки пользователя (список там же), первый прогон CI (когда появится remote) и правки по ним;
-   - хук в отдельном потоке (свой цикл сообщений, высокий приоритет, отметка QPC в колбэке, событие — в поток GUI
-     очередью): время нажатий не зависит от загрузки GUI, а долгий пересчёт не превышает `LowLevelHooksTimeout`
-     (иначе Windows молча снимает хук). Предложено пользователю, не сделано;
+   - ~~хук в отдельном потоке~~ — сделан (2026-10-06, `KeyboardHookWin.cpp`, `re/recording.md` «Порт»): время нажатий не
+     зависит от загрузки GUI, долгий пересчёт или экспорт не превышают `LowLevelHooksTimeout`. Тесты — жизненный цикл
+     потока и окно события (`tst_ui::hookThread`, `windowOfTheKey`); **руками не проверено** (список в `re/recording.md`);
    - ~~аудит производительности~~ — сделан и проверен (2026-10-01, `re/perf.md`; проверка: эквивалентность коммитов,
      снимки окон до/после побайтно, доделки — запас записей после правки, кэш пальцев Form3).
      На 500k записей: нажатие 273 → 5 мкс (QSettings
@@ -477,7 +480,7 @@ python re/scripts/diffstand.py файл --journal                               
      память 170 → ~95 МБ. Стенд:
      `python re/scripts/gen_big.py $TEMP/tsperf` → `cmake --build build-release --target tst_perf` →
      `TS_PERF_DIR=$TEMP/tsperf QT_QPA_PLATFORM=offscreen ./build-release/tst_perf.exe [функция]` (результат —
-     `$TEMP/tsperf/perf.txt`). Предложены пользователю (не сделаны): хук в отдельном потоке (выше), инкрементальный
+     `$TEMP/tsperf/perf.txt`). Предложены пользователю (не сделаны): инкрементальный
      пересчёт при наборе, фоновый пересчёт. Осторожно: QTextDocument с разными форматами участков, собранный вне
      редактора, строится 33 с на 500k (патология Qt) — вставлять прямо в документ редактора.
      Третий проход (2026-10-06, `re/perf.md`): разделитель дробной части — один раз на таблицу/кадр (Qt спрашивает ОС
@@ -485,8 +488,7 @@ python re/scripts/diffstand.py файл --journal                               
      изменений, программная Ext80 быстрее и `Graphs` в double, где доказано (arm64: `graphs.compute` 106 → ~14 мс).
      Стенд: `scrollFrames` (кадр при любом `QT_SCALE_FACTOR`, `TS_PERF_STYLE=Fusion`; на Windows offscreen — только с
      `QT_QPA_FONTDIR=C:/Windows/Fonts`), `numbers`, `macPath`; статический Qt — `tst_perf` на `minimal:enable_fonts`.
-     Рекомендации ждут решения: хук Windows в потоке (рекомендован), один exe собирать с `-O2` (+0,45 МБ, ядро
-     быстрее на 25–45 %);
+     Хук Windows в потоке — сделан (выше). Ждёт решения: один exe собирать с `-O2` (+0,45 МБ, ядро быстрее на 25–45 %);
    - не проверено руками (пользователь пока не пробовал): запись в чужих окнах, мышь графика и клавограммы, панели,
      трей, Form9 (набор в нём должен записываться), импорт настроек оригинала; «Преобразовать в текущую раскладку» на
      настоящей раскладке (ToUnicodeEx).

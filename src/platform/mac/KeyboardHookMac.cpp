@@ -484,6 +484,11 @@ quint64 KeyboardHook::foregroundWindow()
     return frontWindow().id;
 }
 
+QString KeyboardHook::windowTitle(quint64)
+{
+    return foregroundTitle();
+}
+
 QString KeyboardHook::foregroundTitle()
 {
     return frontWindow().title;

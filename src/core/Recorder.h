@@ -16,6 +16,11 @@ struct HookEvent
     char16_t ch = 0;      // the character of a press; with two characters the last one
     int chars = 0;        // characters the press produced: 0, 1, 2; below zero for a dead key
     char16_t firstCh = 0; // chars == 2: the dead key that did not combine with this one
+    // The window that had the focus when the key came (KeyboardHook::foregroundWindow), and whether it is one
+    // of the program's own: the Windows hook does not wait for the GUI, which may see the event after a
+    // window switch. 0: not known, the GUI asks when it handles the event (Linux, macOS, tests).
+    quint64 window = 0;
+    bool ownWindow = false;
 };
 
 struct RecorderSettings

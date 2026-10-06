@@ -20,6 +20,7 @@
 
 #include <QApplication>
 #include <QClipboard>
+#include <QSignalSpy>
 #include <QListWidget>
 #include <QRadioButton>
 #include <QTableView>
@@ -425,6 +426,55 @@ private slots:
         g->setSeriesVisible(GraphWidget::Pause, true);
         QVERIFY(!g->seriesVisible(GraphWidget::Arrhythmia));
         QVERIFY(!w.grab().isNull());
+    }
+
+    // The Windows hook tells the window of the moment of the key: it decides, not the window active now.
+    void windowOfTheKey()
+    {
+        MainWindow w;
+        if (QApplication::activeWindow())
+            QSKIP("the test window got the focus");
+        qint64 t = 0;
+        auto key = [&](quint64 window, bool own, quint8 vk) {
+            for (bool down : {true, false}) {
+                HookEvent e;
+                e.timeUs = (t += 100) * 1000;
+                e.flags = quint32(vk) << 16 | (vk & 0x7f) | KeyRecord::NoChar | (down ? 0u : quint32(KeyRecord::KeyUp));
+                e.window = window;
+                e.ownWindow = own;
+                w.keyEvent(e);
+            }
+        };
+        key(0x1234, false, 'A'); // another program's window
+        QCOMPARE(w.m_doc.records.size(), 2);
+        key(0x1234, true, 'B'); // one of the program's own
+        QCOMPARE(w.m_doc.records.size(), 2);
+        const auto input = quint64(w.m_input->winId());
+        key(input, true, 'C'); // the text input window is typed into
+        QCOMPARE(w.m_doc.records.size(), 4);
+        key(input, true, 0x1B); // its Esc is a command
+        QCOMPARE(w.m_doc.records.size(), 4);
+    }
+
+    // The Windows hook in its thread: started, stopped, started again. It only listens: no input is sent.
+    void hookThread()
+    {
+#ifdef Q_OS_WIN
+        KeyboardHook hook;
+        QSignalSpy started(&hook, &KeyboardHook::started);
+        if (!hook.start())
+            QSKIP("the system did not allow the hook here");
+        QVERIFY(hook.isRunning());
+        QCOMPARE(started.size(), 1);
+        hook.stop();
+        QVERIFY(!hook.isRunning());
+        QVERIFY(hook.start());
+        QCOMPARE(started.size(), 2);
+        hook.stop();
+        QVERIFY(hook.start()); // the destructor stops it
+#else
+        QSKIP("the Windows hook");
+#endif
     }
 
     void recordsKeys()

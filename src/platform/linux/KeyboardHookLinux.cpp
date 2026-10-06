@@ -129,6 +129,11 @@ quint64 KeyboardHook::foregroundWindow()
     return desktop && desktop->source ? desktop->source->window().id : 0;
 }
 
+QString KeyboardHook::windowTitle(quint64)
+{
+    return foregroundTitle();
+}
+
 QString KeyboardHook::foregroundTitle()
 {
     LinuxDesktop *desktop = LinuxDesktop::instance();

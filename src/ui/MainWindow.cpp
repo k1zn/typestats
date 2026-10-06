@@ -875,16 +875,28 @@ void MainWindow::keyEvent(const HookEvent &e)
     Recorder::Context c;
     // Typing into the program's own windows is not recorded - except the text input window, which is
     // there to be typed into (its Esc and F2 are commands, though).
-    const QWidget *active = QApplication::activeWindow();
+    // The window is the one of the moment of the key when the hook tells it (Windows: the hook thread does
+    // not wait for us, and the user may have switched windows since).
     const quint32 vk = (e.flags >> 16) & 0xFF;
-    c.ownWindow = active != nullptr && (active != m_input || vk == 0x1B || vk == 0x71);
-    c.foregroundWindow = &KeyboardHook::foregroundWindow;
-    c.comment = [] {
+    bool own = false, input = false;
+    if (e.window != 0) {
+        own = e.ownWindow;
+        input = m_input->internalWinId() != 0 && quint64(m_input->internalWinId()) == e.window;
+    } else {
+        const QWidget *active = QApplication::activeWindow();
+        own = active != nullptr;
+        input = active == m_input;
+    }
+    c.ownWindow = own && (!input || vk == 0x1B || vk == 0x71);
+    const quint64 window = e.window;
+    c.foregroundWindow = [window] { return window != 0 ? window : KeyboardHook::foregroundWindow(); };
+    c.comment = [window] {
         // Date and time as the system writes them, then the title of the window typed into.
         const QLocale system = QLocale::system();
         const QDateTime now = QDateTime::currentDateTime();
         return system.toString(now.date(), QLocale::ShortFormat) + QLatin1Char(' ')
-               + now.time().toString(QStringLiteral("H:mm:ss")) + QLatin1Char(' ') + KeyboardHook::foregroundTitle();
+               + now.time().toString(QStringLiteral("H:mm:ss")) + QLatin1Char(' ')
+               + (window != 0 ? KeyboardHook::windowTitle(window) : KeyboardHook::foregroundTitle());
     };
 
     const Recorder::Outcome out = m_recorder.handle(e, s, c, m_doc.records);

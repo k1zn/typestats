@@ -3,21 +3,43 @@
 #include "HookClock.h"
 #include "core/KeyName.h"
 
-#include <QPointer>
+#include <algorithm>
+#include <atomic>
+#include <future>
+#include <mutex>
+#include <thread>
 
 #include <qt_windows.h>
 
+// The hook lives in a thread of its own with a message loop (Windows calls a low-level hook in the thread
+// that set it, from its message loop). The callback takes the time and the flags at once and queues the
+// event to the GUI thread: the time of a key no longer waits for the GUI, and a GUI busy for longer than
+// LowLevelHooksTimeout (an export, a large file) no longer makes Windows drop the hook silently.
 struct KeyboardHook::Impl
 {
+    std::thread thread;
+    DWORD threadId = 0;
+    // Events queued by an earlier start() are dropped: stop() does not wait for the queue of the GUI.
+    quint64 session = 0;
+
+    static void deliver(KeyboardHook *hook, quint64 session, const HookEvent &e)
+    {
+        if (hook->m_running && hook->m_impl->session == session)
+            emit hook->key(e);
+    }
 };
 
 namespace {
 
-QPointer<KeyboardHook> g_hook;
+std::atomic<KeyboardHook *> g_target{nullptr}; // set before the thread starts, cleared after it ends
+quint64 g_session = 0;                          // the same
+// ToUnicodeEx and ToAsciiEx change the dead key state of the system: the hook thread and the static
+// functions below (the GUI thread) take turns, as when they ran in one thread.
+std::mutex g_layoutMutex;
 
 } // namespace
 
-KeyboardHook::KeyboardHook(QObject *parent) : QObject(parent)
+KeyboardHook::KeyboardHook(QObject *parent) : QObject(parent), m_impl(std::make_unique<Impl>())
 {
     qRegisterMetaType<HookEvent>();
 }
@@ -29,7 +51,7 @@ KeyboardHook::~KeyboardHook()
 
 namespace {
 
-HHOOK g_handle = nullptr;
+HHOOK g_handle = nullptr; // the hook thread only
 
 // A dead key taken out of the input queue by ToUnicodeEx, to be put back for the hooked application.
 struct DeadKey
@@ -49,6 +71,12 @@ HookEvent eventOf(WPARAM message, const KBDLLHOOKSTRUCT &k)
 {
     HookEvent e;
     e.timeUs = hookNowUs();
+    // The window typed into, now: the GUI sees the event later, maybe after a switch.
+    HWND window = GetForegroundWindow();
+    e.window = quint64(quintptr(window));
+    DWORD process = 0;
+    GetWindowThreadProcessId(window, &process);
+    e.ownWindow = window != nullptr && process == GetCurrentProcessId();
     const bool down = message == WM_KEYDOWN || message == WM_SYSKEYDOWN;
     quint32 flags = 0;
     if (k.flags & LLKHF_EXTENDED)
@@ -65,7 +93,6 @@ HookEvent eventOf(WPARAM message, const KBDLLHOOKSTRUCT &k)
     flags |= k.scanCode & 0xFF;
 
     // The layout of the window that has the keyboard focus.
-    HWND window = GetForegroundWindow();
     if (const DWORD thread = GetWindowThreadProcessId(window, nullptr)) {
         GUITHREADINFO info = {};
         info.cbSize = sizeof(info);
@@ -90,6 +117,7 @@ HookEvent eventOf(WPARAM message, const KBDLLHOOKSTRUCT &k)
 
     int chars = 0;
     if (down) {
+        const std::lock_guard lock(g_layoutMutex);
         WCHAR buffer[2] = {};
         chars = ToUnicodeEx(k.vkCode, k.scanCode, state, buffer, 2, 0, layout);
         if (chars != 0) {
@@ -126,10 +154,39 @@ HookEvent eventOf(WPARAM message, const KBDLLHOOKSTRUCT &k)
 
 LRESULT CALLBACK hookProc(int code, WPARAM message, LPARAM data)
 {
-    if (code == HC_ACTION && (message == WM_KEYDOWN || message == WM_KEYUP || message == WM_SYSKEYDOWN || message == WM_SYSKEYUP))
-        if (KeyboardHook *hook = g_hook.data())
-            emit hook->key(eventOf(message, *reinterpret_cast<const KBDLLHOOKSTRUCT *>(data)));
+    if (code == HC_ACTION && (message == WM_KEYDOWN || message == WM_KEYUP || message == WM_SYSKEYDOWN || message == WM_SYSKEYUP)) {
+        const HookEvent e = eventOf(message, *reinterpret_cast<const KBDLLHOOKSTRUCT *>(data));
+        if (KeyboardHook *hook = g_target.load()) {
+            const quint64 session = g_session;
+            QMetaObject::invokeMethod(hook, [hook, session, e] { KeyboardHook::Impl::deliver(hook, session, e); },
+                                      Qt::QueuedConnection);
+        }
+    }
     return CallNextHookEx(g_handle, code, message, data);
+}
+
+struct Started
+{
+    DWORD error = 0;
+    DWORD threadId = 0;
+};
+
+void hookThread(std::promise<Started> *started)
+{
+    // The time of a key is taken in the callback: the thread should not wait behind others. It runs for
+    // microseconds a key.
+    SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
+    MSG msg;
+    PeekMessageW(&msg, nullptr, WM_USER, WM_USER, PM_NOREMOVE); // the message queue: stop() posts WM_QUIT to it
+    g_handle = SetWindowsHookExW(WH_KEYBOARD_LL, hookProc, GetModuleHandleW(nullptr), 0);
+    const DWORD error = g_handle ? 0 : std::max<DWORD>(GetLastError(), ERROR_GEN_FAILURE); // never 0 on a failure
+    started->set_value({error, GetCurrentThreadId()}); // `started` is gone after this
+    if (!g_handle)
+        return;
+    while (GetMessageW(&msg, nullptr, 0, 0) > 0)
+        DispatchMessageW(&msg);
+    UnhookWindowsHookEx(g_handle);
+    g_handle = nullptr;
 }
 
 } // namespace
@@ -138,23 +195,32 @@ bool KeyboardHook::start()
 {
     if (m_running)
         return true;
-    g_hook = this;
-    g_handle = SetWindowsHookExW(WH_KEYBOARD_LL, hookProc, GetModuleHandleW(nullptr), 0);
-    m_running = g_handle != nullptr;
-    if (m_running)
-        emit started();
-    else
-        emit failed(tr("Не удалось перехватить клавиатуру (SetWindowsHookEx: ошибка %1).").arg(GetLastError()));
-    return m_running;
+    g_target = this;
+    g_session = ++m_impl->session;
+    std::promise<Started> promise;
+    std::future<Started> future = promise.get_future();
+    m_impl->thread = std::thread(hookThread, &promise);
+    const Started result = future.get();
+    if (result.error != 0) {
+        m_impl->thread.join();
+        g_target = nullptr;
+        emit failed(tr("Не удалось перехватить клавиатуру (SetWindowsHookEx: ошибка %1).").arg(result.error));
+        return false;
+    }
+    m_impl->threadId = result.threadId;
+    m_running = true;
+    emit started();
+    return true;
 }
 
 void KeyboardHook::stop()
 {
     if (!m_running)
         return;
-    UnhookWindowsHookEx(g_handle);
-    g_handle = nullptr;
-    m_running = false;
+    PostThreadMessageW(m_impl->threadId, WM_QUIT, 0, 0);
+    m_impl->thread.join();
+    g_target = nullptr;
+    m_running = false; // the events still queued to the GUI are dropped (Impl::deliver)
 }
 
 quint64 KeyboardHook::foregroundWindow()
@@ -164,7 +230,12 @@ quint64 KeyboardHook::foregroundWindow()
 
 QString KeyboardHook::foregroundTitle()
 {
-    HWND window = GetForegroundWindow();
+    return windowTitle(foregroundWindow());
+}
+
+QString KeyboardHook::windowTitle(quint64 id)
+{
+    HWND window = HWND(quintptr(id));
     while (HWND parent = GetParent(window))
         window = parent;
     WCHAR title[80] = {};
@@ -174,6 +245,7 @@ QString KeyboardHook::foregroundTitle()
 
 QString KeyboardHook::layoutKeyName(quint8 scan, bool *dead)
 {
+    const std::lock_guard lock(g_layoutMutex);
     const HKL layout = GetKeyboardLayout(0);
     const UINT vk = MapVirtualKeyExW(scan, MAPVK_VSC_TO_VK_EX, layout);
     BYTE state[256] = {};
@@ -193,6 +265,7 @@ QString KeyboardHook::layoutKeyName(quint8 scan, bool *dead)
 
 int KeyboardHook::toUnicode(quint8 scan, bool shift, bool caps, char16_t out[2])
 {
+    const std::lock_guard lock(g_layoutMutex);
     const HKL layout = GetKeyboardLayout(0);
     BYTE state[256] = {};
     GetKeyboardState(state);
@@ -213,6 +286,7 @@ int KeyboardHook::toUnicode(quint8 scan, bool shift, bool caps, char16_t out[2])
 void KeyboardHook::clearDeadKey()
 {
     // A space after a dead key takes it out of the keyboard state; without one it changes nothing.
+    const std::lock_guard lock(g_layoutMutex);
     const HKL layout = GetKeyboardLayout(0);
     const BYTE state[256] = {};
     WCHAR chars[2];
