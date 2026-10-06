@@ -176,6 +176,18 @@ jobs:
     permissions:
       contents: write
     steps:
+      # The notes are the message of an annotated tag (git tag -a v1.2.3 -m "- what changed"); a plain tag gives none.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+      - name: Release notes
+        run: |
+          git fetch --force origin "refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
+          : > notes.md
+          if [ "$(git cat-file -t "$GITHUB_REF_NAME")" = tag ]; then
+            git tag -l --format='%(contents)' "$GITHUB_REF_NAME" > notes.md
+          fi
+          cat notes.md
       - uses: actions/download-artifact@v8
         with:
           path: dist
@@ -185,14 +197,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           ls -l dist
-          cat > notes.md <<'EOF'
-          Typing statistics — ремейк на Qt 6 для Windows, Linux и macOS.
-
-          - **Windows** — `TypingStatistics.exe`: один файл, установка не нужна.
-          - **Linux** — `TypingStatistics-x86_64.AppImage`: `chmod +x` и запустить; при первом запуске программа попросит
-            разрешение видеть нажатия клавиш и даст команду, которую нужно один раз вставить в терминал.
-          - **macOS** — `.dmg` для Apple Silicon (`arm64`) и Intel (`x86_64`). Программа не нотаризована: в первый раз —
-            правый щелчок → «Открыть». Нужно разрешение «Мониторинг ввода».
-          EOF
-          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "Typing statistics $GITHUB_REF_NAME" \
-            --notes-file notes.md
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" \
+            --title "Typing statistics (remake $GITHUB_REF_NAME)" --notes-file notes.md

@@ -47,6 +47,10 @@ macOS: `.app` с bundle id `org.typingstatistics.TypingStatistics`, миниму
 ~40 мин один раз и кладёт в кэш Actions — кэш живёт 7 дней без обращений), Ubuntu
 (GCC + AppImage через `ci/linux/appimage.sh`; Clang с `TS_SOFT_EXT80=ON`), macOS arm64 и x86_64 (`.dmg`, подпись
 ad-hoc, без нотаризации). AppImage проверяется локально: `ci/linux/appimage.sh <build>` в образе `ci/linux/Dockerfile`.
+**Релиз** — тег `v*` (после всех сборок CI публикует GitHub Release: exe, AppImage, два `.dmg`, без zip). Заголовок
+«Typing statistics (remake vX.Y.Z)», описание — только список изменений, из сообщения аннотированного тега:
+`git tag -a v1.0.2 -m "- изменение"` (у простого тега описание пустое). Без инструкций по установке (решение
+пользователя). Версия в заголовке окна остаётся `1.43c`.
 QXlsx требует `Qt6::GuiPrivate`: на дистрибутивах нужен пакет приватных заголовков (`qt6-base-private-dev` в
 Debian/Ubuntu, `qt6-qtbase-private-devel` в Fedora). `lrelease` ищется и в `bin`/`libexec` Qt (у Debian — вне PATH).
 
