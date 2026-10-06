@@ -40,10 +40,9 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
         run: |
-          foreach ($t in 'windowOfTheKey', 'hookThread') {
-            $p = Start-Process -FilePath build\tst_ui.exe -ArgumentList "$t -v2" -PassThru -NoNewWindow
-            if ($p.WaitForExit(60000)) { "== $t exit $($p.ExitCode)" } else { "== $t HANGS"; $p.Kill() }
-          }
+          $p = Start-Process -FilePath build\tst_ui.exe -ArgumentList "-v2 -o ui.txt,txt" -PassThru -NoNewWindow
+          if ($p.WaitForExit(120000)) { "== exit $($p.ExitCode)" } else { "== HANGS"; $p.Kill() }
+          Get-Content ui.txt -Tail 60
       - name: Test
         run: ctest --test-dir build --output-on-failure
       # The single exe: a static qtbase, built once (~40 min) and then taken from the cache.
