@@ -37,13 +37,12 @@ jobs:
       # TEMPORARY: where tst_ui hangs on the runner (the hook in its thread).
       - name: Hook test (temporary)
         run: |
-          ctest --test-dir build -R tst_ui -V --timeout 60 2>&1 | tail -40 || true
-          echo "== direct from bash"
-          QT_QPA_PLATFORM=offscreen ./build/tst_ui.exe -v2 -o ui2.txt,txt &
-          pid=$!
-          for i in $(seq 60); do kill -0 $pid 2>/dev/null || break; sleep 1; done
-          kill -0 $pid 2>/dev/null && { echo "== HANGS"; kill $pid; } || { wait $pid; echo "== exit $?"; }
-          tail -25 ui2.txt || true
+          echo "== PATH"; echo "$PATH" | tr ':' '\n' | head -12
+          echo "== runtime DLLs"; type -a libstdc++-6.dll libwinpthread-1.dll libgcc_s_seh-1.dll || true
+          echo "== ldd"; ldd ./build/tst_ui.exe | grep -iv "windows\|system32" || true
+          echo "== with MinGW 13.1 first"
+          PATH="$IQTA_TOOLS/mingw1310_64/bin:$PATH" QT_QPA_PLATFORM=offscreen ./build/tst_ui.exe -o ui2.txt,txt; echo "== exit $?"
+          tail -3 ui2.txt || true
       - name: Test
         run: ctest --test-dir build --output-on-failure
       # The single exe: a static qtbase, built once (~40 min) and then taken from the cache.
