@@ -67,7 +67,8 @@ private slots:
     void request()
     {
         const QByteArray hash = QCryptographicHash::hash("x", QCryptographicHash::Sha256);
-        const std::optional<Der::Node> req = Der::parse(TimeStamp::request(hash, 0x1234, true));
+        const QByteArray der = TimeStamp::request(hash, 0x1234, true); // the nodes point into it
+        const std::optional<Der::Node> req = Der::parse(der);
         QVERIFY(req && req->tag == Der::Sequence);
         Der::Reader r(req->content);
         const auto version = r.next(Der::Integer), imprint = r.next(Der::Sequence), nonce = r.next(Der::Integer),
@@ -76,7 +77,8 @@ private slots:
         QCOMPARE(Der::unsignedInteger(*nonce).toByteArray().toHex(), QByteArray("1234"));
         QVERIFY(imprint->content.toByteArray().endsWith(hash));
         // certReq FALSE is the default: DER leaves it out.
-        Der::Reader plain(Der::parse(TimeStamp::request(hash, 1, false))->content);
+        const QByteArray plainDer = TimeStamp::request(hash, 1, false);
+        Der::Reader plain(Der::parse(plainDer)->content);
         plain.next();
         plain.next();
         plain.next();
