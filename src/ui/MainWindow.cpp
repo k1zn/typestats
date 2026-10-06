@@ -291,7 +291,7 @@ QWidget *MainWindow::createToolBar()
     action(20, 198, 4, 23, tr("Видео"), nullptr); // the attached video is not in the port: always disabled
     action(22, 222, 4, 23, tr("Настройки..."), &MainWindow::showSettings);
     action(4, 246, 4, 23, tr("Оперативная статистика"), &MainWindow::showLiveStats);
-    m_helpButton = action(3, 270, 4, 23, tr("Справка"), &MainWindow::showHelpMenu);
+    m_helpButton = action(3, 270, 4, 23, tr("О программе"), &MainWindow::showHelpMenu);
     bevel(bar, 3, 29, 294, 2, QFrame::HLine);
     // Lower row.
     m_deleteButton = action(10, 6, 32, 22, tr("Удалить (%1)").arg(Hotkeys::deleteKey()), &MainWindow::deleteSelection);
@@ -617,10 +617,8 @@ void MainWindow::showTextInput()
 
 void MainWindow::showHelpMenu()
 {
-    QMenu menu(this);
-    menu.addAction(tr("О программе..."), this, [this] { AboutDialog(this).exec(); });
-    menu.addAction(tr("Справка"), this, [] { QDesktopServices::openUrl(QUrl(QStringLiteral("http://fil.urikor.net"))); });
-    menu.exec(m_helpButton->mapToGlobal(QPoint(0, m_helpButton->height())));
+    // The original's menu also had "Справка", its help site (fil.urikor.net), which is long gone: only "About" is left.
+    AboutDialog(this).exec();
 }
 
 void MainWindow::selectPreset(const QString &name)
