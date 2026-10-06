@@ -5,6 +5,16 @@
 
 #include <QStringList>
 
+// A time stamp of a recording (re/stamps.md): it covers the normalized records up to `end`, requested `delayMs` after
+// the last of them; the token is the RFC 3161 one, without its certificates (they are kept once per file).
+struct Stamp
+{
+    int end = 0;
+    quint32 delayMs = 0;
+    bool voided = false; // its records were edited here afterwards: it only links the chain
+    QByteArray token;
+};
+
 // Contents of a .tsf file (see re/tsf_format.md).
 struct TsfDocument
 {
@@ -18,6 +28,8 @@ struct TsfDocument
     QString attachedVideo;
     int videoTimeShiftMs = 0;
     KeyPlatform platform = KeyPlatform::Windows; // "Platform": where it was recorded; none - Windows
+    QList<Stamp> stamps;                    // "Stamp1", "Stamp2"...: the port's own, not signed
+    QList<QByteArray> stampCertificates;    // "StampCert1"...: the certificates of the authorities, DER
     bool signed_ = false;     // file had a signature line
     bool signatureValid = true;
 };

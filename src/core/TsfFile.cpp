@@ -5,6 +5,7 @@
 #include "TsfSignature.h"
 
 #include <QFile>
+#include <QMap>
 
 #include <array>
 
@@ -165,6 +166,46 @@ bool parseHex64(QStringView word, quint64 &out)
     return ok;
 }
 
+// The time stamps (re/stamps.md): "Stamp<i>=<end> <delay ms> <flags> <token, base64>" and
+// "StampCert<i>=<certificate, base64>", in the order of i.
+void readStamps(const QList<QStringView> &lines, TsfDocument &doc)
+{
+    QMap<int, Stamp> stamps;
+    QMap<int, QByteArray> certs;
+    static const QString stampKey = QStringLiteral("Stamp"), certKey = QStringLiteral("StampCert");
+    for (QStringView l : lines) {
+        if (!l.startsWith(stampKey))
+            continue;
+        const qsizetype eq = l.indexOf(u'=');
+        if (eq < 0)
+            continue;
+        const bool cert = l.startsWith(certKey);
+        bool ok = false;
+        const int index = l.mid(cert ? certKey.size() : stampKey.size(), eq - (cert ? certKey.size() : stampKey.size())).toInt(&ok);
+        if (!ok)
+            continue;
+        const QStringView value = l.mid(eq + 1);
+        if (cert) {
+            certs.insert(index, QByteArray::fromBase64(value.toLatin1()));
+            continue;
+        }
+        const QList<QStringView> parts = value.split(u' ', Qt::SkipEmptyParts);
+        if (parts.size() != 4)
+            continue;
+        Stamp s;
+        bool okEnd = false, okDelay = false, okFlags = false;
+        s.end = parts[0].toInt(&okEnd);
+        s.delayMs = parts[1].toUInt(&okDelay);
+        const int flags = parts[2].toInt(&okFlags);
+        s.voided = flags & 1;
+        s.token = QByteArray::fromBase64(parts[3].toLatin1());
+        if (okEnd && okDelay && okFlags && !s.token.isEmpty())
+            stamps.insert(index, s);
+    }
+    doc.stamps = stamps.values();
+    doc.stampCertificates = certs.values();
+}
+
 TsfDocument parseLines(const QList<QStringView> &lines, Tsf::ReadError *err)
 {
     const std::array<QString, KeyCount> header = values(lines);
@@ -211,6 +252,8 @@ TsfDocument parseLines(const QList<QStringView> &lines, Tsf::ReadError *err)
     doc.attachedVideo = header[AttachedVideo];
     if (!doc.attachedVideo.isEmpty())
         doc.videoTimeShiftMs = header[VideoTimeShift].toInt();
+
+    readStamps(lines, doc);
 
     const QString &sig = header[Signature];
     doc.signed_ = !sig.isEmpty();
@@ -276,6 +319,14 @@ QStringList serialize(const TsfDocument &doc, bool sign)
     // The port's own key (the original skips unknown lines of the header; not signed).
     if (doc.platform != KeyPlatform::Windows)
         lines.append(QStringLiteral("Platform=") + keyPlatformName(doc.platform));
+    // The time stamps (the port's own, re/stamps.md).
+    for (int i = 0; i < doc.stamps.size(); ++i) {
+        const Stamp &s = doc.stamps[i];
+        lines.append(QStringLiteral("Stamp%1=%2 %3 %4 ").arg(i + 1).arg(s.end).arg(s.delayMs).arg(s.voided ? 1 : 0)
+                     + QString::fromLatin1(s.token.toBase64()));
+    }
+    for (int i = 0; i < doc.stampCertificates.size(); ++i)
+        lines.append(QStringLiteral("StampCert%1=").arg(i + 1) + QString::fromLatin1(doc.stampCertificates[i].toBase64()));
     return lines;
 }
 

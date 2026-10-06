@@ -107,32 +107,41 @@ int TextModel::lookup(int TextAnchor::*key, int x, int TextAnchor::*value) const
 
 namespace Recalc {
 
+std::optional<KeyRecord> Normalizer::push(const KeyRecord &raw)
+{
+    if (!m_started) {
+        if (!raw.isDown())
+            return std::nullopt; // leading releases
+        m_started = true;
+        m_acc = 60000000u; // the first record
+    } else {
+        m_acc += raw.dtUs;
+    }
+    KeyRecord r = raw;
+    r.flags &= ~(KeyRecord::Transient | KeyRecord::SegmentStart); // in-memory marks of the original
+    const quint8 vk = r.vk();
+    bool keep = true;
+    if (r.isUp()) {
+        m_down.reset(vk);
+    } else {
+        keep = !m_down.test(vk) || !isModifierVk(vk);
+        m_down.set(vk);
+    }
+    if (!keep)
+        return std::nullopt;
+    r.dtUs = quint32(m_acc);
+    m_acc = 0;
+    return r;
+}
+
 KeyRecords normalized(const KeyRecords &recs)
 {
     KeyRecords out;
-    const auto first = std::find_if(recs.begin(), recs.end(), [](const KeyRecord &r) { return r.isDown(); });
-    out.reserve(recs.end() - first);
-
-    std::bitset<256> down;
-    quint64 acc = 0;
-    for (auto it = first; it != recs.end(); ++it) {
-        KeyRecord r = *it;
-        r.flags &= ~(KeyRecord::Transient | KeyRecord::SegmentStart); // in-memory marks of the original
-        acc += it == first ? 60000000u : r.dtUs;
-        const quint8 vk = r.vk();
-        bool keep = true;
-        if (r.isUp()) {
-            down.reset(vk);
-        } else {
-            keep = !down.test(vk) || !isModifierVk(vk);
-            down.set(vk);
-        }
-        if (keep) {
-            r.dtUs = quint32(acc);
-            out.append(r);
-            acc = 0;
-        }
-    }
+    out.reserve(recs.size());
+    Normalizer n;
+    for (const KeyRecord &raw : recs)
+        if (std::optional<KeyRecord> r = n.push(raw))
+            out.append(std::move(*r));
     return out;
 }
 

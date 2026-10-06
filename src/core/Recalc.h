@@ -6,6 +6,8 @@
 #include <QVector>
 
 #include <algorithm>
+#include <bitset>
+#include <optional>
 #include <utility>
 
 // Port of Recalculate (0x40ce40), see re/text_reconstruction.md.
@@ -110,6 +112,20 @@ TextModel run(const KeyRecords &document, const RecalcOptions &opt);
 // The steps of run(), for tests.
 // Drops leading releases and auto-repeated modifier presses; sets dt of the first record to 60 s.
 KeyRecords normalized(const KeyRecords &recs);
+
+// normalized() one record at a time: whether a record is kept, and its dt, are known when it comes and do not
+// change later (the time stamps of a recording hash the normalized records as they are typed).
+class Normalizer
+{
+public:
+    // The record as normalized() gives it, or nothing if it is dropped.
+    std::optional<KeyRecord> push(const KeyRecord &raw);
+
+private:
+    std::bitset<256> m_down;
+    quint64 m_acc = 0;
+    bool m_started = false;
+};
 // Marks the characters removed by BackSpace / Ctrl+BackSpace (one flag per record).
 QVector<bool> erasedRecords(const KeyRecords &recs);
 }

@@ -31,6 +31,7 @@ struct KeyRecord
     quint32 dtUs = 0;    // microseconds since the previous event
     quint32 flags = 0;
     char16_t ch = 0;     // produced UTF-16 character (valid when HasChar)
+    quint32 tag = 0;     // not saved: lets an edit tell where each record went (the time stamps follow it)
     QString comment;     // optional text mark
 
     bool isDown() const { return !(flags & KeyUp); }
@@ -43,6 +44,8 @@ struct KeyRecord
 
 // Movable as bytes (QString is): a growing vector of records is reallocated, not copied one by one.
 Q_DECLARE_TYPEINFO(KeyRecord, Q_RELOCATABLE_TYPE);
+// `tag` lives in the padding after `ch`: records are not larger for it (memory of long recordings, re/perf.md).
+static_assert(sizeof(KeyRecord) == 8 + 8 + sizeof(QString));
 
 using KeyRecords = QVector<KeyRecord>;
 
