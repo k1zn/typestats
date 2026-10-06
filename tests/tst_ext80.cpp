@@ -139,6 +139,25 @@ private slots:
             check(Ext80(m) + Ext80(m >> 1), (long double)m + (long double)(m >> 1), "tie+", double(m), 0);
             check(Ext80(m) / Ext80(k), (long double)m / (long double)k, "tie/", double(m), double(k));
         }
+        // The branches of add: every shift around and past the 64-bit word, both signs, and cancellation of
+        // neighbours (shift 0 and 1); then significands of all ones, which round up to the next power of two.
+        for (int i = 0; i < 100000; ++i) {
+            const quint64 m = rnd.generate64() | (quint64(1) << 63), k = rnd.generate64() | (quint64(1) << 63);
+            const int shift = int(rnd.bounded(0, 132));
+            const Ext80 em(m), ek = Ext80(k) * Ext80(std::ldexp(1.0, -shift)); // exact: times a power of two
+            const long double hm = (long double)m, hk = std::ldexp((long double)k, -shift);
+            check(em + ek, hm + hk, "shift+", double(m), shift);
+            check(em - ek, hm - hk, "shift-", double(m), shift);
+            check(ek - em, hk - hm, "shift-r", double(m), shift);
+            const quint64 near = m - rnd.bounded(0, 1000), half = (k >> 1) | (quint64(1) << 62);
+            check(Ext80(m) - Ext80(near), (long double)m - (long double)near, "cancel0", double(m), double(near));
+            check(Ext80(m) - Ext80(half), (long double)m - (long double)half, "cancel1", double(m), double(half));
+            const quint64 ones = ~quint64(0) >> rnd.bounded(0, 8) << rnd.bounded(0, 8);
+            const double small = std::ldexp(1.0, -int(rnd.bounded(0, 4)));
+            check(Ext80(ones) + Ext80(small), (long double)ones + (long double)small, "ones+", double(ones), small);
+            check(Ext80(ones) * Ext80(ones), (long double)ones * (long double)ones, "ones*", double(ones), 0);
+            check(Ext80(ones) / Ext80(m), (long double)ones / (long double)m, "ones/", double(ones), double(m));
+        }
         QVERIFY(checked > 3000000);
 #endif
     }
