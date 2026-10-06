@@ -21,6 +21,8 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QSignalSpy>
+
+#include <cstdio>
 #include <QListWidget>
 #include <QRadioButton>
 #include <QTableView>
@@ -462,20 +464,20 @@ private slots:
 #ifdef Q_OS_WIN
         KeyboardHook hook;
         QSignalSpy started(&hook, &KeyboardHook::started);
-        qInfo("start");
+        std::fprintf(stderr, "hookThread: %s\n", "start");
         if (!hook.start())
             QSKIP("the system did not allow the hook here");
         QVERIFY(hook.isRunning());
         QCOMPARE(started.size(), 1);
-        qInfo("stop");
+        std::fprintf(stderr, "hookThread: %s\n", "stop");
         hook.stop();
         QVERIFY(!hook.isRunning());
-        qInfo("start again");
+        std::fprintf(stderr, "hookThread: %s\n", "start again");
         QVERIFY(hook.start());
         QCOMPARE(started.size(), 2);
-        qInfo("stop again");
+        std::fprintf(stderr, "hookThread: %s\n", "stop again");
         hook.stop();
-        qInfo("start, and the destructor stops it");
+        std::fprintf(stderr, "hookThread: %s\n", "start, and the destructor stops it");
         QVERIFY(hook.start());
 #else
         QSKIP("the Windows hook");
