@@ -40,7 +40,12 @@ int main(int argc, char *argv[])
     w.show();
     if (QSettings().value(QStringLiteral("AutoMinimize"), false).toBool())
         w.showMinimized();
-    w.startCapture();
+    // `--no-capture`: no keyboard hook (screenshots and demonstrations: the typing of whoever sits at the
+    // computer stays out of the window).
+    if (const qsizetype i = args.indexOf(QStringLiteral("--no-capture")); i > 0)
+        args.remove(i);
+    else
+        w.startCapture();
     QString form;
     if (const qsizetype i = args.indexOf(QStringLiteral("--show")); i > 0 && i + 1 < args.size()) {
         form = args[i + 1];

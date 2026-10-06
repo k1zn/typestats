@@ -26,7 +26,8 @@ if "--window" in sys.argv:
 
 env = dict(os.environ)
 env["PATH"] = os.pathsep.join([str(QT_BIN), str(MINGW_BIN), env.get("PATH", "")])
-proc = subprocess.Popen([str(ROOT / "build" / "TypingStatistics.exe")] + sys.argv[1:2] + sys.argv[3:], env=env)
+# --no-capture: without the hook, or the typing of the user would be recorded into the window being captured.
+proc = subprocess.Popen([str(ROOT / "build" / "TypingStatistics.exe"), "--no-capture"] + sys.argv[1:2] + sys.argv[3:], env=env)
 try:
     deadline = time.time() + 20
     win = None
