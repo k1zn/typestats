@@ -84,7 +84,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Packages
+        timeout-minutes: 15
         run: |
+          # The runner's Azure mirror sometimes does not answer: short timeouts, and apt goes on to the next mirror
+          # of the list (archive.ubuntu.com) instead of waiting minutes on every file.
+          echo 'Acquire::http::Timeout "15"; Acquire::https::Timeout "15"; Acquire::Retries "3";' | sudo tee /etc/apt/apt.conf.d/99ci-timeouts
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends ninja-build libgl-dev libegl-dev \
             libxkbcommon-dev libxkbcommon-x11-dev libxkbregistry-dev libxcb1-dev libxcb-xkb-dev xkb-data \
