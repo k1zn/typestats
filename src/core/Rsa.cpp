@@ -2,6 +2,10 @@
 
 #include "Der.h"
 
+#include <QHash>
+#include <QMutex>
+
+#include <memory>
 #include <vector>
 
 namespace Rsa {
@@ -189,8 +193,22 @@ std::optional<QByteArray> publicOperation(const PublicKey &key, QByteArrayView s
     const Limbs n = fromBytes(key.modulus, words), s = fromBytes(signature, words);
     if (notLess(s, n))
         return std::nullopt;
-    const Montgomery m(n);
-    return toBytes(m.power(s, key.exponent), bytes);
+    // R² mod n costs most of a check: kept per modulus (the stamps of a recording share a few keys).
+    static QMutex mutex;
+    static QHash<QByteArray, std::shared_ptr<const Montgomery>> contexts;
+    std::shared_ptr<const Montgomery> m;
+    {
+        const QMutexLocker lock(&mutex);
+        m = contexts.value(key.modulus);
+    }
+    if (!m) {
+        m = std::make_shared<const Montgomery>(n);
+        const QMutexLocker lock(&mutex);
+        if (contexts.size() > 64)
+            contexts.clear();
+        contexts.insert(key.modulus, m);
+    }
+    return toBytes(m->power(s, key.exponent), bytes);
 }
 
 bool verify(const PublicKey &key, QCryptographicHash::Algorithm alg, QByteArrayView digest, QByteArrayView signature)
