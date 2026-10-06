@@ -45,6 +45,12 @@
 #include <QSplitter>
 #include <QSystemTrayIcon>
 #include <QDesktopServices>
+#include <QDialogButtonBox>
+#include <QFontDatabase>
+#include <QGridLayout>
+#include <QLineEdit>
+#include <QPushButton>
+#include <QStyle>
 #include <QUrl>
 #include <QToolButton>
 #include <QToolTip>
@@ -560,10 +566,11 @@ void MainWindow::updateTitle()
     setWindowTitle(title);
 }
 
-void MainWindow::hookFailed(const QString &reason)
+void MainWindow::hookFailed(const QString &reason, const QString &command)
 {
     // Nothing can be recorded: "Ts: OFF", and the reason once (the hook may start by itself later).
     m_hookError = reason;
+    m_hookCommand = command;
     m_capture->setChecked(false);
     showHookError();
 }
@@ -584,9 +591,41 @@ void MainWindow::showHookError()
         m_hookErrorBox->raise();
         return;
     }
-    m_hookErrorBox = new QMessageBox(QMessageBox::Warning, appTitle(), m_hookError, QMessageBox::Ok, this);
+    if (m_hookCommand.isEmpty()) {
+        auto *box = new QMessageBox(QMessageBox::Warning, appTitle(), m_hookError, QMessageBox::Ok, this);
+        box->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        m_hookErrorBox = box;
+    } else {
+        // The command in one line and a button that copies it; the window stays until the hook starts.
+        auto *dialog = new QDialog(this);
+        dialog->setWindowTitle(appTitle());
+        auto *icon = new QLabel(dialog);
+        const int iconSize = style()->pixelMetric(QStyle::PM_MessageBoxIconSize, nullptr, dialog);
+        icon->setPixmap(style()->standardIcon(QStyle::SP_MessageBoxInformation, nullptr, dialog).pixmap(iconSize));
+        auto *text = new QLabel(m_hookError, dialog);
+        text->setWordWrap(true);
+        auto *command = new QLineEdit(m_hookCommand, dialog);
+        command->setReadOnly(true);
+        command->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
+        command->setCursorPosition(0);
+        command->setMinimumWidth(480);
+        auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close, dialog);
+        auto *copy = buttons->addButton(tr("Скопировать команду"), QDialogButtonBox::ActionRole);
+        copy->setDefault(true);
+        connect(copy, &QPushButton::clicked, dialog, [this, copy] {
+            QGuiApplication::clipboard()->setText(m_hookCommand);
+            copy->setText(tr("Скопировано"));
+        });
+        connect(buttons, &QDialogButtonBox::rejected, dialog, &QDialog::reject);
+        auto *grid = new QGridLayout(dialog);
+        grid->addWidget(icon, 0, 0, Qt::AlignTop);
+        grid->addWidget(text, 0, 1);
+        grid->addWidget(command, 1, 1);
+        grid->addWidget(buttons, 2, 0, 1, 2);
+        grid->setHorizontalSpacing(12);
+        m_hookErrorBox = dialog;
+    }
     m_hookErrorBox->setAttribute(Qt::WA_DeleteOnClose);
-    m_hookErrorBox->setTextInteractionFlags(Qt::TextSelectableByMouse); // the commands can be copied
     m_hookErrorBox->open();
 }
 

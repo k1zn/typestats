@@ -78,7 +78,7 @@ private:
     void updateHistograms();
     void showHistograms();
     void captureToggled(bool on);
-    void hookFailed(const QString &reason);
+    void hookFailed(const QString &reason, const QString &command);
     void hookStarted();
     void showHookError();
     void showTextInput();
@@ -196,7 +196,8 @@ private:
 
     KeyboardHook m_hook;
     QString m_hookError;                     // why the hook does not run; empty when it does (or was not started)
-    QPointer<QMessageBox> m_hookErrorBox;
+    QString m_hookCommand;                   // the terminal command that fixes it, if any
+    QPointer<QDialog> m_hookErrorBox;
     Recorder m_recorder;
     JournalWriter m_journal;
     bool m_journalFailed = false; // the journal could not be written: said once

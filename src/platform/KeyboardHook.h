@@ -51,8 +51,9 @@ public:
 
 signals:
     void key(const HookEvent &e);
-    // The capture is not running: the reason and what to do, for the user.
-    void failed(const QString &reason);
+    // The capture is not running: the reason and what to do, for the user, and a terminal command that fixes it
+    // (Linux: the access to the keyboards), when there is one.
+    void failed(const QString &reason, const QString &command = QString());
     void started();
 
 private:

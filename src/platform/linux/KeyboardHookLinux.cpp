@@ -102,12 +102,13 @@ bool KeyboardHook::start()
     if (status.keyboards == 0)
         emit failed(tr("Клавиатура не найдена. Запись начнётся, как только вы её подключите."));
     else
+        // One line: the udev rule (resources/linux/70-typingstatistics.rules) and its reload.
         emit failed(tr("Программе нужно разрешение видеть нажатия клавиш.\n\n"
-                       "Откройте терминал, вставьте туда эти две строки и введите свой пароль:\n\n"
-                       "echo 'SUBSYSTEM==\"input\", KERNEL==\"event*\", ENV{ID_INPUT_KEYBOARD}==\"1\", TAG+=\"uaccess\"' "
-                       "| sudo tee /etc/udev/rules.d/70-typingstatistics.rules\n"
-                       "sudo udevadm control --reload && sudo udevadm trigger\n\n"
-                       "Это нужно один раз. Запись начнётся сама."));
+                       "Скопируйте команду, вставьте её в терминал и введите свой пароль. Это нужно один раз — "
+                       "запись начнётся сама."),
+                    QStringLiteral("echo 'SUBSYSTEM==\"input\", KERNEL==\"event*\", ENV{ID_INPUT_KEYBOARD}==\"1\", "
+                                   "TAG+=\"uaccess\"' | sudo tee /etc/udev/rules.d/70-typingstatistics.rules > /dev/null "
+                                   "&& sudo udevadm control --reload && sudo udevadm trigger"));
     return false;
 }
 

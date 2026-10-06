@@ -44,6 +44,7 @@
 #include <QComboBox>
 #include <QToolButton>
 #include <QMessageBox>
+#include <QPushButton>
 #include <QKeyEvent>
 
 class TstUi : public QObject
@@ -205,6 +206,24 @@ private slots:
         w.m_capture->setChecked(false);
         emit w.m_hook.started();
         QVERIFY(!w.m_capture->isChecked());
+
+        // With a command (Linux): it is in one line, the button copies it and the window stays.
+        w.m_capture->setChecked(true);
+        emit w.m_hook.failed(QStringLiteral("no access"), QStringLiteral("sudo fix"));
+        auto *dialog = w.m_hookErrorBox.data();
+        QVERIFY(dialog && !qobject_cast<QMessageBox *>(dialog));
+        QCOMPARE(dialog->findChild<QLineEdit *>()->text(), QStringLiteral("sudo fix"));
+        QPushButton *copy = nullptr;
+        for (QPushButton *b : dialog->findChildren<QPushButton *>())
+            if (b->isDefault())
+                copy = b;
+        QVERIFY(copy);
+        QGuiApplication::clipboard()->clear();
+        copy->click();
+        QCOMPARE(QGuiApplication::clipboard()->text(), QStringLiteral("sudo fix"));
+        QVERIFY(dialog->isVisible());
+        emit w.m_hook.started();
+        QTRY_VERIFY(!w.m_hookErrorBox);
     }
 
     void klavogramCursor()

@@ -408,28 +408,18 @@ Special thanks to Urikor (for the great site and the hosting), Avtandilina, Dron
     <message>
         <source>Программе нужно разрешение видеть нажатия клавиш.
 
-Откройте терминал, вставьте туда эти две строки и введите свой пароль:
-
-echo 'SUBSYSTEM=="input", KERNEL=="event*", ENV{ID_INPUT_KEYBOARD}=="1", TAG+="uaccess"' | sudo tee /etc/udev/rules.d/70-typingstatistics.rules
-sudo udevadm control --reload &amp;&amp; sudo udevadm trigger
-
-Это нужно один раз. Запись начнётся сама.</source>
-        <translation>The program needs a permission to see the keys you press.
-
-Open a terminal, paste these two lines there and enter your password:
-
-echo 'SUBSYSTEM=="input", KERNEL=="event*", ENV{ID_INPUT_KEYBOARD}=="1", TAG+="uaccess"' | sudo tee /etc/udev/rules.d/70-typingstatistics.rules
-sudo udevadm control --reload &amp;&amp; sudo udevadm trigger
-
-This is needed once. Recording starts by itself.</translation>
-    </message>
-    <message>
-        <source>Программе нужно разрешение видеть нажатия клавиш.
-
 Откройте «Системные настройки» → «Конфиденциальность и безопасность» → «Мониторинг ввода» и включите Typing statistics. Запись начнётся сама; если нет — перезапустите программу.</source>
         <translation>The program needs a permission to see the keys you press.
 
 Open System Settings → Privacy &amp; Security → Input Monitoring and turn on Typing statistics. Recording will start by itself; if it does not, restart the program.</translation>
+    </message>
+    <message>
+        <source>Программе нужно разрешение видеть нажатия клавиш.
+
+Скопируйте команду, вставьте её в терминал и введите свой пароль. Это нужно один раз — запись начнётся сама.</source>
+        <translation>The program needs a permission to see the keys you press.
+
+Copy the command, paste it into a terminal and enter your password. This is needed once: recording starts by itself.</translation>
     </message>
 </context>
 <context>
@@ -786,6 +776,14 @@ Open System Settings → Privacy &amp; Security → Input Monitoring and turn on
     <message>
         <source>Система запомнила для файлов .tsf другую программу, и сменить её может только пользователь: щёлкните по файлу .tsf правой кнопкой, «Открыть с помощью» → «Выбрать другое приложение», выберите Typing statistics и отметьте «Всегда использовать это приложение».</source>
         <translation>The system remembers another program for .tsf files, and only you can change it: right-click a .tsf file, Open with → Choose another app, select Typing statistics and check "Always use this app".</translation>
+    </message>
+    <message>
+        <source>Скопировать команду</source>
+        <translation>Copy the command</translation>
+    </message>
+    <message>
+        <source>Скопировано</source>
+        <translation>Copied</translation>
     </message>
 </context>
 <context>
