@@ -68,7 +68,7 @@ windeployqt --release --no-translations --no-opengl-sw --no-system-d3d-compiler 
 `Qt6Svg.dll`, `Qt6Network.dll` (были нужны QtMultimedia). С видео было ~54 МБ, zip ~24 МБ; без него не перемерено.
 Проверено запуском с `PATH` без Qt/MinGW.
 
-**Один exe** (`dist/TypingStatistics-single.exe`, ~15,5 МБ): статический qtbase 6.8.3 собран из исходников
+**Один exe** (`dist/TypingStatistics-single.exe`, ~16 МБ): статический qtbase 6.8.3 собран из исходников
 (`C:\Users\kizn\Qt\src`, сборка `C:\Users\kizn\Qt\sb2`, установка `6.8.3\mingw_64_static_min`). Конфигурация qtbase:
 `-DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Release -DFEATURE_optimize_size=ON -DFEATURE_static_runtime=ON`, выключены
 `opengl dynamicgl dbus sql network printsupport concurrent xml jpeg gif freetype textodfwriter textmarkdownreader
@@ -77,8 +77,8 @@ fontcombobox` (`-DFEATURE_x=OFF`). Грабли: без `dynamicgl=OFF` при `
 `graphicsview` нужен стилю windows11; LTO невозможно (slim-LTO не дружит с `-Wa,-mbig-obj`, а без него GCC 13.1 падает
 с ICE). Программа (PATH — только MinGW/CMake/Ninja, без динамического Qt):
 ```bash
-cmake -S . -B build-static-min -G Ninja -DCMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_PREFIX_PATH=C:/Users/kizn/Qt/6.8.3/mingw_64_static_min -DTS_LRELEASE=C:/Users/kizn/Qt/6.8.3/mingw_64/bin/lrelease.exe "-DCMAKE_CXX_FLAGS=-ffunction-sections -fdata-sections" "-DCMAKE_C_FLAGS=-ffunction-sections -fdata-sections" "-DCMAKE_EXE_LINKER_FLAGS=-s -Wl,--gc-sections"
-cmake --build build-static-min --target TypingStatistics
+cmake -S . -B build-static-o2 -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=C:/Users/kizn/Qt/6.8.3/mingw_64_static_min -DTS_LRELEASE=C:/Users/kizn/Qt/6.8.3/mingw_64/bin/lrelease.exe "-DCMAKE_CXX_FLAGS=-ffunction-sections -fdata-sections" "-DCMAKE_C_FLAGS=-ffunction-sections -fdata-sections" "-DCMAKE_EXE_LINKER_FLAGS=-s -Wl,--gc-sections"
+cmake --build build-static-o2 --target TypingStatistics
 ```
 CI собирает так же (`ci/windows/static-qt.sh` — та же конфигурация qtbase плюс явные `FEATURE_system_*=OFF`).
 Предупреждения `-Wall -Wextra` включает сам CMakeLists — только для своих целей, не для QXlsx. В exe только системные DLL Windows; плагины — qwindows, qmodernwindowsstyle, qico. Вес: Qt Gui/Widgets/Core ~4 МБ
@@ -488,7 +488,7 @@ python re/scripts/diffstand.py файл --journal                               
      изменений, программная Ext80 быстрее и `Graphs` в double, где доказано (arm64: `graphs.compute` 106 → ~14 мс).
      Стенд: `scrollFrames` (кадр при любом `QT_SCALE_FACTOR`, `TS_PERF_STYLE=Fusion`; на Windows offscreen — только с
      `QT_QPA_FONTDIR=C:/Windows/Fonts`), `numbers`, `macPath`; статический Qt — `tst_perf` на `minimal:enable_fonts`.
-     Хук Windows в потоке — сделан (выше). Ждёт решения: один exe собирать с `-O2` (+0,45 МБ, ядро быстрее на 25–45 %);
+     Хук Windows в потоке — сделан (выше); один exe собирается с `-O2` (Release; +0,45 МБ, ядро быстрее на 25–45 %);
    - не проверено руками (пользователь пока не пробовал): запись в чужих окнах, мышь графика и клавограммы, панели,
      трей, Form9 (набор в нём должен записываться), импорт настроек оригинала; «Преобразовать в текущую раскладку» на
      настоящей раскладке (ToUnicodeEx).

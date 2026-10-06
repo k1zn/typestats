@@ -51,9 +51,10 @@ jobs:
       - name: Single exe
         run: |
           lrelease="$(cygpath -m "$QT_ROOT_DIR")/bin/lrelease.exe"
-          # Only the static Qt: no trace of the shared one in the environment.
+          # Only the static Qt: no trace of the shared one in the environment. The program -O2 (Release), Qt for
+          # size: +0.45 MB against MinSizeRel, the core 25-45 % faster (re/perf.md, "Один exe").
           env -u Qt6_DIR -u QT_PLUGIN_PATH -u CMAKE_PREFIX_PATH \
-            cmake -S . -B build-static -G Ninja -DCMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ \
+            cmake -S . -B build-static -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ \
               -DCMAKE_PREFIX_PATH=C:/qt-static -DQt6_DIR=C:/qt-static/lib/cmake/Qt6 -DTS_LRELEASE="$lrelease" \
               "-DCMAKE_CXX_FLAGS=-ffunction-sections -fdata-sections" "-DCMAKE_C_FLAGS=-ffunction-sections -fdata-sections" \
               "-DCMAKE_EXE_LINKER_FLAGS=-s -Wl,--gc-sections"

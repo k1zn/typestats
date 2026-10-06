@@ -30,8 +30,8 @@
 Special thanks to Urikor (for the great site and the hosting), Avtandilina, Dron, Nestor and Valery Marusyak for their support and advice.</translation>
     </message>
     <message>
-        <source>&lt;b&gt;Typing statistics v%1&lt;/b&gt;&lt;br&gt;ремейк на Qt 6 для Windows, Linux и macOS&lt;br&gt;&lt;br&gt;Оригинал (2008–2016):&lt;br&gt;Игорь В. Филимонов&lt;br&gt;&lt;br&gt;Ремейк (2026):&lt;br&gt;&lt;a href="https://klavogonki.ru/u/#/600585/"&gt;Эрик (kiZzn)&lt;/a&gt;</source>
-        <translation>&lt;b&gt;Typing statistics v%1&lt;/b&gt;&lt;br&gt;a Qt 6 remake for Windows, Linux and macOS&lt;br&gt;&lt;br&gt;Original (2008–2016):&lt;br&gt;Igor V. Filimonov&lt;br&gt;&lt;br&gt;Remake (2026):&lt;br&gt;&lt;a href="https://klavogonki.ru/u/#/600585/"&gt;Erik (kiZzn)&lt;/a&gt;</translation>
+        <source>&lt;b&gt;Typing statistics v%1&lt;/b&gt;&lt;br&gt;ремейк на Qt 6 для Windows, Linux и macOS&lt;br&gt;&lt;br&gt;Оригинал (2008–2016):&lt;br&gt;&lt;a href="https://klavogonki.ru/u/#/147900/"&gt;Игорь В. Филимонов&lt;/a&gt;&lt;br&gt;&lt;br&gt;Ремейк (2026):&lt;br&gt;&lt;a href="https://klavogonki.ru/u/#/600585/"&gt;Эрик (kiZzn)&lt;/a&gt;</source>
+        <translation>&lt;b&gt;Typing statistics v%1&lt;/b&gt;&lt;br&gt;a Qt 6 remake for Windows, Linux and macOS&lt;br&gt;&lt;br&gt;Original (2008–2016):&lt;br&gt;&lt;a href="https://klavogonki.ru/u/#/147900/"&gt;Igor V. Filimonov&lt;/a&gt;&lt;br&gt;&lt;br&gt;Remake (2026):&lt;br&gt;&lt;a href="https://klavogonki.ru/u/#/600585/"&gt;Erik (kiZzn)&lt;/a&gt;</translation>
     </message>
 </context>
 <context>
