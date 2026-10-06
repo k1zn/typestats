@@ -34,6 +34,13 @@ jobs:
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++
       - name: Build
         run: cmake --build build
+      # TEMPORARY: where tst_ui hangs on the runner (the hook in its thread).
+      - name: Hook test (temporary)
+        run: |
+          export QT_QPA_PLATFORM=offscreen
+          for t in windowOfTheKey hookThread; do
+            timeout 60 ./build/tst_ui.exe $t -v2 2>&1 || echo "== $t: rc=$?"
+          done
       - name: Test
         run: ctest --test-dir build --output-on-failure
       # The single exe: a static qtbase, built once (~40 min) and then taken from the cache.
