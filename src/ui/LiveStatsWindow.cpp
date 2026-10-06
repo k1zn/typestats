@@ -1,5 +1,6 @@
 #include "LiveStatsWindow.h"
 
+#include "Look.h"
 #include "Texts.h"
 #include "core/NumberFormat.h"
 
@@ -16,19 +17,16 @@ LiveStatsWindow::LiveStatsWindow(QWidget *parent) : QWidget(parent, Qt::Tool | Q
     QFont big(QStringLiteral("Arial"));
     big.setPixelSize(37);
     big.setBold(true);
-    auto label = [&](const QString &text, const QColor &background) {
+    auto label = [&](const QString &text) {
         auto *l = new QLabel(text);
         l->setFont(big);
         l->setAlignment(Qt::AlignHCenter | Qt::AlignTop);
         l->setAutoFillBackground(true);
         l->setMinimumHeight(15);
-        QPalette p = l->palette();
-        p.setColor(QPalette::Window, background);
-        l->setPalette(p);
         return l;
     };
-    m_speed = label(QStringLiteral("0"), QColor(192, 192, 192));
-    m_errors = label(formatFixed(0.0, 2, QLocale()) + QLatin1Char('%'), Qt::white);
+    m_speed = label(QStringLiteral("0"));
+    m_errors = label(formatFixed(0.0, 2, QLocale()) + QLatin1Char('%'));
     m_split = new QSplitter(Qt::Vertical);
     m_split->setChildrenCollapsible(false);
     m_split->addWidget(m_speed);
@@ -43,7 +41,20 @@ LiveStatsWindow::LiveStatsWindow(QWidget *parent) : QWidget(parent, Qt::Tool | Q
     layout->addWidget(m_split, 1);
     layout->addWidget(m_status);
     resize(160, 123);
-    setStats({});
+    updateColors();
+}
+
+void LiveStatsWindow::updateColors()
+{
+    const Look::Colors &c = Look::colors();
+    QPalette p = m_errors->palette();
+    p.setColor(QPalette::Window, c.errorsBack);
+    p.setColor(QPalette::WindowText, c.ink);
+    m_errors->setPalette(p);
+    p = m_speed->palette();
+    p.setColor(QPalette::Window, c.speedBack);
+    m_speed->setPalette(p);
+    setStats(m_stats); // the colour of the speed
 }
 
 // FUN_0042a17c: magenta - blue - cyan - green - yellow - red for t = 0..1.
@@ -70,9 +81,10 @@ void LiveStatsWindow::setSpeedRange(int lo, int hi)
 void LiveStatsWindow::setStats(const LiveStats &s)
 {
     const QLocale loc;
+    m_stats = s;
     m_speed->setText(QString::number(int(s.speed)));
     QPalette p = m_speed->palette();
-    p.setColor(QPalette::WindowText, m_hi == m_lo ? QColor(Qt::black)
+    p.setColor(QPalette::WindowText, m_hi == m_lo ? Look::colors().ink
                                                   : speedColor(double((s.speed - float(m_lo)) / float(m_hi - m_lo))));
     m_speed->setPalette(p);
     m_errors->setText(formatFixed(double(s.errorPercent), 2, loc) + QLatin1Char('%'));

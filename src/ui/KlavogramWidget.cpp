@@ -18,17 +18,6 @@
 namespace {
 
 constexpr int kTracks = 9;
-const QColor kBackground(255, 255, 220);
-const QColor kMeasured(255, 255, 180);
-const QColor kPopup(255, 230, 230);
-const QColor kGrid(175, 175, 175);
-
-// By the number of keys already held when the key went down; {the only key held, several held}.
-const QColor kHeldColors[5][2] = {
-    {QColor(180, 240, 180), QColor(34, 172, 34)},  {QColor(32, 209, 247), QColor(6, 149, 179)},
-    {QColor(233, 154, 252), QColor(202, 18, 248)}, {QColor(250, 139, 148), QColor(211, 10, 24)},
-    {QColor(254, 180, 100), QColor(224, 118, 1)},
-};
 
 constexpr int kRulerSteps[] = {1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 60000};
 constexpr int kRulerDigits[] = {3, 3, 3, 2, 2, 2, 1, 1, 1, 0, 0, 0, 0, 0};
@@ -268,7 +257,7 @@ void KlavogramWidget::drawRuler(QPainter &p, int top, int rowHeight)
     const int half = labelWidth / 2;
     float t = float(int((m_scrollMs - float(half)) / float(step) - 1.0f) * step) + (float(step) - m_scrollMs);
 
-    p.setPen(QPen(kGrid, 1, Qt::DotLine));
+    p.setPen(QPen(Look::colors().grid, 1, Qt::DotLine));
     for (;; t += float(step)) {
         const qint64 x = qint64(t * m_zoom);
         if (x >= w + half)
@@ -279,9 +268,9 @@ void KlavogramWidget::drawRuler(QPainter &p, int top, int rowHeight)
             continue;
         const QString label = Stats::formatTime(ms, digits, point, units);
         const int lw = fm.horizontalAdvance(label);
-        p.setPen(Qt::black);
+        p.setPen(Look::colors().ink);
         p.drawText(QRect(int(x) - lw / 2, top - fm.height() - 1, lw, fm.height()), Qt::AlignCenter | Qt::TextDontClip, label);
-        p.setPen(QPen(kGrid, 1, Qt::DotLine));
+        p.setPen(QPen(Look::colors().grid, 1, Qt::DotLine));
         p.drawLine(int(x), top, int(x), top + rowHeight * kTracks);
     }
 }
@@ -308,7 +297,7 @@ void KlavogramWidget::drawKeys(QPainter &p, int top, int rowHeight)
     std::array<QVector<HeldKey>, kTracks> held; // the latest press first
     std::array<qint64, kTracks> segmentX{}, lastX{};
     int heldCount = 0;
-    const QPen black(Qt::black, 1);
+    const QPen ink(Look::colors().ink, 1), edge(Look::colors().keyEdge, 1);
     for (int i = start; i < klav.size(); ++i) {
         const KlavRecord &r = klav[i];
         qint64 x = xOf(r, m_scrollMs, m_zoom);
@@ -318,7 +307,7 @@ void KlavogramWidget::drawKeys(QPainter &p, int top, int rowHeight)
                 continue;
             if (x >= 0)
                 p.fillRect(QRect(QPoint(int(segmentX[f]), top + rowHeight * f), QPoint(int(x) - 1, top + rowHeight * (f + 1) - 1)),
-                           kHeldColors[held[f].first().level][several]);
+                           Look::colors().held[held[f].first().level][several]);
             segmentX[f] = x;
         }
         const int f = track(r);
@@ -329,17 +318,17 @@ void KlavogramWidget::drawKeys(QPainter &p, int top, int rowHeight)
             const QString label = trackLabel(key, m_model->keyNames);
             const int lw = fm.horizontalAdvance(label);
             if (lw < x - lastX[f] - 1 && fm.height() < rowHeight) {
-                p.setPen(black);
+                p.setPen(ink);
                 p.drawText(QRect(int((lastX[f] + x - lw) / 2), y + (rowHeight - fm.height()) / 2, lw, fm.height()),
                            Qt::AlignCenter | Qt::TextDontClip, label);
             }
             if (!key.erased && !(key.flags & KeyRecord::Injected)) {
-                p.setPen(black);
+                p.setPen(edge);
                 p.drawLine(int(lastX[f]), y, int(lastX[f]), y + rowHeight - 1);
                 p.drawLine(int(x) - 1, y, int(x) - 1, y + rowHeight - 1);
             } else {
                 // Erased keys get a red frame, injected ones a blue one.
-                QPen frame((key.flags & KeyRecord::Injected) ? QColor(0, 0, 255) : QColor(255, 0, 0), 3);
+                QPen frame((key.flags & KeyRecord::Injected) ? Look::colors().injected : Look::colors().erased, 3);
                 frame.setJoinStyle(Qt::MiterJoin);
                 p.setPen(frame);
                 p.setBrush(Qt::NoBrush);
@@ -352,14 +341,14 @@ void KlavogramWidget::drawKeys(QPainter &p, int top, int rowHeight)
         } else if (x <= w) {
             segmentX[f] = x;
             if (vk == quint32(Vk::Space) << 16) {
-                p.setPen(QPen(Qt::black, 1, Qt::DashLine));
+                p.setPen(QPen(Look::colors().trackLine, 1, Qt::DashLine));
                 p.drawLine(int(x), top, int(x), bottom);
             }
             if (std::none_of(held[f].begin(), held[f].end(), [vk](const HeldKey &k) { return k.vk == vk; }))
                 held[f].prepend({vk, &r, std::min(heldCount, 4)});
         }
         if (r.fragmentStart) {
-            p.setPen(QPen(Qt::black, 2));
+            p.setPen(QPen(Look::colors().trackLine, 2));
             p.drawLine(int(x), top, int(x), bottom);
         }
         heldCount = 0;
@@ -381,7 +370,7 @@ void KlavogramWidget::paintEvent(QPaintEvent *)
     const int w = width(), h = height();
     const int rowHeight = std::max(1, (h - fm.height()) / kTracks);
     const int top = h - rowHeight * kTracks;
-    p.fillRect(rect(), kBackground);
+    p.fillRect(rect(), Look::colors().pane);
 
     // The measuring cursor sticks to the nearest key event within 8 px.
     int cursorX = -1;
@@ -430,7 +419,7 @@ void KlavogramWidget::paintEvent(QPaintEvent *)
         }
         if (m_selecting)
             p.fillRect(QRect(QPoint(std::min(m_selectionX, cursorX), top), QPoint(std::max(m_selectionX, cursorX) - 1, h - 1)),
-                       kMeasured);
+                       Look::colors().paneMark);
     }
 
     drawRuler(p, top, rowHeight);
@@ -439,12 +428,12 @@ void KlavogramWidget::paintEvent(QPaintEvent *)
 
     for (int i = 0; i <= kTracks; ++i) {
         const int y = top + rowHeight * i - 1;
-        p.setPen(QPen(Qt::black, i == 0 || i == 4 || i == 8 ? 2 : 1));
+        p.setPen(QPen(Look::colors().trackLine, i == 0 || i == 4 || i == 8 ? 2 : 1));
         p.drawLine(0, y, w, y);
     }
 
     if (m_cursorMode && m_model) {
-        p.setPen(QPen(Qt::black, 1));
+        p.setPen(QPen(Look::colors().ink, 1));
         p.drawLine(cursorX, top - 1, cursorX, top + rowHeight * kTracks - 1);
         if (m_selecting) {
             p.drawLine(m_selectionX, top - 1, m_selectionX, top + rowHeight * kTracks - 1);
@@ -455,7 +444,7 @@ void KlavogramWidget::paintEvent(QPaintEvent *)
             const QString speed = formatFixed(measuredSpeed(m_selectionT, m_cursorT), 2, loc) + QLatin1Char(' ') + tr("зн/мин");
             const int tw = std::max(fm.horizontalAdvance(time), fm.horizontalAdvance(speed));
             const QRect box(cursorX, top + 2, tw + 6, fm.height() * 2 + 4);
-            p.setBrush(kPopup);
+            p.setBrush(Look::colors().popup);
             p.drawRect(box);
             p.drawText(cursorX + 2, top + 4, tw, fm.height(), Qt::AlignLeft | Qt::AlignVCenter, time);
             p.drawText(cursorX + 2, top + 4 + fm.height(), tw, fm.height(), Qt::AlignLeft | Qt::AlignVCenter, speed);

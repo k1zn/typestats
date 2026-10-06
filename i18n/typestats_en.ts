@@ -785,6 +785,14 @@ Copy the command, paste it into a terminal and enter your password. This is need
         <source>Скопировано</source>
         <translation>Copied</translation>
     </message>
+    <message>
+        <source>Светлая тема</source>
+        <translation>Light theme</translation>
+    </message>
+    <message>
+        <source>Тёмная тема</source>
+        <translation>Dark theme</translation>
+    </message>
 </context>
 <context>
     <name>SettingsDialog</name>

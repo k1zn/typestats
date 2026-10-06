@@ -38,6 +38,11 @@ int main(int argc, char *argv[])
     // The look of the original: a classic light window with compact controls and the 8 pt dialog font
     // its layout was made for.
     Look::apply();
+    // `--theme dark|light`: for this run only (screenshots), the saved theme stays.
+    if (const qsizetype i = args.indexOf(QStringLiteral("--theme")); i > 0 && i + 1 < args.size()) {
+        Look::setDark(args[i + 1] == QLatin1String("dark"), false);
+        args.remove(i, 2);
+    }
 
     MainWindow w;
     w.show();

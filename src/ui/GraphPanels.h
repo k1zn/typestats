@@ -49,6 +49,8 @@ public:
 
     bool minimized() const { return m_minimized; }
     void setMinimized(bool on);
+    // The background of the theme (Look::colors).
+    void updateColors();
 
 protected:
     void paintEvent(QPaintEvent *e) override;

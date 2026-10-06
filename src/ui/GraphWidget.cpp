@@ -10,11 +10,6 @@
 
 namespace {
 
-const QColor kBackground(255, 255, 220);
-const QColor kOnKlavogram(255, 255, 180);
-const QColor kAxis(240, 240, 32);
-const QColor kGrid(175, 175, 175);
-const QColor kRulerBox(180, 255, 180);
 const QString kStripFont = QStringLiteral("Courier New");
 
 constexpr int kGridSteps[] = {1, 2, 5, 10, 20, 50, 100, 200, 500};
@@ -112,11 +107,7 @@ QString GraphWidget::seriesName(int series)
 
 QColor GraphWidget::seriesColor(int series)
 {
-    static const QColor colors[SeriesCount] = {
-        QColor(255, 150, 150), QColor(255, 0, 0),     QColor(160, 100, 100), QColor(202, 53, 53),
-        QColor(150, 150, 255), QColor(0, 0, 255),     QColor(128, 0, 0),     QColor(0, 128, 0),
-    };
-    return colors[series];
+    return Look::colors().series[series];
 }
 
 const QVector<float> &GraphWidget::values(int series) const
@@ -426,7 +417,7 @@ void GraphWidget::drawGrid(QPainter &p, const QRect &g, int stripFont)
     const int w = g.width(), h = g.height();
     const QFontMetrics fm(font());
     const int cy = fm.height() / 2;
-    QPen dotted(kGrid, 1);
+    QPen dotted(Look::colors().grid, 1);
     dotted.setDashPattern({3, 3}); // PS_DOT of GDI
     const QString point = QLocale().decimalPoint(); // once per frame: for the system locale it is a call to the OS
 
@@ -541,7 +532,7 @@ void GraphWidget::drawSeries(QPainter &p, const QRect &g)
     }
 
     // Fragment borders.
-    p.setPen(QPen(Qt::black, 2));
+    p.setPen(QPen(Look::colors().ink, 2));
     for (int i = first; i < m_fragmentStart.size(); ++i) {
         if (!m_fragmentStart[i])
             continue;
@@ -569,15 +560,15 @@ void GraphWidget::drawRuler(QPainter &p, const QRect &g)
     const int th = fm.height();
     const int left = w - 6 - tw, top = y - th * 3 / 2;
     m_rulerBox = QRect(QPoint(left, top), QPoint(w + 1, y * 2 - top + 3));
-    p.setPen(Qt::black);
-    p.setBrush(kRulerBox);
+    p.setPen(Look::colors().ink);
+    p.setBrush(Look::colors().rulerBox);
     p.drawRect(m_rulerBox.adjusted(0, 0, -1, -1));
     p.setBrush(Qt::NoBrush);
     for (int idx = 0; idx < 3; ++idx) {
         p.setPen(seriesColor(axis[idx]));
         p.drawText(left + 2, top + 1 + th * idx + fm.ascent(), text[idx]);
     }
-    p.setPen(Qt::black);
+    p.setPen(Look::colors().ink);
     p.drawLine(0, y, left - 1, y);
 }
 
@@ -594,9 +585,9 @@ void GraphWidget::drawStrip(QPainter &p, const QRect &g, int stripFont)
         const int x = int(std::floor((float(i) + m_scrollX + 0.5f) * m_zoomX + 0.5f)) - half;
         if (x >= w)
             break;
-        p.setPen((m_model->flags[i] & KeyRecord::Injected) ? QColor(0, 0, 255)
-                 : m_model->erased(i)                       ? QColor(255, 0, 0)
-                                                            : QColor(0, 0, 0));
+        p.setPen((m_model->flags[i] & KeyRecord::Injected) ? Look::colors().injected
+                 : m_model->erased(i)                       ? Look::colors().erased
+                                                            : Look::colors().ink);
         p.drawText(x, g.height() + 1 + fm.ascent(), stripLabel(m_model->names[i]));
     }
     p.setFont(font());
@@ -609,19 +600,19 @@ void GraphWidget::paintEvent(QPaintEvent *)
     const int w = g.width(), h = g.height();
 
     // The axis and the line of text: yellow panels with black borders.
-    p.fillRect(QRect(0, 0, m_axisWidth, height()), kAxis);
-    p.fillRect(QRect(m_axisWidth, h, w, height() - h), kAxis);
-    p.setPen(Qt::black);
+    p.fillRect(QRect(0, 0, m_axisWidth, height()), Look::colors().axis);
+    p.fillRect(QRect(m_axisWidth, h, w, height() - h), Look::colors().axis);
+    p.setPen(Look::colors().ink);
     p.drawLine(0, 0, 0, height() - 1);
     p.drawLine(m_axisWidth - 1, 0, m_axisWidth - 1, height() - 1);
     p.drawLine(m_axisWidth, h, width() - 1, h);
 
     p.translate(g.topLeft());
     p.setClipRect(QRect(0, 0, w, h));
-    p.fillRect(QRect(0, 0, w, h), kBackground);
+    p.fillRect(QRect(0, 0, w, h), Look::colors().pane);
     const int x1 = xOf(m_visFrom), x2 = xOf(m_visTo);
     if (x2 > x1)
-        p.fillRect(QRect(x1, 0, x2 - x1, h), kOnKlavogram);
+        p.fillRect(QRect(x1, 0, x2 - x1, h), Look::colors().paneMark);
 
     // The largest font of the text line whose characters fit into one element.
     int stripFont = -1;
@@ -633,10 +624,10 @@ void GraphWidget::paintEvent(QPaintEvent *)
 
     drawGrid(p, g, stripFont);
     drawSeries(p, g);
-    p.setPen(Qt::black);
+    p.setPen(Look::colors().ink);
     if (!m_cursorHidden)
         p.drawLine(m_mouse.x(), 0, m_mouse.x(), h - 1);
-    p.setPen(QColor(128, 128, 128));
+    p.setPen(Look::colors().dimInk);
     p.drawLine(x1, 0, x1, h - 1);
     p.drawLine(x2, 0, x2, h - 1);
     if (m_hasRuler)

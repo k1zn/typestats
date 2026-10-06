@@ -1,5 +1,6 @@
 #include "GraphPanels.h"
 
+#include "Look.h"
 #include "core/NumberFormat.h"
 
 #include <QCheckBox>
@@ -26,8 +27,6 @@ QColor captionColor()
     return QColor(153, 180, 209);
 #endif
 }
-
-const QColor kLegendBackground(255, 255, 200);
 
 } // namespace
 
@@ -109,9 +108,7 @@ LegendPanel::LegendPanel(GraphWidget *graph, QWidget *parent)
 {
     setFrameStyle(int(QFrame::Box) | int(QFrame::Plain));
     setLineWidth(1);
-    QPalette pal = palette();
-    pal.setColor(QPalette::Window, kLegendBackground);
-    setPalette(pal);
+    updateColors();
     const QFontMetrics fm(m_font);
     m_rowHeight = fm.height();
     m_charWidth = fm.horizontalAdvance(QLatin1Char('1'));
@@ -119,6 +116,13 @@ LegendPanel::LegendPanel(GraphWidget *graph, QWidget *parent)
     connect(this, &FloatingPanel::captionDoubleClicked, this, [this] { setMinimized(!m_minimized); });
     connect(graph, &GraphWidget::cursorChanged, this, qOverload<>(&QWidget::update));
     connect(graph, &GraphWidget::seriesVisibilityChanged, this, qOverload<>(&QWidget::update));
+}
+
+void LegendPanel::updateColors()
+{
+    QPalette pal = palette();
+    pal.setColor(QPalette::Window, Look::colors().legend);
+    setPalette(pal);
 }
 
 void LegendPanel::setMinimized(bool on)

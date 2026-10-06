@@ -12,6 +12,7 @@
 #include "ui/HistogramWindow.h"
 #include "ui/KlavogramWidget.h"
 #include "ui/LiveStatsWindow.h"
+#include "ui/Look.h"
 #include "ui/MainWindow.h"
 #include "ui/Presets.h"
 #include "ui/TextInputWindow.h"
@@ -352,6 +353,53 @@ private slots:
         QCOMPARE(w.m_model.text, text.left(9) + QStringLiteral("xxxxx") + text.mid(14));
         w.undo();
         QCOMPARE(w.m_model.text, text);
+    }
+
+    void darkTheme()
+    {
+        // The button in the right corner of the toolbar switches the theme now, keeps it, and the text keeps its
+        // selection while its style colours follow the theme.
+        auto foregrounds = [](const QTextDocument *doc) {
+            QSet<QRgb> colors;
+            for (QTextBlock b = doc->begin(); b.isValid(); b = b.next())
+                for (auto it = b.begin(); !it.atEnd(); ++it)
+                    if (it.fragment().charFormat().hasProperty(QTextFormat::ForegroundBrush))
+                        colors.insert(it.fragment().charFormat().foreground().color().rgb());
+            return colors;
+        };
+        MainWindow w;
+        w.resize(876, 579);
+        w.show();
+        QVERIFY(w.openFile(golden("824.tsf")));
+        QWidget *bar = w.m_themeButton->parentWidget();
+        QCOMPARE(w.m_themeButton->geometry().right(), bar->width() - 7);
+        QVERIFY(!w.m_themeButton->isChecked() && !Look::isDark());
+        const QSet<QRgb> light = foregrounds(w.m_text->document());
+        QVERIFY(light.contains(QColor(255, 0, 0).rgb())); // erased characters
+        QTextCursor c = w.m_text->textCursor();
+        c.setPosition(5);
+        c.setPosition(20, QTextCursor::KeepAnchor);
+        w.m_text->setTextCursor(c);
+
+        w.m_themeButton->click();
+        QVERIFY(Look::isDark());
+        QVERIFY(QSettings().value(QStringLiteral("DarkTheme")).toBool());
+        QCOMPARE(QApplication::palette().color(QPalette::Window), QColor(0x36, 0x36, 0x36));
+        QCOMPARE(w.m_legend->palette().color(QPalette::Window), Look::colors().legend);
+        const QSet<QRgb> dark = foregrounds(w.m_text->document());
+        QVERIFY(dark.contains(Look::colors().erased.rgb()));
+        QVERIFY(!dark.contains(QColor(255, 0, 0).rgb()));
+        QCOMPARE(w.m_text->textCursor().selectionStart(), 5);
+        QCOMPARE(w.m_text->textCursor().selectionEnd(), 20);
+        // A window opened later is dark too.
+        MainWindow w2;
+        QVERIFY(w2.m_themeButton->isChecked());
+
+        w.m_themeButton->click();
+        QVERIFY(!Look::isDark());
+        QVERIFY(!QSettings().value(QStringLiteral("DarkTheme")).toBool());
+        QCOMPARE(w.m_legend->palette().color(QPalette::Window), QColor(255, 255, 200));
+        QCOMPARE(foregrounds(w.m_text->document()), light);
     }
 
     void panelButtons()

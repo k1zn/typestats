@@ -11,6 +11,7 @@
 #include "AppPaths.h"
 #include "Hotkeys.h"
 #include "LiveStatsWindow.h"
+#include "Look.h"
 #include "SettingsDialog.h"
 #include "TextView.h"
 #include "Texts.h"
@@ -37,6 +38,8 @@
 #include <QInputDialog>
 #include <QLabel>
 #include <QMenu>
+#include <QPainter>
+#include <QPainterPath>
 #include <QMessageBox>
 #include <QScrollBar>
 #include <QSettings>
@@ -58,6 +61,8 @@
 #include <QTimer>
 #include <QVBoxLayout>
 #include <QWheelEvent>
+
+#include <cmath>
 
 namespace {
 
@@ -199,10 +204,6 @@ MainWindow::MainWindow(QWidget *parent)
     warn.setPixelSize(24);
     warn.setBold(true);
     m_damaged->setFont(warn);
-    QPalette warnPalette = m_damaged->palette();
-    warnPalette.setColor(QPalette::Window, QColor(192, 220, 192)); // clMoneyGreen
-    warnPalette.setColor(QPalette::WindowText, Qt::red);
-    m_damaged->setPalette(warnPalette);
     m_damaged->setGeometry(128, 224, 409, 49);
     m_damaged->hide();
 
@@ -252,6 +253,7 @@ MainWindow::MainWindow(QWidget *parent)
     timer->start(100);
 
     resize(876, 579);
+    updateThemeColors();
     loadSettings();
     applySettings();
 }
@@ -375,7 +377,88 @@ QWidget *MainWindow::createToolBar()
     connect(m_onlyText, &QCheckBox::toggled, this, &MainWindow::recalculate);
     connect(m_byPauses, &QCheckBox::toggled, this, &MainWindow::recalculate);
     connect(m_pause, &QSpinBox::valueChanged, this, &MainWindow::recalculate);
+
+    // The empty right corner: the theme (kept there by eventFilter when the window is resized).
+    m_themeButton = new QToolButton(bar);
+    m_themeButton->setIconSize(QSize(16, 16));
+    m_themeButton->setFocusPolicy(Qt::NoFocus);
+    m_themeButton->setFixedSize(23, 23);
+    m_themeButton->setCheckable(true);
+    m_themeButton->setChecked(Look::isDark());
+    connect(m_themeButton, &QToolButton::toggled, this, &MainWindow::setDarkTheme);
+    bar->installEventFilter(this);
     return bar;
+}
+
+namespace {
+
+// A crescent (the dark theme is off) or a sun (on).
+QIcon themeIcon(bool dark)
+{
+    QIcon icon;
+    for (int size : {16, 32, 48}) {
+        QPixmap pixmap(size, size);
+        pixmap.fill(Qt::transparent);
+        QPainter p(&pixmap);
+        p.setRenderHint(QPainter::Antialiasing);
+        p.scale(size / 16.0, size / 16.0);
+        if (!dark) {
+            QPainterPath moon, bite;
+            moon.addEllipse(QRectF(2, 2, 12, 12));
+            bite.addEllipse(QRectF(6.5, 0, 11, 11));
+            p.fillPath(moon.subtracted(bite), QColor(72, 84, 150));
+        } else {
+            const QColor sun(255, 186, 32);
+            const QPointF center(8, 8);
+            p.setPen(Qt::NoPen);
+            p.setBrush(sun);
+            p.drawEllipse(center, 3.4, 3.4);
+            p.setPen(QPen(sun, 1.5, Qt::SolidLine, Qt::RoundCap));
+            for (int i = 0; i < 8; ++i) {
+                const double a = i * M_PI / 4;
+                const QPointF d(std::cos(a), std::sin(a));
+                p.drawLine(center + d * 5.2, center + d * 7.2);
+            }
+        }
+        icon.addPixmap(pixmap);
+    }
+    return icon;
+}
+
+} // namespace
+
+void MainWindow::setDarkTheme(bool on)
+{
+    Look::setDark(on);
+    updateThemeColors();
+}
+
+void MainWindow::updateThemeColors()
+{
+    const bool dark = Look::isDark();
+    m_themeButton->setIcon(themeIcon(dark));
+    m_themeButton->setToolTip(dark ? tr("Светлая тема") : tr("Тёмная тема"));
+    QPalette warnPalette = m_damaged->palette();
+    warnPalette.setColor(QPalette::Window, Look::colors().damaged);
+    warnPalette.setColor(QPalette::WindowText, Look::colors().damagedText);
+    m_damaged->setPalette(warnPalette);
+    m_legend->updateColors();
+    m_live->updateColors();
+    if (m_model.text.isEmpty())
+        return;
+    // The colours of the text styles are in its document: it is built again, with the selection and the scroll.
+    const int anchor = m_text->textCursor().anchor(), position = m_text->textCursor().position(); // numbers: a cursor
+    const int scroll = m_text->verticalScrollBar()->value();                                        // follows the edits
+    m_text->setModel(m_model);
+    {
+        const QSignalBlocker b(m_text);
+        QTextCursor c(m_text->document());
+        c.setPosition(anchor);
+        c.setPosition(position, QTextCursor::KeepAnchor);
+        m_text->setTextCursor(c);
+    }
+    m_text->verticalScrollBar()->setValue(scroll);
+    klavogramMoved(); // the highlight of the part on the klavogram
 }
 
 void MainWindow::loadSettings()
@@ -1036,6 +1119,8 @@ void MainWindow::showEvent(QShowEvent *e)
 
 bool MainWindow::eventFilter(QObject *o, QEvent *e)
 {
+    if (m_themeButton && o == m_themeButton->parentWidget() && e->type() == QEvent::Resize)
+        m_themeButton->move(m_themeButton->parentWidget()->width() - m_themeButton->width() - 6, 4);
     // The wheel over the graph moves its scroll bar by a small step.
     if (o == m_graph && e->type() == QEvent::Wheel) {
         const int delta = static_cast<QWheelEvent *>(e)->angleDelta().y();

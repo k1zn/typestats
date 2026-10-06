@@ -16,10 +16,6 @@
 
 namespace {
 
-const QColor kBackground(255, 255, 220);
-const QColor kAxis(240, 240, 32);
-const QColor kGrid(175, 175, 175);
-const QColor kBar(180, 240, 180);
 const QString kLabelFont = QStringLiteral("Courier New");
 
 constexpr float kGridSteps[] = {0.1f, 0.2f, 0.5f, 1.0f, 2.0f, 5.0f, 10.0f, 20.0f, 50.0f, 100.0f};
@@ -175,13 +171,13 @@ void HistogramWidget::paintEvent(QPaintEvent *)
     const int w = g.width(), h = g.height();
 
     // The axis and the line of labels: yellow panels with black borders.
-    p.fillRect(QRect(0, 0, m_axisWidth, height()), kAxis);
-    p.fillRect(QRect(m_axisWidth, h, w, height() - h), kAxis);
-    p.setPen(Qt::black);
+    p.fillRect(QRect(0, 0, m_axisWidth, height()), Look::colors().axis);
+    p.fillRect(QRect(m_axisWidth, h, w, height() - h), Look::colors().axis);
+    p.setPen(Look::colors().ink);
     p.drawLine(0, 0, 0, height() - 1);
     p.drawLine(m_axisWidth - 1, 0, m_axisWidth - 1, height() - 1);
     p.drawLine(m_axisWidth, h, width() - 1, h);
-    p.fillRect(g, kBackground);
+    p.fillRect(g, Look::colors().pane);
     if (m_values.isEmpty())
         return;
 
@@ -203,7 +199,7 @@ void HistogramWidget::paintEvent(QPaintEvent *)
             break;
         }
     const float top = float(h) / m_zoomY - m_offsetY;
-    QPen dots(kGrid, 1);
+    QPen dots(Look::colors().grid, 1);
     dots.setDashPattern({3, 3}); // PS_DOT of GDI
     for (float a = float(int(-m_offsetY / step)) * step; a < top; a += step) {
         const float py = (m_offsetY + a) * m_zoomY;
@@ -214,7 +210,7 @@ void HistogramWidget::paintEvent(QPaintEvent *)
             const int y = int(float(h) - py);
             p.drawLine(g.left(), y, g.right(), y);
         }
-        p.setPen(Qt::black);
+        p.setPen(Look::colors().ink);
         p.setClipRect(QRect(1, 0, m_axisWidth - 2, height()));
         p.drawText(2, int(float(h) - py - float(cy)) + fm.ascent(), formatFixed(double(a), 0, QLocale()));
         p.setClipping(false);
@@ -223,8 +219,8 @@ void HistogramWidget::paintEvent(QPaintEvent *)
     // The bars: neighbours share a border.
     p.setClipRect(g);
     p.translate(g.topLeft());
-    p.setPen(Qt::black);
-    p.setBrush(kBar);
+    p.setPen(Look::colors().keyEdge);
+    p.setBrush(Look::colors().bar);
     const int first = firstIndex();
     for (int i = first; i < m_values.size(); ++i) {
         const int x1 = int(std::floor((float(i) + m_scrollX) * m_zoomX + 0.5f));

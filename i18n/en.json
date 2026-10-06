@@ -206,5 +206,7 @@
   "Программе нужно разрешение видеть нажатия клавиш.\n\nОткройте «Системные настройки» → «Конфиденциальность и безопасность» → «Мониторинг ввода» и включите Typing statistics. Запись начнётся сама; если нет — перезапустите программу.": "The program needs a permission to see the keys you press.\n\nOpen System Settings → Privacy & Security → Input Monitoring and turn on Typing statistics. Recording will start by itself; if it does not, restart the program.",
   "Программе нужно разрешение видеть нажатия клавиш.\n\nСкопируйте команду, вставьте её в терминал и введите свой пароль. Это нужно один раз — запись начнётся сама.": "The program needs a permission to see the keys you press.\n\nCopy the command, paste it into a terminal and enter your password. This is needed once: recording starts by itself.",
   "Скопировать команду": "Copy the command",
-  "Скопировано": "Copied"
+  "Скопировано": "Copied",
+  "Тёмная тема": "Dark theme",
+  "Светлая тема": "Light theme"
 }

@@ -14,11 +14,11 @@ QTextCharFormat formatOf(quint8 style)
 {
     QTextCharFormat f;
     if (style & (TextStyle::Separator | TextStyle::Injected))
-        f.setForeground(QColor(0, 0, 255));
+        f.setForeground(Look::colors().injected);
     else if (style & TextStyle::Comment)
-        f.setForeground(QColor(0, 128, 0));
+        f.setForeground(Look::colors().comment);
     else if (style & TextStyle::Erased)
-        f.setForeground(QColor(255, 0, 0));
+        f.setForeground(Look::colors().erased);
     if (style & TextStyle::Marked)
         f.setFontUnderline(true);
     return f;
@@ -112,7 +112,7 @@ void TextView::setVisibleRange(int from, int to)
         s.cursor = QTextCursor(document());
         s.cursor.setPosition(from);
         s.cursor.setPosition(std::min(to, document()->characterCount() - 1), QTextCursor::KeepAnchor);
-        s.format.setBackground(QColor(255, 255, 0));
+        s.format.setBackground(Look::colors().visible);
         selections.append(s);
     }
     setExtraSelections(selections);

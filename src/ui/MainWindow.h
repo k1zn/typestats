@@ -63,6 +63,10 @@ private:
     friend class TstPerf;
 
     QWidget *createToolBar();
+    // The theme button in the right corner of the toolbar: the dark theme of the remake on and off.
+    void setDarkTheme(bool on);
+    // What keeps colours of its own: the "damaged" bar, the legend, live statistics, the styles of the text.
+    void updateThemeColors();
     QToolButton *toolButton(QWidget *panel, int n, int x, int y, int h, const QString &hint);
     void loadSettings();
     void saveSettings() const;
@@ -193,6 +197,7 @@ private:
     QToolButton *m_newZonesButton = nullptr;
     QToolButton *m_newPresetButton = nullptr;
     QToolButton *m_helpButton = nullptr;
+    QToolButton *m_themeButton = nullptr;
 
     KeyboardHook m_hook;
     QString m_hookError;                     // why the hook does not run; empty when it does (or was not started)
