@@ -6,6 +6,7 @@
 #include <QApplication>
 #include <QIcon>
 #include <QSettings>
+#include <QFileOpenEvent>
 #include <QTimer>
 #include <QTranslator>
 
@@ -42,10 +43,12 @@ int main(int argc, char *argv[])
         w.showMinimized();
     // `--no-capture`: no keyboard hook (screenshots and demonstrations: the typing of whoever sits at the
     // computer stays out of the window).
-    if (const qsizetype i = args.indexOf(QStringLiteral("--no-capture")); i > 0)
+    if (const qsizetype i = args.indexOf(QStringLiteral("--no-capture")); i > 0) {
         args.remove(i);
-    else
+    } else {
         w.startCapture();
+        QTimer::singleShot(0, &w, &MainWindow::offerFileAssociation); // after the window is shown
+    }
     QString form;
     if (const qsizetype i = args.indexOf(QStringLiteral("--show")); i > 0 && i + 1 < args.size()) {
         form = args[i + 1];
@@ -53,6 +56,20 @@ int main(int argc, char *argv[])
     }
     if (args.size() > 1)
         w.openFile(args[1]);
+    // macOS gives a double-clicked file (and a file dropped on the Dock icon) as an event, not as an argument.
+    struct FileOpener : QObject
+    {
+        MainWindow *window;
+        explicit FileOpener(MainWindow *w) : window(w) {}
+        bool eventFilter(QObject *o, QEvent *e) override
+        {
+            if (e->type() != QEvent::FileOpen)
+                return QObject::eventFilter(o, e);
+            window->openFile(static_cast<QFileOpenEvent *>(e)->file());
+            return true;
+        }
+    } opener(&w);
+    app.installEventFilter(&opener);
     if (!form.isEmpty())
         QTimer::singleShot(0, &w, [&w, form] { w.showForm(form); });
     return app.exec();

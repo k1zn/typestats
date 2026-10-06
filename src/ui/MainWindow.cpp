@@ -22,6 +22,7 @@
 #include "core/KeyList.h"
 #include "core/MainStats.h"
 #include "core/NumberFormat.h"
+#include "platform/FileAssociation.h"
 
 #include <QApplication>
 #include <QCheckBox>
@@ -673,6 +674,37 @@ void MainWindow::deletePreset()
 void MainWindow::startCapture()
 {
     m_hook.start();
+}
+
+void MainWindow::offerFileAssociation()
+{
+    using FileAssociation::State;
+    const State state = FileAssociation::tsfState();
+    if (state == State::Unsupported || state == State::Ours)
+        return;
+    if (state == State::Moved) { // it was this program: the new place, without asking
+        FileAssociation::associateTsf();
+        return;
+    }
+    QSettings settings;
+    if (settings.value(QStringLiteral("TsfAssociationAsked"), false).toBool())
+        return;
+    settings.setValue(QStringLiteral("TsfAssociationAsked"), true);
+    QString text = tr("Открывать записи набора (файлы .tsf) в этой программе двойным щелчком?");
+    if (state != State::None)
+        text += QStringLiteral("\n\n") + tr("Сейчас они открываются в другой программе.");
+    if (QMessageBox::question(this, appTitle(), text) != QMessageBox::Yes)
+        return;
+    if (!FileAssociation::associateTsf()) {
+        QMessageBox::warning(this, appTitle(), tr("Не удалось назначить программу для файлов .tsf."));
+        return;
+    }
+    if (FileAssociation::tsfState() == State::Overridden)
+        QMessageBox::information(
+            this, appTitle(),
+            tr("Система запомнила для файлов .tsf другую программу, и сменить её может только пользователь: щёлкните "
+               "по файлу .tsf правой кнопкой, «Открыть с помощью» → «Выбрать другое приложение», выберите Typing "
+               "statistics и отметьте «Всегда использовать это приложение»."));
 }
 
 void MainWindow::normalizeRecords()

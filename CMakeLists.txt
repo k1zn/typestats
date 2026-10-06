@@ -49,7 +49,8 @@ target_link_libraries(tsstat PRIVATE tscore)
 # --- the keyboard hook and the desktop (src/platform) ---
 set(PLATFORM_SOURCES
     src/platform/KeyboardHook.h src/platform/KeyboardHook.cpp src/platform/HookClock.h
-    src/platform/DesktopParsers.h src/platform/DesktopParsers.cpp)
+    src/platform/DesktopParsers.h src/platform/DesktopParsers.cpp
+    src/platform/FileAssociation.h src/platform/FileAssociation.cpp)
 if(WIN32)
     list(APPEND PLATFORM_SOURCES src/platform/KeyboardHookWin.cpp)
 elseif(APPLE)
@@ -63,8 +64,11 @@ endif()
 add_library(tsplatform STATIC ${PLATFORM_SOURCES})
 target_include_directories(tsplatform PUBLIC src)
 target_link_libraries(tsplatform PUBLIC tscore)
-if(APPLE)
-    target_link_libraries(tsplatform PRIVATE "-framework ApplicationServices" "-framework Carbon" "-framework CoreFoundation")
+if(WIN32)
+    target_link_libraries(tsplatform PRIVATE shell32) # SHChangeNotify (FileAssociation)
+elseif(APPLE)
+    target_link_libraries(tsplatform PRIVATE "-framework ApplicationServices" "-framework Carbon" "-framework CoreFoundation"
+                          "-framework CoreServices")
 elseif(UNIX)
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(XKBCOMMON REQUIRED IMPORTED_TARGET xkbcommon)
@@ -127,6 +131,7 @@ if(UNIX AND NOT APPLE)
     set(TS_APP_ID org.typingstatistics.TypingStatistics)
     install(TARGETS TypingStatistics RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
     install(FILES resources/linux/${TS_APP_ID}.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+    install(FILES resources/linux/${TS_APP_ID}.xml DESTINATION ${CMAKE_INSTALL_DATADIR}/mime/packages)
     install(FILES resources/icons/app.png DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/32x32/apps
             RENAME ${TS_APP_ID}.png)
     install(FILES resources/linux/app-256.png DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps

@@ -15,7 +15,8 @@ n-граммы и слова, зоны пальцев, оперативная с
 - делаем Excel-экспорт (xlsx/csv), копирование с тегами, мультиязычность (ru/en);
 - видео (прикреплённый AVI, синхронный с клавограммой) было сделано через QtMultimedia и **убрано** (2026-10-05):
   кнопки 20/21 на месте и всегда выключены; поля `AttachedVideo`/`VideoTimeShift` `.tsf` читаются и пишутся как есть;
-- сознательно выкидываем: «Запускать Ts на одном ядре» и регистрацию `.tsf` в реестре.
+- сознательно выкидываем: «Запускать Ts на одном ядре». Регистрацию `.tsf` (оригинал писал её в реестр сам) порт
+  делает по согласию: при первом запуске спрашивает один раз (`platform/FileAssociation`, все три ОС).
 
 `TypeStats.exe` в корне — оригинал. Не трогать. В git его нет (2026-10-05 убран из всей истории `filter-branch`, локально —
 `.git/info/exclude`; старая история — локальная ветка `backup/with-original`, не пушить): нужен только стенду и Ghidra.
@@ -156,6 +157,12 @@ src/platform/       библиотека `tsplatform`. `KeyboardHook.h`: сиг�
   mac/KeyboardHookMac.cpp  listen-only CGEventTap в своём потоке, символы — `UCKeyTranslate` текущего источника
                     ввода, окно — `CGWindowListCopyWindowInfo` (шаг 6; проверяет только CI и ручной запуск)
   DesktopParsers.*  разбор ответов окружений Linux (только QtCore, тест на всех ОС — `tst_platform`)
+  FileAssociation.* открытие .tsf двойным щелчком, всё в профиле пользователя: Windows — HKCU\Software\Classes
+                    (ProgId `TypingStatistics.tsf`; выбор «Открыть с помощью» (UserChoice) программа сменить не может —
+                    `Overridden`, показывает, как сделать руками), Linux — MIME `application/x-typing-statistics`
+                    (resources/linux/*.xml) + свой .desktop для AppImage + mimeapps.list, macOS — тип из Info.plist +
+                    Launch Services. `tsfState`/`associateTsf`; `MainWindow::offerFileAssociation` спрашивает один раз
+                    (`TsfAssociationAsked`), перенесённый exe/AppImage чинит молча. Файл из Finder — `QFileOpenEvent` (main)
 src/main.cpp        QApplication: светлая схема, стиль windowsvista и шрифт 8 pt на Windows (вид оригинала), переводчик
                     (ключ `Language` = Russian/English, иначе язык системы; `--lang ru|en`), MainWindow, файл из аргумента
 src/ui/

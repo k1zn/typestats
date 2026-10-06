@@ -394,40 +394,40 @@ Special thanks to Urikor (for the great site and the hosting), Avtandilina, Dron
 <context>
     <name>KeyboardHook</name>
     <message>
-        <source>Не удалось перехватить клавиатуру (SetWindowsHookEx: ошибка %1).</source>
-        <translation>Could not hook the keyboard (SetWindowsHookEx: error %1).</translation>
+        <source>Не удалось начать запись нажатий (ошибка %1). Перезапустите программу.</source>
+        <translation>Could not start recording the keys (error %1). Restart the program.</translation>
     </message>
     <message>
-        <source>Не удалось начать чтение клавиатур (inotify, eventfd).</source>
-        <translation>Could not start reading the keyboards (inotify, eventfd).</translation>
+        <source>Не удалось начать запись нажатий. Перезапустите программу.</source>
+        <translation>Could not start recording the keys. Restart the program.</translation>
     </message>
     <message>
-        <source>Клавиатуры не найдены (/dev/input/event*). Запись начнётся, когда клавиатура появится.</source>
-        <translation>No keyboards found (/dev/input/event*). Recording starts when a keyboard appears.</translation>
+        <source>Клавиатура не найдена. Запись начнётся, как только вы её подключите.</source>
+        <translation>No keyboard found. Recording starts as soon as you plug one in.</translation>
     </message>
     <message>
-        <source>Нет доступа к клавиатурам (/dev/input/event*): программа читает нажатия прямо с них, и так работает и в X11, и в Wayland.
+        <source>Программе нужно разрешение видеть нажатия клавиш.
 
-Доступ даёт правило udev — один раз, с паролем администратора (если программа установлена пакетом, правило уже есть, нужна только вторая команда или повторный вход в систему):
+Откройте терминал, вставьте туда эти две строки и введите свой пароль:
 
 echo 'SUBSYSTEM=="input", KERNEL=="event*", ENV{ID_INPUT_KEYBOARD}=="1", TAG+="uaccess"' | sudo tee /etc/udev/rules.d/70-typingstatistics.rules
 sudo udevadm control --reload &amp;&amp; sudo udevadm trigger
 
-Доступ получает только тот, кто сейчас вошёл в систему. Запись начнётся сама, перезапускать программу не нужно.</source>
-        <translation>No access to the keyboards (/dev/input/event*): the program reads the keys from them directly, which works under both X11 and Wayland.
+Это нужно один раз. Запись начнётся сама.</source>
+        <translation>The program needs a permission to see the keys you press.
 
-The access is given by a udev rule, once, with the administrator's password (if the program was installed from a package, the rule is there already: only the second command or logging in again is needed):
+Open a terminal, paste these two lines there and enter your password:
 
 echo 'SUBSYSTEM=="input", KERNEL=="event*", ENV{ID_INPUT_KEYBOARD}=="1", TAG+="uaccess"' | sudo tee /etc/udev/rules.d/70-typingstatistics.rules
 sudo udevadm control --reload &amp;&amp; sudo udevadm trigger
 
-Only the user logged in now gets the access. Recording starts by itself, no restart is needed.</translation>
+This is needed once. Recording starts by itself.</translation>
     </message>
     <message>
-        <source>Нет разрешения на чтение клавиатуры.
+        <source>Программе нужно разрешение видеть нажатия клавиш.
 
 Откройте «Системные настройки» → «Конфиденциальность и безопасность» → «Мониторинг ввода» и включите Typing statistics. Запись начнётся сама; если нет — перезапустите программу.</source>
-        <translation>No permission to read the keyboard.
+        <translation>The program needs a permission to see the keys you press.
 
 Open System Settings → Privacy &amp; Security → Input Monitoring and turn on Typing statistics. Recording will start by itself; if it does not, restart the program.</translation>
     </message>
@@ -770,6 +770,22 @@ Open System Settings → Privacy &amp; Security → Input Monitoring and turn on
     <message>
         <source>О программе</source>
         <translation>About</translation>
+    </message>
+    <message>
+        <source>Открывать записи набора (файлы .tsf) в этой программе двойным щелчком?</source>
+        <translation>Open typing recordings (.tsf files) in this program by a double click?</translation>
+    </message>
+    <message>
+        <source>Сейчас они открываются в другой программе.</source>
+        <translation>They open in another program now.</translation>
+    </message>
+    <message>
+        <source>Не удалось назначить программу для файлов .tsf.</source>
+        <translation>Could not make this program open .tsf files.</translation>
+    </message>
+    <message>
+        <source>Система запомнила для файлов .tsf другую программу, и сменить её может только пользователь: щёлкните по файлу .tsf правой кнопкой, «Открыть с помощью» → «Выбрать другое приложение», выберите Typing statistics и отметьте «Всегда использовать это приложение».</source>
+        <translation>The system remembers another program for .tsf files, and only you can change it: right-click a .tsf file, Open with → Choose another app, select Typing statistics and check "Always use this app".</translation>
     </message>
 </context>
 <context>

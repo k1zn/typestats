@@ -45,6 +45,9 @@ public:
     bool openFile(const QString &path);
     // Installs the keyboard hook: from now on what is typed elsewhere is recorded.
     void startCapture();
+    // At the first start: offers to open .tsf files in the program by a double click (asked once). An association
+    // of this program whose exe has moved is brought up to date silently.
+    void offerFileAssociation();
     // Opens a form by name (`--show NAME`, for screenshots): settings, extra, hist, hist-fingers, hist-extra, kbd, about, input.
     void showForm(const QString &name);
 

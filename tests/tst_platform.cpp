@@ -1,9 +1,15 @@
-// Key code tables of the hooks (core/Keyboard) and what the Linux desktops say (platform/DesktopParsers).
+// Key code tables of the hooks (core/Keyboard), what the Linux desktops say (platform/DesktopParsers) and the
+// association of .tsf (platform/FileAssociation: in a registry key / directories of the test's own).
 // Runs on every system: nothing here talks to a desktop.
 
 #include "core/Keyboard.h"
 #include "platform/DesktopParsers.h"
+#include "platform/FileAssociation.h"
 
+#include <QDir>
+#include <QFile>
+#include <QSettings>
+#include <QTemporaryDir>
 #include <QTest>
 
 using Keyboard::ScanCode;
@@ -218,6 +224,116 @@ private slots:
         QCOMPARE(debian.options, QStringLiteral("grp:alt_shift_toggle,grp_led:scroll"));
         QCOMPARE(debian.model, QStringLiteral("pc105"));
         QCOMPARE(Desktop::parseDefaultKeyboard(QStringLiteral("KEYMAP=ru\nXKBLAYOUT=de\n")).layout, QStringLiteral("de"));
+    }
+
+    // The MIME type the program writes for an AppImage is the one the package installs.
+    void mimeDefinition()
+    {
+        QFile f(QStringLiteral(TS_GOLDEN_DIR "/../../resources/linux/org.typingstatistics.TypingStatistics.xml"));
+        QVERIFY(f.open(QIODevice::ReadOnly));
+        QCOMPARE(QString::fromUtf8(f.readAll()), FileAssociation::mimeDefinition());
+    }
+
+    void association()
+    {
+        using FileAssociation::State;
+        QTemporaryDir dir;
+        // Programs: two that exist, one that does not.
+        auto program = [&dir](const QString &name) {
+            const QString path = dir.filePath(name);
+            QFile f(path);
+            if (f.open(QIODevice::WriteOnly))
+                f.write("#!/bin/sh\n");
+            f.close();
+            f.setPermissions(f.permissions() | QFile::ExeOwner);
+            return path;
+        };
+        const QString exe = program(QStringLiteral("TypingStatistics.exe")), other = program(QStringLiteral("TypeStats.exe"));
+        const QString gone = dir.filePath(QStringLiteral("old/TypingStatistics.exe"));
+#if defined(Q_OS_WIN)
+        FileAssociation::Places p;
+        const QString root = QStringLiteral("HKEY_CURRENT_USER\\Software\\TypingStatisticsTest");
+        p.classes = root + QStringLiteral("\\Classes");
+        p.userChoice = root + QStringLiteral("\\UserChoice");
+        QSettings(root, QSettings::NativeFormat).remove(QString());
+        QCOMPARE(FileAssociation::tsfState(exe, p), State::None);
+        QVERIFY(FileAssociation::associateTsf(exe, p));
+        QCOMPARE(FileAssociation::tsfState(exe, p), State::Ours);
+        QCOMPARE(QSettings(p.classes, QSettings::NativeFormat).value(QStringLiteral("TypingStatistics.tsf/shell/open/command/.")).toString(),
+                 QLatin1Char('"') + QDir::toNativeSeparators(exe) + QStringLiteral("\" \"%1\""));
+        QCOMPARE(FileAssociation::tsfState(other, p), State::Other); // another copy of the program is registered
+        QVERIFY(FileAssociation::associateTsf(gone, p));
+        QCOMPARE(FileAssociation::tsfState(exe, p), State::Moved);
+        QSettings(p.classes, QSettings::NativeFormat).setValue(QStringLiteral(".tsf/."), QStringLiteral("tsFile")); // the original's
+        QCOMPARE(FileAssociation::tsfState(exe, p), State::Other);
+        QSettings(p.userChoice, QSettings::NativeFormat).setValue(QStringLiteral("ProgId"), QStringLiteral("Applications\\TypingStatistics.exe"));
+        QCOMPARE(FileAssociation::tsfState(exe, p), State::Ours); // chosen by the user in "Open with"
+        QSettings(p.userChoice, QSettings::NativeFormat).setValue(QStringLiteral("ProgId"), QStringLiteral("tsFile"));
+        QVERIFY(FileAssociation::associateTsf(exe, p));
+        QCOMPARE(FileAssociation::tsfState(exe, p), State::Overridden);
+        QSettings(root, QSettings::NativeFormat).remove(QString());
+#elif defined(Q_OS_MACOS)
+        Q_UNUSED(exe);
+        Q_UNUSED(other);
+        Q_UNUSED(gone);
+        QCOMPARE(FileAssociation::tsfState(), State::Unsupported); // a test is not an .app
+#else
+        FileAssociation::Places p;
+        p.dataHome = dir.filePath(QStringLiteral("home/data"));
+        p.configHome = dir.filePath(QStringLiteral("home/config"));
+        p.dataDirs = {dir.filePath(QStringLiteral("usr/share"))};
+        p.configDirs = {dir.filePath(QStringLiteral("etc/xdg"))};
+        p.desktops = {QStringLiteral("KDE")};
+        p.runTools = false;
+        const QString list = p.configHome + QStringLiteral("/mimeapps.list");
+        auto write = [](const QString &path, const QByteArray &data) {
+            QDir().mkpath(QFileInfo(path).absolutePath());
+            QFile f(path);
+            QVERIFY(f.open(QIODevice::WriteOnly));
+            f.write(data);
+        };
+        auto read = [](const QString &path) {
+            QFile f(path);
+            return f.open(QIODevice::ReadOnly) ? QString::fromUtf8(f.readAll()) : QString();
+        };
+        write(list, "[Default Applications]\ntext/plain=org.kde.kate.desktop\n\n[Removed Associations]\nx=y\n");
+
+        QCOMPARE(FileAssociation::tsfState(exe, p), State::None);
+        QVERIFY(FileAssociation::associateTsf(exe, p));
+        QCOMPARE(FileAssociation::tsfState(exe, p), State::Ours);
+        // The user's type, the user's desktop file (there is none in the system), the default; the rest is kept.
+        QCOMPARE(read(p.dataHome + QStringLiteral("/mime/packages/org.typingstatistics.TypingStatistics.xml")),
+                 FileAssociation::mimeDefinition());
+        const QString desktop = read(p.dataHome + QStringLiteral("/applications/org.typingstatistics.TypingStatistics.desktop"));
+        QVERIFY(desktop.contains(QStringLiteral("Exec=\"") + exe + QStringLiteral("\" %f\n")));
+        QVERIFY(desktop.contains(QStringLiteral("MimeType=application/x-typing-statistics;\n")));
+        QCOMPARE(read(list), QStringLiteral("[Default Applications]\ntext/plain=org.kde.kate.desktop\n"
+                                            "application/x-typing-statistics=org.typingstatistics.TypingStatistics.desktop\n\n"
+                                            "[Removed Associations]\nx=y\n\n"
+                                            "[Added Associations]\n"
+                                            "application/x-typing-statistics=org.typingstatistics.TypingStatistics.desktop;\n"));
+        QCOMPARE(FileAssociation::tsfState(other, p), State::Other);
+        // The AppImage was moved: its old place is gone.
+        QVERIFY(FileAssociation::associateTsf(gone, p));
+        QCOMPARE(FileAssociation::tsfState(exe, p), State::Moved);
+        QVERIFY(FileAssociation::associateTsf(exe, p));
+        QCOMPARE(FileAssociation::tsfState(exe, p), State::Ours);
+        // A desktop-specific list goes first.
+        write(p.configHome + QStringLiteral("/kde-mimeapps.list"),
+              "[Default Applications]\napplication/x-typing-statistics=other.desktop\n");
+        QCOMPARE(FileAssociation::tsfState(exe, p), State::Other);
+        QFile::remove(p.configHome + QStringLiteral("/kde-mimeapps.list"));
+
+        // Installed by a package that starts this program: no desktop file of the user's own.
+        QDir(p.dataHome).removeRecursively();
+        write(p.dataDirs[0] + QStringLiteral("/applications/org.typingstatistics.TypingStatistics.desktop"),
+              (QStringLiteral("[Desktop Entry]\nExec=") + exe + QStringLiteral(" %f\nMimeType=application/x-typing-statistics;\n")).toUtf8());
+        write(p.dataDirs[0] + QStringLiteral("/mime/packages/org.typingstatistics.TypingStatistics.xml"), FileAssociation::mimeDefinition().toUtf8());
+        QVERIFY(FileAssociation::associateTsf(exe, p));
+        QVERIFY(!QFileInfo::exists(p.dataHome + QStringLiteral("/applications/org.typingstatistics.TypingStatistics.desktop")));
+        QVERIFY(!QFileInfo::exists(p.dataHome + QStringLiteral("/mime")));
+        QCOMPARE(FileAssociation::tsfState(exe, p), State::Ours);
+#endif
     }
 };
 

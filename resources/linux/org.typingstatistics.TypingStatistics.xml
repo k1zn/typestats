@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/x-typing-statistics">
+    <comment>Typing statistics file</comment>
+    <comment xml:lang="ru">Запись Typing statistics</comment>
+    <sub-class-of type="text/plain"/>
+    <glob pattern="*.tsf"/>
+  </mime-type>
+</mime-info>
