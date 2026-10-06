@@ -84,6 +84,9 @@ void setRows(QTableWidget *list, const QVector<QStringList> &rows)
         list->setRowCount(rows.size());
     for (int r = 0; r < rows.size(); ++r)
         for (int c = 0; c < rows[r].size(); ++c) {
+            // A new item repaints the list: the key list is set on every step of scrolling.
+            if (const QTableWidgetItem *old = list->item(r, c); old && old->text() == rows[r][c])
+                continue;
             auto *item = new QTableWidgetItem(rows[r][c]);
             item->setToolTip(rows[r][c]);
             list->setItem(r, c, item);

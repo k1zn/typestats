@@ -36,7 +36,11 @@
 #include "ui/TextView.h"
 #include "ui/Texts.h"
 
+#include <QAbstractScrollArea>
 #include <QApplication>
+#include <QMouseEvent>
+#include <QStyle>
+#include <QWheelEvent>
 #include <QDir>
 #include <QElapsedTimer>
 #include <QFile>
@@ -61,6 +65,37 @@
 #include <windows.h>
 #include <psapi.h>
 #endif
+
+// Time inside QApplication::notify by event type and receiver class (inclusive: a paint inside an
+// UpdateRequest counts in both), on while g_notifyTimes is set.
+struct NotifyTimes
+{
+    QMap<QString, std::pair<qint64, int>> byKey; // ns, count
+};
+static NotifyTimes *g_notifyTimes = nullptr;
+
+class TimedApplication : public QApplication
+{
+public:
+    using QApplication::QApplication;
+    bool notify(QObject *receiver, QEvent *e) override
+    {
+        if (!g_notifyTimes)
+            return QApplication::notify(receiver, e);
+        const int type = e->type();
+        QElapsedTimer t;
+        t.start();
+        const bool r = QApplication::notify(receiver, e);
+        // A viewport is named after its scroll area.
+        const QObject *named = receiver->objectName() == QLatin1String("qt_scrollarea_viewport") && receiver->parent()
+                                   ? receiver->parent()
+                                   : receiver;
+        auto &v = g_notifyTimes->byKey[QStringLiteral("%1 %2").arg(type).arg(QString::fromLatin1(named->metaObject()->className()))];
+        v.first += t.nsecsElapsed();
+        ++v.second;
+        return r;
+    }
+};
 
 class TstPerf : public QObject
 {
@@ -737,6 +772,159 @@ private slots:
         QFile::remove(JournalWriter(QCoreApplication::applicationDirPath()).path());
     }
 
+    // A frame of scrolling with the mouse, as the user drags: the move event, everything it updates, the
+    // painting of the window (the backing store of the offscreen platform: the CPU part, without the
+    // compositor). Run with QT_SCALE_FACTOR=1.25 / 1.5 / 2 for HiDPI, TS_PERF_STYLE=Fusion for the look
+    // outside Windows. Also counts the paint events per widget for one step.
+    void scrollFrames()
+    {
+        Look::apply();
+        if (const QString style = qEnvironmentVariable("TS_PERF_STYLE"); !style.isEmpty())
+            QApplication::setStyle(style);
+        MainWindow w;
+        w.resize(1000, 700);
+        w.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        const int n = m_sizes.last();
+        QVERIFY(w.openFile(tsf(n)));
+        QCoreApplication::processEvents();
+        log(QStringLiteral("# scale %1, dpr %2, style %3")
+                .arg(qEnvironmentVariable("QT_SCALE_FACTOR", QStringLiteral("1")))
+                .arg(w.devicePixelRatioF())
+                .arg(QApplication::style()->name()));
+
+        struct Counter : QObject
+        {
+            QMap<QString, int> paints;
+            bool eventFilter(QObject *o, QEvent *e) override
+            {
+                if (e->type() == QEvent::Paint) {
+                    QObject *named = o;
+                    // The viewport of a scroll area is named after the area.
+                    if (o->objectName() == QLatin1String("qt_scrollarea_viewport") && o->parent())
+                        named = o->parent();
+                    ++paints[QString::fromLatin1(named->metaObject()->className())];
+                }
+                return false;
+            }
+        } counter;
+
+        auto move = [](QWidget *target, int x, Qt::MouseButtons buttons) {
+            const QPointF pos(x, target->height() / 2);
+            QMouseEvent e(QEvent::MouseMove, pos, target->mapToGlobal(pos), Qt::NoButton, buttons, Qt::NoModifier);
+            QApplication::sendEvent(target, &e);
+        };
+        auto press = [](QWidget *target, int x, Qt::MouseButton button) {
+            const QPointF pos(x, target->height() / 2);
+            QMouseEvent e(QEvent::MouseButtonPress, pos, target->mapToGlobal(pos), button, button, Qt::NoModifier);
+            QApplication::sendEvent(target, &e);
+        };
+        auto release = [](QWidget *target, int x, Qt::MouseButton button) {
+            const QPointF pos(x, target->height() / 2);
+            QMouseEvent e(QEvent::MouseButtonRelease, pos, target->mapToGlobal(pos), button, Qt::NoButton, Qt::NoModifier);
+            QApplication::sendEvent(target, &e);
+        };
+        constexpr int steps = 20;
+        // One drag of 20 steps of 10 px with the left button, each step painted.
+        auto drag = [&](QWidget *target, int dir) {
+            int x = target->width() / 2;
+            press(target, x, Qt::LeftButton);
+            for (int i = 0; i < steps; ++i) {
+                x += 10 * dir;
+                move(target, x, Qt::LeftButton);
+                QCoreApplication::processEvents();
+            }
+            release(target, x, Qt::LeftButton);
+        };
+        auto paintsPerStep = [&](QWidget *target, const QString &what) {
+            counter.paints.clear();
+            qApp->installEventFilter(&counter);
+            drag(target, 1);
+            qApp->removeEventFilter(&counter);
+            QStringList parts;
+            for (auto it = counter.paints.cbegin(); it != counter.paints.cend(); ++it)
+                parts << QStringLiteral("%1 %2").arg(it.key()).arg(double(it.value()) / steps);
+            log(QStringLiteral("# paints per step, %1: %2").arg(what, parts.join(QStringLiteral(", "))));
+        };
+
+        w.m_klav->setScrollMs(float(kExtMilli * w.m_model.klav[w.m_model.klav.size() / 2].tDraw));
+        w.klavogramMoved();
+        QCoreApplication::processEvents();
+        int dir = 1;
+        measure(QStringLiteral("frame: drag klavogram x%1").arg(steps), n, [&] { drag(w.m_klav, dir = -dir); });
+        paintsPerStep(w.m_klav, QStringLiteral("klavogram"));
+        measure(QStringLiteral("frame: drag graph x%1").arg(steps), n, [&] { drag(w.m_graph, dir = -dir); });
+        paintsPerStep(w.m_graph, QStringLiteral("graph"));
+        measure(QStringLiteral("frame: wheel klavogram x%1").arg(steps), n, [&] {
+            for (int i = 0; i < steps; ++i) {
+                const QPointF pos(100, 50);
+                QWheelEvent e(pos, w.m_klav->mapToGlobal(pos), {}, QPoint(0, (dir = -dir) * 120), Qt::NoButton,
+                              Qt::NoModifier, Qt::NoScrollPhase, false);
+                QApplication::sendEvent(w.m_klav, &e);
+                QCoreApplication::processEvents();
+            }
+        });
+        // By parts: the handlers without painting, then the painting of what a step updates.
+        measure(QStringLiteral("  klavogramMoved x%1").arg(steps), n, [&] {
+            for (int i = 0; i < steps; ++i)
+                w.klavogramMoved();
+        });
+        measure(QStringLiteral("  drag klavogram x%1, painted once").arg(steps), n, [&] {
+            int x = w.m_klav->width() / 2;
+            press(w.m_klav, x, Qt::LeftButton);
+            for (int i = 0; i < steps; ++i)
+                move(w.m_klav, x += 10 * (dir = -dir), Qt::LeftButton);
+            release(w.m_klav, x, Qt::LeftButton);
+            QCoreApplication::processEvents();
+        });
+        measure(QStringLiteral("  repaint klavogram x%1").arg(steps), n, [&] {
+            for (int i = 0; i < steps; ++i)
+                w.m_klav->repaint();
+        });
+        measure(QStringLiteral("  repaint graph x%1").arg(steps), n, [&] {
+            for (int i = 0; i < steps; ++i)
+                w.m_graph->repaint();
+        });
+        measure(QStringLiteral("  processEvents (nothing) x%1").arg(steps), n, [&] {
+            for (int i = 0; i < steps; ++i)
+                QCoreApplication::processEvents();
+        });
+        measure(QStringLiteral("  klavogram update + processEvents x%1").arg(steps), n, [&] {
+            for (int i = 0; i < steps; ++i) {
+                w.m_klav->update();
+                QCoreApplication::processEvents();
+            }
+        });
+        measure(QStringLiteral("  graph update + processEvents x%1").arg(steps), n, [&] {
+            for (int i = 0; i < steps; ++i) {
+                w.m_graph->update();
+                QCoreApplication::processEvents();
+            }
+        });
+        // Where a frame of dragging goes: time inside notify by event and receiver.
+        {
+            NotifyTimes times;
+            g_notifyTimes = &times;
+            drag(w.m_klav, 1);
+            g_notifyTimes = nullptr;
+            QList<std::pair<qint64, QString>> top;
+            for (auto it = times.byKey.cbegin(); it != times.byKey.cend(); ++it)
+                top.append({it.value().first, QStringLiteral("%1 x%2 %3 ms").arg(it.key()).arg(it.value().second).arg(double(it.value().first) / 1e6, 0, 'f', 2)});
+            std::sort(top.begin(), top.end(), [](const auto &a, const auto &b) { return a.first > b.first; });
+            for (int i = 0; i < std::min<qsizetype>(12, top.size()); ++i)
+                log(QStringLiteral("# notify, drag klavogram x%1: %2").arg(steps).arg(top[i].second));
+        }
+        measure(QStringLiteral("frame: whole window repaint"), n, [&] {
+            w.repaint();
+        });
+
+        // Form4 at the same scale.
+        w.showHistograms();
+        QCoreApplication::processEvents();
+        measure(QStringLiteral("frame: Form4 repaint"), n, [&] { w.m_hist->repaint(); });
+        w.m_hist->hide();
+    }
+
     // Numbers with the system locale: Qt asks the OS for its decimal point on every call (macOS: CFLocale).
     void numbers()
     {
@@ -872,7 +1060,7 @@ int main(int argc, char *argv[])
     // crash report; a slow variant under measurement should just be slow.
     if (!qEnvironmentVariableIsSet("QTEST_FUNCTION_TIMEOUT"))
         qputenv("QTEST_FUNCTION_TIMEOUT", "3600000");
-    QApplication app(argc, argv);
+    TimedApplication app(argc, argv);
     TstPerf test;
     return QTest::qExec(&test, argc, argv);
 }
