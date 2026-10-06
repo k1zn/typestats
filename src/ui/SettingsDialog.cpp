@@ -75,6 +75,7 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent)
     m_copyStrike = checkBox(tags, tr("Выделять исправления зачёркиванием"), 8, 32, "CopyBlock2", true);
     m_copyNext = checkBox(tags, tr("Выделять цветом следующий символ"), 8, 48, "CopyBlock3", true);
 
+    m_askSave = checkBox(this, tr("Спрашивать о сохранении при выходе"), 8, 200, "AskSaveOnExit", true);
     m_tray = checkBox(this, tr("Сворачивать в трей"), 8, 216, "MinimizeToTray", false);
     if (!QSystemTrayIcon::isSystemTrayAvailable()) { // GNOME without the AppIndicator extension
         m_tray->setEnabled(false);
@@ -143,6 +144,7 @@ void SettingsDialog::save() const
     s.setValue(QStringLiteral("JournalOn"), m_journal->isChecked());
     s.setValue(QStringLiteral("AutoComments"), m_autoComments->isChecked());
     s.setValue(QStringLiteral("AutoMinimize"), m_autoMinimize->isChecked());
+    s.setValue(QStringLiteral("AskSaveOnExit"), m_askSave->isChecked());
     if (languageChanged())
         s.setValue(QStringLiteral("Language"), m_language->currentText());
 }

@@ -140,7 +140,8 @@ private:
     void copy(int kind);
     void textHovered(int textPos, const QPoint &globalPos);
     void showTextMenu(const QPoint &globalPos);
-    void saveDocument(bool block);
+    bool saveDocument(bool block); // false: not saved (cancelled or failed)
+    bool askToSave(); // on exit: false - stay
 
     void open();
     void openJournal();
@@ -150,6 +151,8 @@ private:
     TsfDocument m_doc;
     bool m_clean = true; // the recording is genuine: it is signed when saved (g_fileClean)
     bool m_loaded = false; // the recording came from a .tsf: its author and date are kept (g_fileLoaded)
+    bool m_unsaved = false; // the records changed since they were opened, saved or cleared
+    bool m_opening = false; // a .tsf is being opened: switching recording off adds no releases
     KeyRecords m_undo;     // the records before the last deletion
     Editing::ToUnicode m_toUnicode = &KeyboardHook::toUnicode; // the current layout (tests put their own)
     int m_labelRecord = -1; // the record whose label is under the mouse

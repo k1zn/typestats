@@ -208,5 +208,8 @@
   "Скопировать команду": "Copy the command",
   "Скопировано": "Copied",
   "Тёмная тема": "Dark theme",
-  "Светлая тема": "Light theme"
+  "Светлая тема": "Light theme",
+  "Записи не сохранены. Сохранить их перед выходом?": "The recording is not saved. Save it before exiting?",
+  "Больше не спрашивать": "Do not ask again",
+  "Спрашивать о сохранении при выходе": "Ask to save on exit"
 }

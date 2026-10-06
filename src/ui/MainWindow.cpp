@@ -611,11 +611,36 @@ void MainWindow::showForm(const QString &name)
 
 void MainWindow::closeEvent(QCloseEvent *e)
 {
+    if (!askToSave()) {
+        e->ignore();
+        return;
+    }
     saveSettings();
     Presets::store(Presets::current()); // the preset follows what was changed while it was current
     e->accept();
     m_tray->hide();
     QApplication::quit(); // the tool windows do not keep the program running
+}
+
+bool MainWindow::askToSave()
+{
+    // Not in the original: it closed without asking.
+    QSettings settings;
+    if (!m_unsaved || m_doc.records.isEmpty() || !settings.value(QStringLiteral("AskSaveOnExit"), true).toBool())
+        return true;
+    if (isHidden())
+        restoreFromTray();
+    QMessageBox box(QMessageBox::Question, appTitle(), tr("Записи не сохранены. Сохранить их перед выходом?"),
+                    QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, this);
+    box.setDefaultButton(QMessageBox::Save);
+    auto *never = new QCheckBox(tr("Больше не спрашивать"), &box);
+    box.setCheckBox(never);
+    const int answer = box.exec();
+    if (answer == QMessageBox::Cancel)
+        return false;
+    if (never->isChecked())
+        settings.setValue(QStringLiteral("AskSaveOnExit"), false);
+    return answer == QMessageBox::Discard || saveDocument(false);
 }
 
 void MainWindow::changeEvent(QEvent *e)
@@ -726,8 +751,10 @@ void MainWindow::captureToggled(bool on)
     const QIcon icon = QApplication::windowIcon();
     m_tray->setIcon(on ? icon : QIcon(icon.pixmap(32, 32, QIcon::Disabled)));
     // Switched off: the keys still held get their releases.
-    if (!on && Recorder::appendReleases(m_doc.records) > 0)
+    if (!on && !m_opening && Recorder::appendReleases(m_doc.records) > 0) {
+        m_unsaved = true;
         recalculate();
+    }
     m_text->setFocus();
 }
 
@@ -862,6 +889,7 @@ void MainWindow::deleteSelection()
     normalizeRecords();
     m_undo = m_doc.records;
     Editing::deleteRange(m_doc.records, from, to);
+    m_unsaved = true;
     recalculate();
 }
 
@@ -871,6 +899,7 @@ void MainWindow::removeNonText()
     normalizeRecords();
     m_undo = m_doc.records;
     Editing::removeNonText(m_doc.records, m_model.recordOfElement(b), m_model.recordOfElement(e));
+    m_unsaved = true;
     recalculate();
 }
 
@@ -883,6 +912,7 @@ void MainWindow::convertLayout()
     normalizeRecords();
     m_undo = m_doc.records; // the original's record range keeps the copy for "Отменить"
     Editing::convertLayout(m_doc.records, from, to, m_toUnicode, KeyboardHook::capsLock());
+    m_unsaved = true;
     KeyboardHook::clearDeadKey();
     recalculate();
 }
@@ -894,6 +924,7 @@ void MainWindow::undo()
         return;
     normalizeRecords();
     m_doc.records.swap(m_undo);
+    m_unsaved = true;
     keepRoomForRecording();
     recalculate();
 }
@@ -913,6 +944,7 @@ void MainWindow::askLabel(int record)
                                                m_doc.records[record].comment, &ok);
     if (ok)
         m_doc.records[record].comment = text;
+        m_unsaved = true;
     const int scroll = m_text->verticalScrollBar()->value();
     recalculate();
     m_text->verticalScrollBar()->setValue(scroll);
@@ -928,6 +960,7 @@ void MainWindow::mark()
     }
     normalizeRecords();
     const int label = Editing::markRange(m_doc.records, from, to);
+    m_unsaved = true;
     if (label > 0) {
         askLabel(label);
         return;
@@ -941,6 +974,7 @@ void MainWindow::removeLabel(int record)
 {
     normalizeRecords();
     Editing::removeLabel(m_doc.records, record);
+    m_unsaved = true;
     const int scroll = m_text->verticalScrollBar()->value();
     recalculate();
     m_text->verticalScrollBar()->setValue(scroll);
@@ -1063,6 +1097,7 @@ void MainWindow::keyEvent(const HookEvent &e)
     if (out.liveReset)
         m_liveTicks = 10; // shown at the next tick
     if (out.recorded) {
+        m_unsaved = true;
         if (m_journalOn && !m_journal.append(m_doc.records.last()) && !m_journalFailed) {
             m_journalFailed = true; // said once
             auto *box = new QMessageBox(QMessageBox::Warning, appTitle(),
@@ -1516,6 +1551,7 @@ void MainWindow::updateKeyList()
 void MainWindow::setDocument(const TsfDocument &doc, const QString &title, bool damaged)
 {
     m_doc = doc;
+    m_unsaved = false;
     keepRoomForRecording();
     setTitle(title);
     m_damaged->setVisible(damaged);
@@ -1560,6 +1596,11 @@ bool MainWindow::openFile(const QString &path)
             m_fingers->addItem(scheme);
         m_fingers->setCurrentText(scheme);
     }
+    // LoadTsf: an opened file is looked at, not added to - recording is switched off ("Вкл").
+    // Opening a journal (0x42abcc) leaves it as it is.
+    m_opening = true;
+    m_capture->setChecked(false);
+    m_opening = false;
     setDocument(doc, name, doc.signed_ && !doc.signatureValid);
     return true;
 }
@@ -1588,7 +1629,7 @@ void MainWindow::save()
     saveDocument(false);
 }
 
-void MainWindow::saveDocument(bool block)
+bool MainWindow::saveDocument(bool block)
 {
     // SaveTsf: the properties first. A loaded file keeps its author and date; a new recording and a
     // block get the author from the settings and the current time.
@@ -1600,10 +1641,10 @@ void MainWindow::saveDocument(bool block)
     else
         properties.setProperties(m_doc.author, m_doc.date, m_doc.comment, true);
     if (properties.exec() != QDialog::Accepted)
-        return;
+        return false;
     QString path = QFileDialog::getSaveFileName(this, {}, m_path, QStringLiteral("Typing statistics files (*.tsf)"));
     if (path.isEmpty())
-        return;
+        return false;
     if (QFileInfo(path).suffix().isEmpty())
         path += QStringLiteral(".tsf");
 
@@ -1629,16 +1670,18 @@ void MainWindow::saveDocument(bool block)
     // A recording made here or loaded with a valid signature is signed (g_fileClean).
     if (!Tsf::write(path, doc, m_clean)) {
         QMessageBox::warning(this, appTitle(), tr("Не удалось сохранить файл %1").arg(path));
-        return;
+        return false;
     }
     if (block)
-        return;
+        return true;
     const KeyRecords records = m_doc.records;
     m_doc = doc;
     m_doc.records = records;
     m_path = path;
     m_loaded = true;
+    m_unsaved = false;
     setTitle(QFileInfo(path).fileName());
+    return true;
 }
 
 void MainWindow::clear()

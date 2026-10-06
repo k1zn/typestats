@@ -2,6 +2,8 @@
 // recording, editing, copying, the graph and its link with the klavogram.
 
 #include "core/Editing.h"
+#include "core/TsfFile.h"
+#include "core/Journal.h"
 #include "core/KeyList.h"
 #include "ui/AppPaths.h"
 #include "ui/ExtraStatsWindow.h"
@@ -40,6 +42,7 @@
 
 #include "xlsxdocument.h"
 #include <QTest>
+#include <QTimer>
 #include <QTextBlock>
 #include <QTextCursor>
 #include <QComboBox>
@@ -137,14 +140,15 @@ private slots:
         QVERIFY(w.m_keys->rowCount() > 5);
         QVERIFY(!w.grab().isNull()); // every widget paints itself
         QVERIFY(w.m_legend->isVisible());
-        // The capture state goes first in the title: it is what the task bar shows.
-        QVERIFY(w.windowTitle().startsWith(QStringLiteral("Ts: ON - Typing statistics v")));
-        QVERIFY(w.windowTitle().endsWith(QStringLiteral(" - обыка.tsf")));
-        w.m_capture->setChecked(false);
-        QVERIFY(w.windowTitle().startsWith(QStringLiteral("Ts: OFF - ")));
+        // The capture state goes first in the title: it is what the task bar shows. An opened file switches
+        // recording off (LoadTsf).
+        QVERIFY(w.windowTitle().startsWith(QStringLiteral("Ts: OFF - Typing statistics v")));
         QVERIFY(w.windowTitle().endsWith(QStringLiteral(" - обыка.tsf")));
         w.m_capture->setChecked(true);
         QVERIFY(w.windowTitle().startsWith(QStringLiteral("Ts: ON - ")));
+        QVERIFY(w.windowTitle().endsWith(QStringLiteral(" - обыка.tsf")));
+        w.m_capture->setChecked(false);
+        QVERIFY(w.windowTitle().startsWith(QStringLiteral("Ts: OFF - ")));
     }
 
     void hotkeyNames()
@@ -885,6 +889,87 @@ private slots:
         QCOMPARE(w.m_doc.records.size(), 2);
         QVERIFY(w.m_doc.records.last().isUp());
         QCOMPARE(w.m_model.text, QStringLiteral("a"));
+    }
+
+    void openingSwitchesCaptureOff()
+    {
+        MainWindow w;
+        HookEvent e;
+        e.timeUs = 1000;
+        e.flags = quint32(0x41) << 16 | 0x1E | KeyRecord::HasChar;
+        e.ch = u'a';
+        e.chars = 1;
+        if (QApplication::activeWindow())
+            QSKIP("the test window got the focus");
+        w.keyEvent(e); // 'a' is held
+        QVERIFY(w.m_capture->isChecked());
+        // A .tsf: recording goes off, and the held key of the recording left behind adds nothing to the file.
+        QVERIFY(w.openFile(golden("обыка.tsf")));
+        QVERIFY(!w.m_capture->isChecked());
+        TsfDocument file;
+        QCOMPARE(Tsf::read(golden("обыка.tsf"), file), Tsf::ReadError::None);
+        QCOMPARE(w.m_doc.records.size(), file.records.size());
+        QVERIFY(!w.m_unsaved);
+        // A journal leaves recording as it is (0x42abcc).
+        QTemporaryDir dir;
+        JournalWriter journal(dir.path());
+        KeyRecord r;
+        r.flags = quint32(0x41) << 16 | 0x1E | KeyRecord::HasChar;
+        r.ch = u'a';
+        QVERIFY(journal.append(r));
+        journal.close();
+        w.m_capture->setChecked(true);
+        QVERIFY(w.openFile(journal.path()));
+        QVERIFY(w.m_capture->isChecked());
+    }
+
+    void askToSaveOnExit()
+    {
+        QSettings().remove(QStringLiteral("AskSaveOnExit"));
+        MainWindow w;
+        HookEvent e;
+        e.timeUs = 1000;
+        e.flags = quint32(0x41) << 16 | 0x1E | KeyRecord::HasChar;
+        e.ch = u'a';
+        e.chars = 1;
+        if (QApplication::activeWindow())
+            QSKIP("the test window got the focus");
+        QVERIFY(w.askToSave()); // nothing recorded: no question
+        w.keyEvent(e);
+        QVERIFY(w.m_unsaved);
+        // The answer to the question, given once it is shown.
+        const auto answer = [](QMessageBox::StandardButton button, bool never) {
+            QTimer::singleShot(0, [=] {
+                auto *box = qobject_cast<QMessageBox *>(QApplication::activeModalWidget());
+                QVERIFY(box);
+                QVERIFY(box->checkBox());
+                box->checkBox()->setChecked(never);
+                box->button(button)->click();
+            });
+        };
+        answer(QMessageBox::Cancel, true);
+        QVERIFY(!w.askToSave()); // stays; "do not ask" with Cancel is not remembered
+        QVERIFY(QSettings().value(QStringLiteral("AskSaveOnExit"), true).toBool());
+        answer(QMessageBox::Discard, true);
+        QVERIFY(w.askToSave());
+        QVERIFY(!QSettings().value(QStringLiteral("AskSaveOnExit"), true).toBool());
+        QVERIFY(w.askToSave()); // not asked any more
+        // The same switch in the settings.
+        {
+            SettingsDialog d;
+            auto *ask = d.findChildren<QCheckBox *>().at(0);
+            for (QCheckBox *c : d.findChildren<QCheckBox *>())
+                if (c->text() == QStringLiteral("Спрашивать о сохранении при выходе"))
+                    ask = c;
+            QVERIFY(!ask->isChecked());
+            ask->setChecked(true);
+            d.save();
+        }
+        QVERIFY(QSettings().value(QStringLiteral("AskSaveOnExit")).toBool());
+        // Saved, opened or cleared: nothing to ask about.
+        w.clear();
+        QVERIFY(w.askToSave());
+        QSettings().remove(QStringLiteral("AskSaveOnExit"));
     }
 
     void exportTables()

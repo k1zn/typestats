@@ -793,6 +793,14 @@ Copy the command, paste it into a terminal and enter your password. This is need
         <source>Тёмная тема</source>
         <translation>Dark theme</translation>
     </message>
+    <message>
+        <source>Записи не сохранены. Сохранить их перед выходом?</source>
+        <translation>The recording is not saved. Save it before exiting?</translation>
+    </message>
+    <message>
+        <source>Больше не спрашивать</source>
+        <translation>Do not ask again</translation>
+    </message>
 </context>
 <context>
     <name>SettingsDialog</name>
@@ -891,6 +899,10 @@ Copy the command, paste it into a terminal and enter your password. This is need
     <message>
         <source>%1 (Управление перехватом)</source>
         <translation>%1 (Capture on/off)</translation>
+    </message>
+    <message>
+        <source>Спрашивать о сохранении при выходе</source>
+        <translation>Ask to save on exit</translation>
     </message>
 </context>
 <context>
