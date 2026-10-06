@@ -20,7 +20,8 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     add_compile_options(-ffp-contract=off)
 endif()
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Test)
+# Network: the time stamps of a recording (re/stamps.md), RFC 3161 over plain HTTP.
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network Test)
 # A static Qt has no Linguist tools: TS_LRELEASE then names lrelease.exe of another Qt.
 find_package(Qt6 QUIET COMPONENTS LinguistTools)
 
@@ -99,7 +100,7 @@ file(GLOB UI_SOURCES CONFIGURE_DEPENDS
     src/export/*.cpp src/export/*.h)
 add_library(tsui STATIC ${UI_SOURCES})
 target_include_directories(tsui PUBLIC src)
-target_link_libraries(tsui PUBLIC tscore tsplatform Qt6::Widgets QXlsx::QXlsx)
+target_link_libraries(tsui PUBLIC tscore tsplatform Qt6::Widgets Qt6::Network QXlsx::QXlsx)
 
 qt_add_executable(TypingStatistics WIN32 MACOSX_BUNDLE src/main.cpp resources/resources.qrc)
 if(WIN32)

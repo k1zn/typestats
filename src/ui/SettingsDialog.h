@@ -27,7 +27,7 @@ private:
     QLineEdit *m_loSpeed, *m_hiSpeed;
     QListWidget *m_mainStats;
     QCheckBox *m_copyColor, *m_copyStrike, *m_copyNext;
-    QCheckBox *m_tray, *m_journal, *m_autoComments, *m_autoMinimize, *m_askSave;
+    QCheckBox *m_tray, *m_journal, *m_autoComments, *m_autoMinimize, *m_askSave, *m_stamp;
     QComboBox *m_language;
     QString m_openedLanguage;
 };

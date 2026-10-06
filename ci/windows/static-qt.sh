@@ -29,9 +29,11 @@ fi
 rm -rf "qtbase-everywhere-src-$version" build
 tar xf "$archive"
 
-off="opengl dynamicgl dbus sql network printsupport concurrent xml jpeg gif freetype textodfwriter
+# Network stays (the time stamps of a recording, RFC 3161 over plain HTTP), without TLS and its backends.
+off="opengl dynamicgl dbus sql printsupport concurrent xml jpeg gif freetype textodfwriter
      textmarkdownreader textmarkdownwriter pdf vulkan colordialog fontdialog wizard mdiarea calendarwidget
-     dockwidget undoview columnview fontcombobox"
+     dockwidget undoview columnview fontcombobox ssl openssl schannel dtls ocsp libproxy brotli zstd
+     networklistmanager networkdiskcache localserver udpsocket sctp"
 # Qt's own copies of the libraries: a runner has others in PATH (Strawberry Perl's zlib, libpng).
 system="doubleconversion freetype harfbuzz jpeg libb2 pcre2 png textmarkdownreader zlib"
 features=()

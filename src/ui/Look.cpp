@@ -30,6 +30,7 @@ const Colors kLight = {
      {QColor(233, 154, 252), QColor(202, 18, 248)},
      {QColor(250, 139, 148), QColor(211, 10, 24)},
      {QColor(254, 180, 100), QColor(224, 118, 1)}},
+    QColor(0, 128, 0),     QColor(176, 112, 0),   QColor(200, 0, 0),
 };
 
 // The same hues on a dark warm background: the dark series and text colours lighter, the key fills darker (their
@@ -48,6 +49,7 @@ const Colors kDark = {
      {QColor(105, 55, 125), QColor(140, 20, 175)},
      {QColor(125, 50, 58), QColor(165, 15, 30)},
      {QColor(130, 85, 30), QColor(170, 95, 5)}},
+    QColor(100, 200, 100), QColor(230, 180, 60),  QColor(255, 110, 110),
 };
 
 // The system colours of Windows (COLOR_BTNFACE, COLOR_3DSHADOW, ...): the light palette outside Windows.

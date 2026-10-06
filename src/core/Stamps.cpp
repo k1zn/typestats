@@ -61,6 +61,7 @@ void Chain::reset()
 {
     m_normalizer = {};
     m_encoded.clear();
+    m_timeUs.clear();
 }
 
 bool Chain::push(const KeyRecord &raw)
@@ -69,6 +70,7 @@ bool Chain::push(const KeyRecord &raw)
     if (!r)
         return false;
     m_encoded += encode(*r);
+    m_timeUs.append(m_timeUs.isEmpty() ? 0 : m_timeUs.last() + r->dtUs);
     return true;
 }
 

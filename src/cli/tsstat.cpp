@@ -9,14 +9,19 @@
 // --extra the list of the extra statistics window (Form3) for kind 0..6: "speed<TAB>text[<TAB>count]".
 //
 //   tsstat --to-journal out.tsj file.tsf    the records of the file as a journal (re/journal.md)
+//   tsstat --verify file.tsf                the time stamps of the recording (re/stamps.md); exit code 0 - all
+//                                           the records confirmed, 1 - not all, 2 - stamps that do not check
 
 #include "core/ExtraStats.h"
 #include "core/FingerZones.h"
 #include "core/Journal.h"
 #include "core/MainStats.h"
+#include "core/Stamps.h"
 #include "core/TsfFile.h"
 
 #include <QCoreApplication>
+#include <QDateTime>
+#include <QTimeZone>
 #include <QTextStream>
 
 int main(int argc, char *argv[])
@@ -32,6 +37,7 @@ int main(int argc, char *argv[])
     QString pattern;
     ExtraStats::CharFilter filter;
     QString file, journalOut;
+    bool verify = false;
     for (int i = 1; i < args.size(); ++i) {
         const QString &a = args[i];
         if (a == QLatin1String("--split") && i + 1 < args.size())
@@ -49,6 +55,8 @@ int main(int argc, char *argv[])
             printRuns = true;
         else if (a == QLatin1String("--extra") && i + 1 < args.size())
             extraKind = args[++i].toInt();
+        else if (a == QLatin1String("--verify"))
+            verify = true;
         else if (a == QLatin1String("--to-journal") && i + 1 < args.size())
             journalOut = args[++i];
         else if (a == QLatin1String("--avg"))
@@ -86,6 +94,30 @@ int main(int argc, char *argv[])
         for (const KeyRecord &r : doc.records)
             f.write(Journal::encode(r));
         return 0;
+    }
+    if (verify) {
+        const Stamps::Report r = Stamps::verify(Recalc::normalized(doc.records), doc.stamps, doc.stampCertificates);
+        static const char *const status[] = {"none", "confirmed", "partial", "broken"};
+        const auto utc = [](qint64 ms) {
+            return ms ? QDateTime::fromMSecsSinceEpoch(ms, QTimeZone::utc()).toString(Qt::ISODate) : QString();
+        };
+        const std::pair<const char *, QString> rows[] = {
+            {"status", QLatin1String(status[int(r.status)])},
+            {"stamps", QString::number(r.stamps)},
+            {"bad", QString::number(r.bad)},
+            {"voided", QString::number(r.voided)},
+            {"records", QString::number(r.records)},
+            {"stamped", QString::number(r.stamped)},
+            {"confirmed", QString::number(r.confirmed)},
+            {"drift_ms", QString::number(r.driftMs)},
+            {"first", utc(r.firstMs)},
+            {"last", utc(r.lastMs)},
+            {"injected", QString::number(r.injected)},
+            {"authorities", r.authorities.join(QStringLiteral(", "))},
+        };
+        for (const auto &[name, value] : rows)
+            out << name << "\t" << value << "\n";
+        return r.status == Stamps::Report::Status::Confirmed ? 0 : r.status == Stamps::Report::Status::Broken ? 2 : 1;
     }
     opt.keyNames = doc.platform;
     const TextModel m = Recalc::run(doc.records, opt);

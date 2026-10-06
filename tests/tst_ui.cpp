@@ -2,6 +2,9 @@
 // recording, editing, copying, the graph and its link with the klavogram.
 
 #include "core/Editing.h"
+#include "ui/StampRecorder.h"
+#include "core/Stamps.h"
+#include "core/Der.h"
 #include "core/TsfFile.h"
 #include "core/Journal.h"
 #include "core/KeyList.h"
@@ -50,6 +53,19 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QKeyEvent>
+
+// A time stamp token that only carries the imprint (not signed): enough for StampRecorder, which keeps what
+// comes; the report would not accept it.
+QByteArray fakeToken(const QByteArray &imprint)
+{
+    using namespace Der;
+    const QByteArray algId = tlv(Sequence, tlv(Oid, oid("2.16.840.1.101.3.4.2.1")) + tlv(Null, {}));
+    const QByteArray tst = tlv(Sequence, integer(1) + tlv(Oid, oid("1.2.3.4")) + tlv(Sequence, algId + tlv(OctetString, imprint))
+                                             + integer(7) + tlv(GeneralizedTime, "20261006120000Z"));
+    const QByteArray encap = tlv(Sequence, tlv(Oid, oid("1.2.840.113549.1.9.16.1.4")) + tlv(context(0), tlv(OctetString, tst)));
+    const QByteArray signedData = tlv(Sequence, integer(3) + tlv(Set, {}) + encap + tlv(Set, tlv(Sequence, integer(1))));
+    return tlv(Sequence, tlv(Oid, oid("1.2.840.113549.1.7.2")) + tlv(context(0), signedData));
+}
 
 class TstUi : public QObject
 {
@@ -970,6 +986,148 @@ private slots:
         w.clear();
         QVERIFY(w.askToSave());
         QSettings().remove(QStringLiteral("AskSaveOnExit"));
+    }
+
+    void stampRecorder()
+    {
+        TsfDocument doc;
+        StampRecorder s;
+        struct Request { QByteArray imprint; int service; StampRecorder::Done done; };
+        QList<Request> sent;
+        s.setSend([&](const QByteArray &imprint, int service, StampRecorder::Done done) {
+            sent.append({imprint, service, std::move(done)});
+        });
+        QSignalSpy changed(&s, &StampRecorder::changed);
+        s.attach(&doc);
+        const auto key = [&](char16_t c, quint32 dtUs, bool up = false) {
+            KeyRecord r;
+            r.dtUs = dtUs;
+            r.flags = quint32(c - u'a' + 0x41) << 16 | 0x1E | KeyRecord::HasChar | (up ? quint32(KeyRecord::KeyUp) : 0u);
+            r.ch = c;
+            doc.records.append(r);
+            s.recordsAdded();
+        };
+        key(u'a', 1000); // off: nothing goes out
+        QVERIFY(sent.isEmpty());
+        s.setEnabled(true);
+        s.attach(&doc);
+        // The first key of a session is stamped at once.
+        key(u'b', 1000);
+        QCOMPARE(sent.size(), 1);
+        QCOMPARE(sent[0].service, 0);
+        Stamps::Chain chain;
+        for (const KeyRecord &r : doc.records)
+            chain.push(r);
+        QVERIFY(sent[0].imprint == chain.hash({}, 0, 2, 0) || sent[0].imprint == chain.hash({}, 0, 2, 1));
+        key(u'b', 1000, true); // while it is on its way: no second request
+        QCOMPARE(sent.size(), 1);
+        sent[0].done(fakeToken(sent[0].imprint), {});
+        QCOMPARE(doc.stamps.size(), 1);
+        QCOMPARE(doc.stamps[0].end, 2);
+        QCOMPARE(changed.size(), 1);
+        // Within the interval nothing; the first key after it - a stamp of everything since.
+        key(u'c', 4000000);
+        QCOMPARE(sent.size(), 1);
+        key(u'c', 6000000, true);
+        QCOMPARE(sent.size(), 2);
+        // An authority fails: the next one at once, with a request of its own.
+        sent[1].done({}, QStringLiteral("down"));
+        QCOMPARE(sent.size(), 3);
+        QCOMPARE(sent[2].service, 1);
+        sent[2].done(QByteArray("garbage"), {});
+        QCOMPARE(sent.size(), 4);
+        QCOMPARE(sent[3].service, 2);
+        sent[3].done({}, QStringLiteral("down"));
+        QCOMPARE(sent.size(), 4); // all failed: it waits
+        QVERIFY(s.lastError().contains(QStringLiteral("down")));
+        QCOMPARE(doc.stamps.size(), 1);
+        // Recording stops: what is left is stamped now (the authority that answered last goes first).
+        s.captureChanged(false);
+        QCOMPARE(sent.size(), 5);
+        QCOMPARE(sent[4].service, 0);
+        // The records replaced while it was on its way (an edit, another document): the answer is dropped.
+        s.attach(&doc);
+        sent[4].done(fakeToken(sent[4].imprint), {});
+        QCOMPARE(doc.stamps.size(), 1);
+        // After the last key, the idle stamp.
+        s.captureChanged(true);
+        key(u'd', 1000);
+        QCOMPARE(sent.size(), 6); // a new session starts with a stamp
+        sent[5].done(fakeToken(sent[5].imprint), {});
+        QCOMPARE(doc.stamps.size(), 2);
+        key(u'd', 1000, true);
+        QCOMPARE(sent.size(), 6);
+        QTRY_COMPARE_WITH_TIMEOUT(sent.size(), 7, Stamps::kIdleMs + 2000);
+    }
+
+    void stampLive()
+    {
+        // The real authorities over the network (TS_STAMP_LIVE=1, ~15 s): records made up on the clock - no input
+        // is sent anywhere - stamped as they come, then checked as a file would be.
+        if (qEnvironmentVariableIntValue("TS_STAMP_LIVE") != 1)
+            QSKIP("TS_STAMP_LIVE=1 to ask the real time stamping authorities");
+        TsfDocument doc;
+        StampRecorder s;
+        s.setEnabled(true);
+        s.attach(&doc);
+        QElapsedTimer clock;
+        clock.start();
+        qint64 last = 0;
+        const QString text = QStringLiteral("stamps over the network ");
+        for (int round = 0; round < 2; ++round)
+            for (const QChar c : text) {
+                for (const bool up : {false, true}) {
+                    QTest::qWait(up ? 70 : 180);
+                    const qint64 now = clock.nsecsElapsed() / 1000;
+                    KeyRecord r;
+                    r.dtUs = quint32(now - last);
+                    last = now;
+                    const quint8 vk = c == u' ' ? 0x20 : quint8(c.toUpper().unicode());
+                    r.flags = quint32(vk) << 16 | 0x1E | KeyRecord::HasChar | (up ? quint32(KeyRecord::KeyUp) : 0u);
+                    r.ch = c.unicode();
+                    doc.records.append(r);
+                    s.recordsAdded();
+                }
+            }
+        QTRY_VERIFY_WITH_TIMEOUT(!doc.stamps.isEmpty() && doc.stamps.last().end == doc.records.size() && !s.busy(),
+                                 Stamps::kIdleMs + 20000);
+        QVERIFY2(s.lastError().isEmpty(), qPrintable(s.lastError()));
+        const Stamps::Report r = Stamps::verify(Recalc::normalized(doc.records), doc.stamps, doc.stampCertificates);
+        qInfo("stamps %d, confirmed %d of %d, drift %lld ms, %s", r.stamps, r.confirmed, r.records,
+              qint64(r.driftMs), qPrintable(r.authorities.join(u',')));
+        QCOMPARE(r.bad, 0);
+        QVERIFY(r.stamps >= 3);
+        QCOMPARE(r.status, Stamps::Report::Status::Confirmed);
+    }
+
+    void proofButton()
+    {
+        MainWindow w;
+        QVERIFY(w.m_proofButton->isHidden()); // no stamps, stamping off
+        QVERIFY(w.openFile(QStringLiteral(TS_GOLDEN_DIR "/stamps/stamped.tsf")));
+        QTRY_VERIFY(!w.m_proofButton->isHidden());
+        QCOMPARE(w.m_proofButton->text(), QStringLiteral("✓ 100 %"));
+        // A deletion in the last part voids its stamp: the time of the rest stays confirmed.
+        const int pos = w.m_model.positionOfElement(70);
+        QTextCursor c = w.m_text->textCursor();
+        c.setPosition(pos);
+        c.setPosition(pos + 2, QTextCursor::KeepAnchor);
+        w.m_text->setTextCursor(c);
+        w.deleteSelection();
+        QCOMPARE(w.m_doc.stamps.size(), 3);
+        QVERIFY(w.m_doc.stamps[2].voided);
+        QTRY_VERIFY(w.m_proofButton->text() != QStringLiteral("✓ 100 %") && w.m_proofButton->text().startsWith(QStringLiteral("✓ ")));
+        w.undo();
+        QVERIFY(!w.m_doc.stamps[2].voided);
+        QTRY_COMPARE(w.m_proofButton->text(), QStringLiteral("✓ 100 %"));
+        // Saved and read back, the stamps are the same.
+        QTemporaryDir dir;
+        const QString path = dir.filePath(QStringLiteral("s.tsf"));
+        QVERIFY(Tsf::write(path, w.m_doc, true));
+        TsfDocument back;
+        QCOMPARE(Tsf::read(path, back), Tsf::ReadError::None);
+        QCOMPARE(Stamps::verify(Recalc::normalized(back.records), back.stamps, back.stampCertificates).status,
+                 Stamps::Report::Status::Confirmed);
     }
 
     void exportTables()

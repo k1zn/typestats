@@ -45,6 +45,7 @@ struct Colors
     QColor speedBack, errorsBack; // live statistics
     QColor series[8];
     QColor held[5][2]; // klavogram keys by the number held at once: [level][one / several]
+    QColor proofOk, proofPartial, proofBad; // the time stamps of the recording (the button of the toolbar)
 };
 const Colors &colors();
 

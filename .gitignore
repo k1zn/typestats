@@ -12,3 +12,4 @@ dist/
 build-static-min/
 build-soft/
 build-static-o2/
+build-static-net/

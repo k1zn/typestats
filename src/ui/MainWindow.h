@@ -31,6 +31,7 @@ class QSplitter;
 class QSystemTrayIcon;
 class QTableWidget;
 class QToolButton;
+class StampRecorder;
 class TextInputWindow;
 class TextView;
 
@@ -128,6 +129,8 @@ private:
 
     // Editing and copying, see re/editing.md.
     void normalizeRecords();
+    void beginEdit(); // before an edit of the records: the copy for "Отменить", the stamps follow the records
+    void endEdit();
     void selectionChanged();
     void deleteSelection();
     void removeNonText();
@@ -142,6 +145,9 @@ private:
     void showTextMenu(const QPoint &globalPos);
     bool saveDocument(bool block); // false: not saved (cancelled or failed)
     bool askToSave(); // on exit: false - stay
+    // The time stamps of the recording (re/stamps.md): the button of the toolbar and its details.
+    void updateProof();
+    void showProof();
 
     void open();
     void openJournal();
@@ -154,6 +160,7 @@ private:
     bool m_unsaved = false; // the records changed since they were opened, saved or cleared
     bool m_opening = false; // a .tsf is being opened: switching recording off adds no releases
     KeyRecords m_undo;     // the records before the last deletion
+    QList<Stamp> m_undoStamps; // and their time stamps
     Editing::ToUnicode m_toUnicode = &KeyboardHook::toUnicode; // the current layout (tests put their own)
     int m_labelRecord = -1; // the record whose label is under the mouse
     QString m_path; // empty: not saved yet
@@ -201,12 +208,15 @@ private:
     QToolButton *m_newPresetButton = nullptr;
     QToolButton *m_helpButton = nullptr;
     QToolButton *m_themeButton = nullptr;
+    QToolButton *m_proofButton = nullptr;
 
     KeyboardHook m_hook;
     QString m_hookError;                     // why the hook does not run; empty when it does (or was not started)
     QString m_hookCommand;                   // the terminal command that fixes it, if any
     QPointer<QDialog> m_hookErrorBox;
     Recorder m_recorder;
+    StampRecorder *m_stamps = nullptr;
+    bool m_proofPending = false;
     JournalWriter m_journal;
     bool m_journalFailed = false; // the journal could not be written: said once
     LiveStatsWindow *m_live = nullptr;

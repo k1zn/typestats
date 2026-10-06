@@ -2,6 +2,7 @@
 
 #include "AboutDialog.h"
 #include "Presets.h"
+#include "StampRecorder.h"
 #include "TextInputWindow.h"
 #include "GraphPanels.h"
 #include "GraphWidget.h"
@@ -131,6 +132,12 @@ MainWindow::MainWindow(QWidget *parent)
     : QWidget(parent), m_schemes(AppPaths::file(QStringLiteral("FingerZones.ini"))), m_journal(AppPaths::dataDir())
 {
     m_doc.platform = currentKeyPlatform(); // a recording made here
+    m_stamps = new StampRecorder(this);
+    m_stamps->attach(&m_doc);
+    connect(m_stamps, &StampRecorder::changed, this, [this] {
+        m_unsaved = true;
+        updateProof();
+    });
     updateTitle();
     setMinimumWidth(220);
 
@@ -386,6 +393,13 @@ QWidget *MainWindow::createToolBar()
     m_themeButton->setCheckable(true);
     m_themeButton->setChecked(Look::isDark());
     connect(m_themeButton, &QToolButton::toggled, this, &MainWindow::setDarkTheme);
+    // Left of it: the time stamps of the recording, when there are any or they are being taken.
+    m_proofButton = new QToolButton(bar);
+    m_proofButton->setFocusPolicy(Qt::NoFocus);
+    m_proofButton->setAutoRaise(true);
+    m_proofButton->setFixedHeight(23);
+    m_proofButton->hide();
+    connect(m_proofButton, &QToolButton::clicked, this, &MainWindow::showProof);
     bar->installEventFilter(this);
     return bar;
 }
@@ -580,6 +594,11 @@ void MainWindow::applySettings()
     m_globalClear = s.value(QStringLiteral("GlobalClear"), true).toBool();
     m_autoComments = s.value(QStringLiteral("AutoComments"), false).toBool();
     m_journalOn = s.value(QStringLiteral("JournalOn"), false).toBool();
+    const bool stamping = s.value(QStringLiteral("StampRecording"), false).toBool();
+    if (stamping != m_stamps->enabled()) {
+        m_stamps->setEnabled(stamping);
+        updateProof();
+    }
     m_mainOptions.resize(MainStats::RowCount);
     for (int i = 0; i < MainStats::RowCount; ++i)
         m_mainOptions[i] = s.value(QStringLiteral("MainOption%1").arg(i), true).toBool();
@@ -641,6 +660,91 @@ bool MainWindow::askToSave()
     if (never->isChecked())
         settings.setValue(QStringLiteral("AskSaveOnExit"), false);
     return answer == QMessageBox::Discard || saveDocument(false);
+}
+
+void MainWindow::updateProof()
+{
+    // Once per turn of the event loop: a stamp, an edit and a document may come together.
+    if (m_proofPending)
+        return;
+    m_proofPending = true;
+    QTimer::singleShot(0, this, [this] {
+        m_proofPending = false;
+        if (m_doc.stamps.isEmpty() && !m_stamps->enabled()) {
+            m_proofButton->hide();
+            return;
+        }
+        const Stamps::Report r = Stamps::verify(Recalc::normalized(m_doc.records), m_doc.stamps, m_doc.stampCertificates);
+        // Short: the corner has room for little; the words are in the hint and the details.
+        QString text, hint;
+        QColor color = Look::colors().dimInk;
+        const qint64 percent = r.records ? qint64(r.confirmed) * 100 / r.records : 0;
+        switch (r.status) {
+        case Stamps::Report::Status::None:
+            text = QStringLiteral("⏱");
+            hint = tr("Запись будет заверена метками времени");
+            break;
+        case Stamps::Report::Status::Confirmed:
+            text = QStringLiteral("✓ 100 %");
+            hint = tr("Запись заверена метками времени");
+            color = Look::colors().proofOk;
+            break;
+        case Stamps::Report::Status::Partial:
+            text = QStringLiteral("✓ %1 %").arg(percent);
+            hint = tr("Время подтверждено для %1 % записей").arg(percent);
+            color = Look::colors().proofPartial;
+            break;
+        case Stamps::Report::Status::Broken:
+            text = QStringLiteral("✗");
+            hint = tr("Метки времени не сходятся с записью");
+            color = Look::colors().proofBad;
+            break;
+        }
+        if (!m_stamps->lastError().isEmpty()) {
+            text += QStringLiteral(" !");
+            hint += u'\n' + tr("Метку времени получить не удалось: %1").arg(m_stamps->lastError());
+        }
+        m_proofButton->setText(text);
+        m_proofButton->setStyleSheet(QStringLiteral("QToolButton { color: %1; font-weight: bold; }").arg(color.name()));
+        m_proofButton->setToolTip(hint + u'\n' + tr("Подробнее — по щелчку"));
+        m_proofButton->adjustSize();
+        m_proofButton->move(m_themeButton->x() - m_proofButton->width() - 4, 4);
+        m_proofButton->show();
+    });
+}
+
+void MainWindow::showProof()
+{
+    const Stamps::Report r = Stamps::verify(Recalc::normalized(m_doc.records), m_doc.stamps, m_doc.stampCertificates);
+    const QLocale loc;
+    const auto percent = [&](int part) { return r.records ? qint64(part) * 100 / r.records : 0; };
+    QStringList lines;
+    if (r.stamps == 0) {
+        lines << tr("Меток времени пока нет: они ставятся во время набора.");
+    } else {
+        lines << tr("Меток времени: %1 (%2)").arg(r.stamps).arg(r.authorities.join(QStringLiteral(", ")));
+        if (r.firstMs)
+            lines << tr("Набрано: %1 — %2")
+                         .arg(loc.toString(QDateTime::fromMSecsSinceEpoch(r.firstMs), QLocale::ShortFormat),
+                              loc.toString(QDateTime::fromMSecsSinceEpoch(r.lastMs).time(), QLocale::ShortFormat));
+        lines << tr("Записей: %1, под метками: %2").arg(r.records).arg(r.stamped);
+        lines << tr("Время подтверждено: %1 (%2 %), расхождение до %3 с")
+                     .arg(r.confirmed)
+                     .arg(percent(r.confirmed))
+                     .arg(loc.toString(r.driftMs / 1000.0, 'f', 1));
+        if (r.voided)
+            lines << tr("Изменено после записи: участков — %1").arg(r.voided);
+        if (r.bad)
+            lines << tr("Не сходятся с записью или подписью: меток — %1").arg(r.bad);
+    }
+    lines << tr("Искусственных нажатий (от программ): %1").arg(r.injected);
+    if (!m_stamps->lastError().isEmpty())
+        lines << QString() << tr("Последняя ошибка: %1").arg(m_stamps->lastError());
+    QMessageBox box(QMessageBox::Information, appTitle(), lines.join(u'\n'), QMessageBox::Ok, this);
+    box.setInformativeText(
+        tr("Метки ставят службы времени DigiCert, Sectigo и GlobalSign: они подтверждают, что записи были набраны в "
+           "это время и потом не менялись. Наружу уходят только хэши, не нажатия. Включается в настройках."));
+    box.exec();
 }
 
 void MainWindow::changeEvent(QEvent *e)
@@ -755,6 +859,8 @@ void MainWindow::captureToggled(bool on)
         m_unsaved = true;
         recalculate();
     }
+    if (!m_opening)
+        m_stamps->captureChanged(on);
     m_text->setFocus();
 }
 
@@ -861,6 +967,26 @@ void MainWindow::normalizeRecords()
     // Editing works on the records the text was built from (the original normalizes them in place).
     m_doc.records = m_model.records;
     keepRoomForRecording();
+    m_stamps->attach(&m_doc); // the same normalized records, the chain built anew
+}
+
+void MainWindow::beginEdit()
+{
+    normalizeRecords();
+    for (int i = 0; i < m_doc.records.size(); ++i)
+        m_doc.records[i].tag = quint32(i + 1);
+    m_undo = m_doc.records;
+    m_undoStamps = m_doc.stamps;
+}
+
+void MainWindow::endEdit()
+{
+    // The stamps follow their records; those whose records changed are voided (re/stamps.md).
+    Stamps::follow(m_doc.stamps, m_doc.records);
+    m_stamps->attach(&m_doc);
+    m_unsaved = true;
+    recalculate();
+    updateProof();
 }
 
 void MainWindow::keepRoomForRecording()
@@ -886,21 +1012,17 @@ void MainWindow::deleteSelection()
     const auto [from, to] = Editing::recordRange(m_model, m_text->selectionStart(), m_text->selectionLength());
     if (to == 0)
         return;
-    normalizeRecords();
-    m_undo = m_doc.records;
+    beginEdit();
     Editing::deleteRange(m_doc.records, from, to);
-    m_unsaved = true;
-    recalculate();
+    endEdit();
 }
 
 void MainWindow::removeNonText()
 {
     const auto [b, e] = Stats::range(m_model, m_text->selectionStart(), m_text->selectionLength(), m_byPauses->isChecked());
-    normalizeRecords();
-    m_undo = m_doc.records;
+    beginEdit();
     Editing::removeNonText(m_doc.records, m_model.recordOfElement(b), m_model.recordOfElement(e));
-    m_unsaved = true;
-    recalculate();
+    endEdit();
 }
 
 void MainWindow::convertLayout()
@@ -909,12 +1031,10 @@ void MainWindow::convertLayout()
     const auto [from, to] = Editing::recordRange(m_model, m_text->selectionStart(), m_text->selectionLength());
     if (to == 0)
         return;
-    normalizeRecords();
-    m_undo = m_doc.records; // the original's record range keeps the copy for "Отменить"
+    beginEdit(); // the original's record range keeps the copy for "Отменить"
     Editing::convertLayout(m_doc.records, from, to, m_toUnicode, KeyboardHook::capsLock());
-    m_unsaved = true;
     KeyboardHook::clearDeadKey();
-    recalculate();
+    endEdit();
 }
 
 void MainWindow::undo()
@@ -924,9 +1044,12 @@ void MainWindow::undo()
         return;
     normalizeRecords();
     m_doc.records.swap(m_undo);
+    m_doc.stamps.swap(m_undoStamps);
     m_unsaved = true;
     keepRoomForRecording();
+    m_stamps->attach(&m_doc);
     recalculate();
+    updateProof();
 }
 
 void MainWindow::editLabel(int record)
@@ -1099,6 +1222,7 @@ void MainWindow::keyEvent(const HookEvent &e)
         m_liveTicks = 10; // shown at the next tick
     if (out.recorded) {
         m_unsaved = true;
+        m_stamps->recordsAdded();
         if (m_journalOn && !m_journal.append(m_doc.records.last()) && !m_journalFailed) {
             m_journalFailed = true; // said once
             auto *box = new QMessageBox(QMessageBox::Warning, appTitle(),
@@ -1155,8 +1279,10 @@ void MainWindow::showEvent(QShowEvent *e)
 
 bool MainWindow::eventFilter(QObject *o, QEvent *e)
 {
-    if (m_themeButton && o == m_themeButton->parentWidget() && e->type() == QEvent::Resize)
+    if (m_themeButton && o == m_themeButton->parentWidget() && e->type() == QEvent::Resize) {
         m_themeButton->move(m_themeButton->parentWidget()->width() - m_themeButton->width() - 6, 4);
+        m_proofButton->move(m_themeButton->x() - m_proofButton->width() - 4, 4);
+    }
     // The wheel over the graph moves its scroll bar by a small step.
     if (o == m_graph && e->type() == QEvent::Wheel) {
         const int delta = static_cast<QWheelEvent *>(e)->angleDelta().y();
@@ -1553,11 +1679,14 @@ void MainWindow::setDocument(const TsfDocument &doc, const QString &title, bool 
 {
     m_doc = doc;
     m_unsaved = false;
+    m_undoStamps.clear();
     keepRoomForRecording();
+    m_stamps->attach(&m_doc);
     setTitle(title);
     m_damaged->setVisible(damaged);
     m_damaged->raise();
     recalculate();
+    updateProof();
 }
 
 bool MainWindow::openFile(const QString &path)
@@ -1660,6 +1789,10 @@ bool MainWindow::saveDocument(bool block)
         const auto [from, to] = Editing::recordRange(m_model, m_text->selectionStart(), m_text->selectionLength());
         doc.records = to == 0 ? m_model.records : m_model.records.mid(from, to - from);
         doc.attachedVideo.clear();
+        if (to != 0) { // a part: the stamps cover the whole recording
+            doc.stamps.clear();
+            doc.stampCertificates.clear();
+        }
     }
     // The finger layout goes into the file unless it is the built-in one.
     doc.fingerZonesName.clear();

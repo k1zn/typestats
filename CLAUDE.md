@@ -17,6 +17,11 @@ n-граммы и слова, зоны пальцев, оперативная с
   кнопки 20/21 на месте и всегда выключены; поля `AttachedVideo`/`VideoTimeShift` `.tsf` читаются и пишутся как есть;
 - сознательно выкидываем: «Запускать Ts на одном ядре». Регистрацию `.tsf` (оригинал писал её в реестр сам) порт
   делает по согласию: при первом запуске спрашивает один раз (`platform/FileAssociation`, все три ОС).
+- **метки времени записи** (2026-10-06, своё, `re/stamps.md`): подпись оригинала — MD5 с открытой «солью», её
+  пересчитает любой; по желанию (настройка `StampRecording`, выкл.) во время набора хэши нормализованных записей
+  уходят службам RFC 3161 (DigiCert, Sectigo, GlobalSign), метки — в строки `Stamp<i>`/`StampCert<i>` `.tsf`.
+  Доказывают «набрано в реальном времени и не правилось», но не «набирал человек» (изменённая программа, аппаратный
+  бот). Кнопка состояния — слева от кнопки темы; `tsstat --verify`.
 
 `TypeStats.exe` в корне — оригинал. Не трогать. В git его нет (2026-10-05 убран из всей истории `filter-branch`, локально —
 `.git/info/exclude`; старая история — локальная ветка `backup/with-original`, не пушить): нужен только стенду и Ghidra.
@@ -73,16 +78,18 @@ windeployqt --release --no-translations --no-opengl-sw --no-system-d3d-compiler 
 `Qt6Svg.dll`, `Qt6Network.dll` (были нужны QtMultimedia). С видео было ~54 МБ, zip ~24 МБ; без него не перемерено.
 Проверено запуском с `PATH` без Qt/MinGW.
 
-**Один exe** (`dist/TypingStatistics-single.exe`, ~16 МБ): статический qtbase 6.8.3 собран из исходников
-(`C:\Users\kizn\Qt\src`, сборка `C:\Users\kizn\Qt\sb2`, установка `6.8.3\mingw_64_static_min`). Конфигурация qtbase:
+**Один exe** (`dist/TypingStatistics-single.exe`, ~17 МБ): статический qtbase 6.8.3 собран из исходников
+(`C:\Users\kizn\Qt\src`; установка `6.8.3\mingw_64_static_net` — `ci/windows/static-qt.sh`, с network для меток
+времени; прежняя `mingw_64_static_min` — без network). Конфигурация qtbase:
 `-DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Release -DFEATURE_optimize_size=ON -DFEATURE_static_runtime=ON`, выключены
-`opengl dynamicgl dbus sql network printsupport concurrent xml jpeg gif freetype textodfwriter textmarkdownreader
+`opengl dynamicgl dbus sql printsupport concurrent xml jpeg gif freetype textodfwriter textmarkdownreader
 textmarkdownwriter pdf vulkan colordialog fontdialog wizard mdiarea calendarwidget dockwidget undoview columnview
-fontcombobox` (`-DFEATURE_x=OFF`). Грабли: без `dynamicgl=OFF` при `opengl=OFF` не собирается плагин windows;
+fontcombobox ssl openssl schannel dtls ocsp libproxy brotli zstd networklistmanager networkdiskcache localserver
+udpsocket sctp` (`-DFEATURE_x=OFF`; network остаётся, без TLS — службы меток по HTTP). Грабли: без `dynamicgl=OFF` при `opengl=OFF` не собирается плагин windows;
 `graphicsview` нужен стилю windows11; LTO невозможно (slim-LTO не дружит с `-Wa,-mbig-obj`, а без него GCC 13.1 падает
 с ICE). Программа (PATH — только MinGW/CMake/Ninja, без динамического Qt):
 ```bash
-cmake -S . -B build-static-o2 -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=C:/Users/kizn/Qt/6.8.3/mingw_64_static_min -DTS_LRELEASE=C:/Users/kizn/Qt/6.8.3/mingw_64/bin/lrelease.exe "-DCMAKE_CXX_FLAGS=-ffunction-sections -fdata-sections" "-DCMAKE_C_FLAGS=-ffunction-sections -fdata-sections" "-DCMAKE_EXE_LINKER_FLAGS=-s -Wl,--gc-sections"
+cmake -S . -B build-static-o2 -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=C:/Users/kizn/Qt/6.8.3/mingw_64_static_net -DTS_LRELEASE=C:/Users/kizn/Qt/6.8.3/mingw_64/bin/lrelease.exe "-DCMAKE_CXX_FLAGS=-ffunction-sections -fdata-sections" "-DCMAKE_C_FLAGS=-ffunction-sections -fdata-sections" "-DCMAKE_EXE_LINKER_FLAGS=-s -Wl,--gc-sections"
 cmake --build build-static-o2 --target TypingStatistics
 ```
 CI собирает так же (`ci/windows/static-qt.sh` — та же конфигурация qtbase плюс явные `FEATURE_system_*=OFF`).
@@ -138,13 +145,18 @@ src/core/      только QtCore, тестируемо
                       labelStart/markRange/removeLabel, copyText, copyTagged, convertLayout — ГОТОВО, тесты на синтетике
   NumberFormat.*      formatFixed(v, decimals, loc): округление половинок от нуля, как FloatToStrF оригинала
                       (QLocale округляет к чётному), NaN/Inf как FloatToStrF — используется всеми списками
+  Der.*, Rsa.*        разбор/запись DER; проверка подписи RSA PKCS#1 v1.5 (Монтгомери) — для меток времени
+  TimeStamp.*         RFC 3161: запрос, ответ, проверка токена (CMS SignedData, цепочка до корней `StampRoots.inc`)
+  Stamps.*            метки записи (`re/stamps.md`): `Chain` (хэши нормализованного потока), `verify` → Report
+                      (годные/плохие/аннулированные, время подтверждено полосами offset), `follow` после правки
+                      (`KeyRecord::tag`); `Recalc::Normalizer` — потоковая нормализация
   Ext80.h             80-битная x87-арифметика: `Ext` = `long double` там, где он x87 (GCC/Clang на x86), иначе
                       программный `Ext80` (arm64, MSVC); `kExtMilli` = 0.001L, `extFloor`/`extFabs`. Всё ядро и окна
                       считают «как оригинал» через `Ext`
 src/cli/tsstat.cpp  консольная утилита: `tsstat [--split MS] [--only-text] [--by-pauses] [--sel S L] [--text|--runs] f.tsf`
                     печатает «Параметр\tЗначение» как ListView2 (для дифф-стенда);
                     `--extra KIND [--avg] [--sort N] [--desc] [--pattern P] [--only S] [--any S] [--exclude S]` — список Form3;
-                    `--to-journal out.tsj f.tsf` — записи файла журналом
+                    `--to-journal out.tsj f.tsf` — записи файла журналом; `--verify f.tsf` — метки времени
 src/platform/       библиотека `tsplatform`. `KeyboardHook.h`: сигналы `key(HookEvent{timeUs, flags, ch, chars, firstCh,
                     window, ownWindow})` в потоке GUI, `failed(причина)`, `started()`; статические `toUnicode`/`clearDeadKey`/
                     `capsLock` (преобразование раскладки), `layoutKeyName` (Tkbd), `foregroundWindow()/foregroundTitle()/
@@ -223,6 +235,9 @@ src/ui/
                       однократный перенос реестра оригинала (флаг `RegistryImported`, вызывается из main)
   TextInputWindow.*   Form9 «Ввод текста» (F4; Esc — скрыть, F2 — очистить); набор в нём записывается
   AboutDialog.*       Form7 «О программе» (меню кнопки «Справка»)
+  StampRecorder.*     метки времени во время записи: когда брать, отправка (QtNetwork; `setSend` — подмена в
+                      тестах), приём в документ; MainWindow: `beginEdit`/`endEdit` (метки следуют правке),
+                      `updateProof`/`showProof` (кнопка слева от кнопки темы и окно подробностей)
   TextView.*          Memo4: QTextEdit, Arial 16 px, стили TextRun (красный/синий/зелёный/подчёркивание), `setModel`
                       вставляет текст кусками с форматом (не `setPlainText` + `mergeCharFormat`: медленно и берёт формат
                       под курсором), `setVisibleRange` — жёлтая подсветка участка, видимого на клавограмме;
@@ -258,6 +273,9 @@ tests/tst_orig.cpp  ядро против записанного вывода о
                     выделения, ListView1 — 4 файла × 5 наборов опций; серии графиков — 824; Form3 (ключ `extra`) и
                     Form4 (ключ `hist`) — 824 и обыка (обыка — при «Только текст» = 1 и = 0).
                     Сверка float — побитная на всех платформах (через `Ext`)
+tests/tst_stamps.cpp ядро меток времени на `tests/golden/stamps/*.tsf` (настоящие метки служб, сняты
+                    `re/scripts/make_stamped.py` — своя реализация хэша на Python); `tst_ui::stampLive` — настоящие
+                    службы через сетевой код программы, только с `TS_STAMP_LIVE=1`
 tests/tst_platform.cpp  все ОС: таблицы кодов (scan↔VK, evdev, Mac), разбор ответов sway/Hyprland/GNOME/KDE, i3-IPC
 tests/tst_evdev.cpp только Linux: XkbKeyboard (символы, флаги, группы, мёртвые клавиши, golden-записи через перевод),
                     EvdevReader на FIFO с поддельным sysfs

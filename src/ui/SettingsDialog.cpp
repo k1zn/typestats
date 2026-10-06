@@ -48,7 +48,7 @@ QLineEdit *speedEdit(QWidget *parent, int y, const char *key, int byDefault)
 SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent)
 {
     setWindowTitle(tr("Настройки"));
-    setFixedSize(589, 317);
+    setFixedSize(589, 333); // the original's 317, and a row for the time stamps
 
     auto *fonts = new QGroupBox(tr("Размер шрифта"), this);
     fonts->setGeometry(0, 0, 129, 65);
@@ -84,6 +84,10 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent)
     m_journal = checkBox(this, tr("Вести журнал"), 8, 232, "JournalOn", false);
     m_autoComments = checkBox(this, tr("Автокомментарии"), 8, 248, "AutoComments", false);
     m_autoMinimize = checkBox(this, tr("Сворачивать при старте"), 8, 264, "AutoMinimize", false);
+    // The port's own (re/stamps.md): only hashes go to the authorities.
+    m_stamp = checkBox(this, tr("Заверять запись метками времени (нужен интернет)"), 8, 280, "StampRecording", false);
+    m_stamp->setToolTip(tr("Во время набора хэши записей (не сами нажатия) отправляются службам времени DigiCert, "
+                           "Sectigo и GlobalSign; их метки подтверждают, что запись набрана в это время и не менялась"));
 
     (new QLabel(tr("Основная статистика"), this))->move(304, 0);
     m_mainStats = new QListWidget(this);
@@ -108,10 +112,10 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent)
     m_language->setCurrentText(m_openedLanguage);
 
     auto *ok = new QPushButton(tr("Ok"), this);
-    ok->setGeometry(8, 288, 81, 25);
+    ok->setGeometry(8, 304, 81, 25);
     ok->setDefault(true);
     auto *cancel = new QPushButton(tr("Отмена"), this);
-    cancel->setGeometry(96, 288, 83, 25);
+    cancel->setGeometry(96, 304, 83, 25);
     connect(ok, &QPushButton::clicked, this, &QDialog::accept);
     connect(cancel, &QPushButton::clicked, this, &QDialog::reject);
 }
@@ -145,6 +149,7 @@ void SettingsDialog::save() const
     s.setValue(QStringLiteral("AutoComments"), m_autoComments->isChecked());
     s.setValue(QStringLiteral("AutoMinimize"), m_autoMinimize->isChecked());
     s.setValue(QStringLiteral("AskSaveOnExit"), m_askSave->isChecked());
+    s.setValue(QStringLiteral("StampRecording"), m_stamp->isChecked());
     if (languageChanged())
         s.setValue(QStringLiteral("Language"), m_language->currentText());
 }

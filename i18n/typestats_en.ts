@@ -801,6 +801,70 @@ Copy the command, paste it into a terminal and enter your password. This is need
         <source>Больше не спрашивать</source>
         <translation>Do not ask again</translation>
     </message>
+    <message>
+        <source>Метку времени получить не удалось: %1</source>
+        <translation>Could not get a time stamp: %1</translation>
+    </message>
+    <message>
+        <source>Меток времени пока нет: они ставятся во время набора.</source>
+        <translation>No time stamps yet: they are taken while typing.</translation>
+    </message>
+    <message>
+        <source>Меток времени: %1 (%2)</source>
+        <translation>Time stamps: %1 (%2)</translation>
+    </message>
+    <message>
+        <source>Набрано: %1 — %2</source>
+        <translation>Typed: %1 to %2</translation>
+    </message>
+    <message>
+        <source>Записей: %1, под метками: %2</source>
+        <translation>Records: %1, under stamps: %2</translation>
+    </message>
+    <message>
+        <source>Время подтверждено: %1 (%2 %), расхождение до %3 с</source>
+        <translation>Time confirmed: %1 (%2 %), spread up to %3 s</translation>
+    </message>
+    <message>
+        <source>Изменено после записи: участков — %1</source>
+        <translation>Changed after recording: %1 parts</translation>
+    </message>
+    <message>
+        <source>Не сходятся с записью или подписью: меток — %1</source>
+        <translation>Stamps that do not match the records or their signature: %1</translation>
+    </message>
+    <message>
+        <source>Искусственных нажатий (от программ): %1</source>
+        <translation>Synthetic keystrokes (sent by programs): %1</translation>
+    </message>
+    <message>
+        <source>Последняя ошибка: %1</source>
+        <translation>Last error: %1</translation>
+    </message>
+    <message>
+        <source>Метки ставят службы времени DigiCert, Sectigo и GlobalSign: они подтверждают, что записи были набраны в это время и потом не менялись. Наружу уходят только хэши, не нажатия. Включается в настройках.</source>
+        <translation>The stamps come from the time stamping services of DigiCert, Sectigo and GlobalSign: they confirm that the records were typed at that time and not changed afterwards. Only hashes leave the computer, not the keystrokes. Turned on in the settings.</translation>
+    </message>
+    <message>
+        <source>Запись будет заверена метками времени</source>
+        <translation>The recording will be time-stamped</translation>
+    </message>
+    <message>
+        <source>Запись заверена метками времени</source>
+        <translation>The recording is time-stamped</translation>
+    </message>
+    <message>
+        <source>Время подтверждено для %1 % записей</source>
+        <translation>Time confirmed for %1 % of the records</translation>
+    </message>
+    <message>
+        <source>Метки времени не сходятся с записью</source>
+        <translation>The time stamps do not match the recording</translation>
+    </message>
+    <message>
+        <source>Подробнее — по щелчку</source>
+        <translation>Click for details</translation>
+    </message>
 </context>
 <context>
     <name>SettingsDialog</name>
@@ -903,6 +967,21 @@ Copy the command, paste it into a terminal and enter your password. This is need
     <message>
         <source>Спрашивать о сохранении при выходе</source>
         <translation>Ask to save on exit</translation>
+    </message>
+    <message>
+        <source>Заверять запись метками времени (нужен интернет)</source>
+        <translation>Time-stamp the recording (needs the Internet)</translation>
+    </message>
+    <message>
+        <source>Во время набора хэши записей (не сами нажатия) отправляются службам времени DigiCert, Sectigo и GlobalSign; их метки подтверждают, что запись набрана в это время и не менялась</source>
+        <translation>While typing, hashes of the records (not the keystrokes) go to the time stamping services of DigiCert, Sectigo and GlobalSign; their stamps confirm that the recording was typed at that time and not changed</translation>
+    </message>
+</context>
+<context>
+    <name>StampRecorder</name>
+    <message>
+        <source>ответ не к этому запросу</source>
+        <translation>the answer is not to this request</translation>
     </message>
 </context>
 <context>

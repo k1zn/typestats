@@ -30,11 +30,14 @@ public:
     // A raw record of the document; true if the normalization keeps it.
     bool push(const KeyRecord &raw);
     int size() const { return int(m_encoded.size() / 12); }
+    // Time of a record since the first one, by the records' dt.
+    qint64 timeUs(int i) const { return m_timeUs[i]; }
     QByteArray hash(QByteArrayView previousImprint, int from, int to, quint32 delayMs) const;
 
 private:
     Recalc::Normalizer m_normalizer;
     QByteArray m_encoded;
+    QVector<qint64> m_timeUs;
 };
 
 struct Report
