@@ -230,7 +230,7 @@ private slots:
     void mimeDefinition()
     {
         QFile f(QStringLiteral(TS_GOLDEN_DIR "/../../resources/linux/org.typingstatistics.TypingStatistics.xml"));
-        QVERIFY(f.open(QIODevice::ReadOnly));
+        QVERIFY(f.open(QIODevice::ReadOnly | QIODevice::Text)); // a Windows checkout has CRLF
         QCOMPARE(QString::fromUtf8(f.readAll()), FileAssociation::mimeDefinition());
     }
 
