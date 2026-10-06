@@ -842,10 +842,6 @@ Copy the command, paste it into a terminal and enter your password. This is need
         <translation>Last error: %1</translation>
     </message>
     <message>
-        <source>Метки ставят службы времени DigiCert, Sectigo и GlobalSign: они подтверждают, что записи были набраны в это время и потом не менялись. Наружу уходят только хэши, не нажатия. Включается в настройках.</source>
-        <translation>The stamps come from the time stamping services of DigiCert, Sectigo and GlobalSign: they confirm that the records were typed at that time and not changed afterwards. Only hashes leave the computer, not the keystrokes. Turned on in the settings.</translation>
-    </message>
-    <message>
         <source>Запись будет заверена метками времени</source>
         <translation>The recording will be time-stamped</translation>
     </message>
@@ -864,6 +860,14 @@ Copy the command, paste it into a terminal and enter your password. This is need
     <message>
         <source>Подробнее — по щелчку</source>
         <translation>Click for details</translation>
+    </message>
+    <message>
+        <source>Метки</source>
+        <translation>Stamps</translation>
+    </message>
+    <message>
+        <source>Метки ставят службы времени DigiCert, Sectigo и GlobalSign: они подтверждают, что записи были набраны в это время и не менялись позже. Наружу уходят только хэши, без вашего набранного текста. Включается в настройках.</source>
+        <translation>The stamps come from the time stamping services of DigiCert, Sectigo and GlobalSign: they confirm that the records were typed at that time and not changed later. Only hashes leave the computer, without the text you typed. Turned on in the settings.</translation>
     </message>
 </context>
 <context>
@@ -973,8 +977,8 @@ Copy the command, paste it into a terminal and enter your password. This is need
         <translation>Time-stamp the recording (needs the Internet)</translation>
     </message>
     <message>
-        <source>Во время набора хэши записей (не сами нажатия) отправляются службам времени DigiCert, Sectigo и GlobalSign; их метки подтверждают, что запись набрана в это время и не менялась</source>
-        <translation>While typing, hashes of the records (not the keystrokes) go to the time stamping services of DigiCert, Sectigo and GlobalSign; their stamps confirm that the recording was typed at that time and not changed</translation>
+        <source>Метки ставят службы времени DigiCert, Sectigo и GlobalSign: они подтверждают, что записи были набраны в это время и не менялись позже. Наружу уходят только хэши, без вашего набранного текста.</source>
+        <translation>The stamps come from the time stamping services of DigiCert, Sectigo and GlobalSign: they confirm that the records were typed at that time and not changed later. Only hashes leave the computer, without the text you typed.</translation>
     </message>
 </context>
 <context>

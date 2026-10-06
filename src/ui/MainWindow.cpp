@@ -681,7 +681,7 @@ void MainWindow::updateProof()
         const qint64 percent = r.records ? qint64(r.confirmed) * 100 / r.records : 0;
         switch (r.status) {
         case Stamps::Report::Status::None:
-            text = QStringLiteral("⏱");
+            text = tr("Метки");
             hint = tr("Запись будет заверена метками времени");
             break;
         case Stamps::Report::Status::Confirmed:
@@ -743,7 +743,8 @@ void MainWindow::showProof()
     QMessageBox box(QMessageBox::Information, appTitle(), lines.join(u'\n'), QMessageBox::Ok, this);
     box.setInformativeText(
         tr("Метки ставят службы времени DigiCert, Sectigo и GlobalSign: они подтверждают, что записи были набраны в "
-           "это время и потом не менялись. Наружу уходят только хэши, не нажатия. Включается в настройках."));
+           "это время и не менялись позже. Наружу уходят только хэши, без вашего набранного текста. Включается в "
+           "настройках."));
     box.exec();
 }
 

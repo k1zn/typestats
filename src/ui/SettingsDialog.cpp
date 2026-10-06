@@ -86,8 +86,9 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent)
     m_autoMinimize = checkBox(this, tr("Сворачивать при старте"), 8, 264, "AutoMinimize", false);
     // The port's own (re/stamps.md): only hashes go to the authorities.
     m_stamp = checkBox(this, tr("Заверять запись метками времени (нужен интернет)"), 8, 280, "StampRecording", false);
-    m_stamp->setToolTip(tr("Во время набора хэши записей (не сами нажатия) отправляются службам времени DigiCert, "
-                           "Sectigo и GlobalSign; их метки подтверждают, что запись набрана в это время и не менялась"));
+    m_stamp->setToolTip(tr("Метки ставят службы времени DigiCert, Sectigo и GlobalSign: они подтверждают, что записи "
+                           "были набраны в это время и не менялись позже. Наружу уходят только хэши, без вашего "
+                           "набранного текста."));
 
     (new QLabel(tr("Основная статистика"), this))->move(304, 0);
     m_mainStats = new QListWidget(this);
