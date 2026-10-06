@@ -11,3 +11,4 @@ build-release/
 dist/
 build-static-min/
 build-soft/
+build-static-o2/
