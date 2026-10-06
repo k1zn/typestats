@@ -2,6 +2,7 @@
 // recording, editing, copying, the graph and its link with the klavogram.
 
 #include "core/Editing.h"
+#include "core/KeyList.h"
 #include "ui/AppPaths.h"
 #include "ui/ExtraStatsWindow.h"
 #include "ui/FingerZonesDialog.h"
@@ -771,6 +772,23 @@ private slots:
         QVERIFY(!keys.rows.first().at(1).isValid()); // the first press has no pause
         QVERIFY(keys.rows.at(1).at(1).toDouble() > 1.0);
         QVERIFY(keys.rows.at(1).at(2).toDouble() > 1.0);
+        // Exactly the numbers the list shows (in the locale of the list).
+        for (const QLocale &loc : {QLocale(), QLocale(QLocale::Russian), QLocale(QLocale::English)}) {
+            const auto shown = KeyList::rows(w.m_model.klav, loc, -std::numeric_limits<double>::infinity(),
+                                             std::numeric_limits<double>::infinity(), -1, 3, w.m_model.keyNames);
+            QCOMPARE(shown.size(), keys.rows.size());
+            for (int i = 0; i < shown.size(); ++i) {
+                QCOMPARE(keys.rows[i].at(0).toString(), shown[i].key);
+                for (const auto &[cell, text] : {std::pair{keys.rows[i].at(1), shown[i].pause},
+                                                 std::pair{keys.rows[i].at(2), shown[i].duration}}) {
+                    bool ok = false;
+                    const double v = loc.toDouble(text, &ok);
+                    QCOMPARE(cell.isValid(), ok);
+                    if (ok)
+                        QCOMPARE(cell.toDouble(), v);
+                }
+            }
+        }
 
         const QString xlsx = m_settings.filePath(QStringLiteral("keys.xlsx"));
         QVERIFY(TableExport::write(xlsx, keys, true, QLocale(QLocale::Russian)));

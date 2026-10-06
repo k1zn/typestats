@@ -303,14 +303,20 @@ QString formatSpeed(float speed, const QLocale &loc)
     return formatFixed(speed, 2, loc);
 }
 
+QString formatSpeed(float speed, QStringView point)
+{
+    return formatFixed(speed, 2, point);
+}
+
 QString toText(const QVector<Row> &rows, bool averages, const QLocale &loc, const QStringList &captions)
 {
     QString out = captions.value(0) + QLatin1Char('\t') + captions.value(1);
     if (averages)
         out += QLatin1Char('\t') + captions.value(2);
     out += QLatin1String("\r\n");
+    const QString point = loc.decimalPoint();
     for (const Row &r : rows) {
-        out += r.text + QLatin1Char('\t') + formatSpeed(r.speed, loc);
+        out += r.text + QLatin1Char('\t') + formatSpeed(r.speed, point);
         if (averages)
             out += QLatin1Char('\t') + QString::number(r.value);
         out += QLatin1String("\r\n");

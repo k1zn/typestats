@@ -8,6 +8,11 @@
 
 QString formatFixed(double v, int decimals, const QLocale &loc)
 {
+    return formatFixed(v, decimals, decimals > 0 ? loc.decimalPoint() : QString());
+}
+
+QString formatFixed(double v, int decimals, QStringView point)
+{
     if (!std::isfinite(v)) // as FloatToStrF writes them
         return std::isnan(v) ? QStringLiteral("NAN") : v < 0 ? QStringLiteral("-INF") : QStringLiteral("INF");
     static const std::array<Ext, 19> powers = [] {
@@ -21,12 +26,11 @@ QString formatFixed(double v, int decimals, const QLocale &loc)
     // The rounding of the original: |v|·10^decimals + 0.5 in 80-bit precision, then the integer part.
     const Ext scaled = extFloor(extFabs(Ext(v)) * powers[decimals] + Ext(0.5));
     const bool minus = v < 0 && scaled != Ext(0);
-    const QString point = decimals > 0 ? loc.decimalPoint() : QString();
 
     if (scaled >= Ext(18446744073709551616.0)) { // 2^64: an integer double, or close to it
         QString s = QString::number(std::fabs(v), 'f', decimals);
         if (decimals > 0)
-            s.replace(QLatin1Char('.'), point);
+            s.replace(QLatin1Char('.'), point.toString());
         return minus ? u'-' + s : s;
     }
     std::uint64_t scale = 1;
@@ -36,8 +40,10 @@ QString formatFixed(double v, int decimals, const QLocale &loc)
     std::uint64_t whole = n / scale, frac = n % scale;
     if (point.size() > 4) {
         QString s = QString::number(whole);
-        if (decimals > 0)
-            s += point + QString::number(frac).rightJustified(decimals, u'0');
+        if (decimals > 0) {
+            s += point;
+            s += QString::number(frac).rightJustified(decimals, u'0');
+        }
         return minus ? u'-' + s : s;
     }
 

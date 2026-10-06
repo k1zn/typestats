@@ -75,6 +75,7 @@ struct Sort
 
 // Two decimals, halves rounded away from zero (FloatToStrF ffFixed of the original).
 QString formatSpeed(float speed, const QLocale &loc);
+QString formatSpeed(float speed, QStringView point);
 
 // "Сохранить": header and rows as tab-separated text, in list order. The captions of the header are the
 // text, the speed and the count (the window gives translated ones).

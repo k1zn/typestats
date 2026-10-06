@@ -428,7 +428,7 @@ void GraphWidget::drawGrid(QPainter &p, const QRect &g, int stripFont)
     const int cy = fm.height() / 2;
     QPen dotted(kGrid, 1);
     dotted.setDashPattern({3, 3}); // PS_DOT of GDI
-    const QLocale loc;
+    const QString point = QLocale().decimalPoint(); // once per frame: for the system locale it is a call to the OS
 
     // Vertical lines at the spaces of the text.
     if (stripFont > 0 && m_model) {
@@ -483,7 +483,7 @@ void GraphWidget::drawGrid(QPainter &p, const QRect &g, int stripFont)
         p.setClipRect(QRect(-m_axisWidth + 1, 0, m_axisWidth - 2, height()));
         for (int idx = 0; idx < 3; ++idx) {
             const Scale &s = m_scale[axis[idx]];
-            const QString label = formatFixed(double(a) / s.scale + s.offset, decimals[idx], loc);
+            const QString label = formatFixed(double(a) / s.scale + s.offset, decimals[idx], point);
             const int y = int(float(h) - py - float((3 - 2 * idx) * cy));
             p.setPen(seriesColor(axis[idx]));
             p.drawText(-fm.horizontalAdvance(label) - 3, y + fm.ascent(), label);

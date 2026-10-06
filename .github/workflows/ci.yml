@@ -106,7 +106,7 @@ jobs:
         run: |
           python3 re/scripts/gen_big.py "$RUNNER_TEMP/tsperf" --sizes 500000
           cmake --build build --target tst_perf
-          TS_PERF_DIR="$RUNNER_TEMP/tsperf" TS_PERF_SIZES=500000 QT_QPA_PLATFORM=offscreen ./build/tst_perf core window > /dev/null || true
+          TS_PERF_DIR="$RUNNER_TEMP/tsperf" TS_PERF_SIZES=500000 QT_QPA_PLATFORM=offscreen ./build/tst_perf core window numbers > /dev/null || true
           cat "$RUNNER_TEMP/tsperf/perf.txt"
       - name: AppImage
         if: matrix.package
@@ -149,7 +149,7 @@ jobs:
         run: |
           python3 re/scripts/gen_big.py "$RUNNER_TEMP/tsperf" --sizes 500000
           cmake --build build --target tst_perf
-          TS_PERF_DIR="$RUNNER_TEMP/tsperf" TS_PERF_SIZES=500000 QT_QPA_PLATFORM=offscreen ./build/tst_perf core window convertLayout macPath > /dev/null || true
+          TS_PERF_DIR="$RUNNER_TEMP/tsperf" TS_PERF_SIZES=500000 QT_QPA_PLATFORM=offscreen ./build/tst_perf core window convertLayout macPath numbers > /dev/null || true
           cat "$RUNNER_TEMP/tsperf/perf.txt"
       - name: Package
         run: |
@@ -157,8 +157,13 @@ jobs:
           # Ad-hoc signature (arm64 runs only signed code). Not notarized: the first start is
           # "Open" from the context menu, or `xattr -dr com.apple.quarantine`.
           codesign --force --deep --sign - build/TypingStatistics.app
-          hdiutil create -volname "Typing statistics" -srcfolder build/TypingStatistics.app -ov -format UDZO \
-            build/TypingStatistics-macos-${{ matrix.arch }}.dmg
+          # hdiutil sometimes fails on the runners with "Resource busy": try again.
+          for i in 1 2 3 4; do
+            hdiutil create -volname "Typing statistics" -srcfolder build/TypingStatistics.app -ov -format UDZO \
+              build/TypingStatistics-macos-${{ matrix.arch }}.dmg && break
+            [ "$i" = 4 ] && exit 1
+            sleep 10
+          done
       - uses: actions/upload-artifact@v7
         with:
           name: TypingStatistics-macos-${{ matrix.arch }}

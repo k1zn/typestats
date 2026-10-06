@@ -191,8 +191,13 @@ MainStats compute(const TextModel &m, int b, int e, int splitMs, bool byPauses)
 
 QString formatTime(int ms, int digits, const QLocale &loc, const StatsUnits &u)
 {
+    return formatTime(ms, digits, digits > 0 ? loc.decimalPoint() : QString(), u);
+}
+
+QString formatTime(int ms, int digits, QStringView point, const StatsUnits &u)
+{
     const int minutes = ms / 60000;
-    QString s = formatFixed((ms % 60000) * 0.001, digits, loc) + u.s;
+    QString s = formatFixed((ms % 60000) * 0.001, digits, point) + u.s;
     if (minutes != 0) {
         s = QString::number(minutes % 60) + u.m + QLatin1Char(' ') + s;
         if (minutes / 60 != 0)

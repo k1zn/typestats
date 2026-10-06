@@ -16,7 +16,7 @@ bool isNumber(const QVariant &v)
     return v.typeId() == QMetaType::Double || v.typeId() == QMetaType::Float || v.typeId() == QMetaType::Int;
 }
 
-QString csvCell(const QVariant &v, const QLocale &locale, QChar separator)
+QString csvCell(const QVariant &v, const QString &point, QChar separator)
 {
     if (!v.isValid())
         return {};
@@ -26,7 +26,7 @@ QString csvCell(const QVariant &v, const QLocale &locale, QChar separator)
         QString s = QString::number(v.toDouble(), 'f', 6);
         while (s.contains(QLatin1Char('.')) && (s.endsWith(QLatin1Char('0')) || s.endsWith(QLatin1Char('.'))))
             s.chop(1);
-        return s.replace(QLatin1Char('.'), locale.decimalPoint());
+        return s.replace(QLatin1Char('.'), point);
     }
     QString s = v.toString();
     if (s.contains(separator) || s.contains(QLatin1Char('"')) || s.contains(QLatin1Char('\n'))
@@ -39,16 +39,17 @@ QString csvCell(const QVariant &v, const QLocale &locale, QChar separator)
 
 QByteArray toCsv(const Table &table, const QLocale &locale)
 {
-    const QChar separator = locale.decimalPoint() == QLatin1String(",") ? QLatin1Char(';') : QLatin1Char(',');
+    const QString point = locale.decimalPoint(); // once: for the system locale it is a call to the OS
+    const QChar separator = point == QLatin1String(",") ? QLatin1Char(';') : QLatin1Char(',');
     QString out;
     QStringList cells;
     for (const QString &h : table.header)
-        cells << csvCell(h, locale, separator);
+        cells << csvCell(h, point, separator);
     out += cells.join(separator) + QLatin1String("\r\n");
     for (const QVariantList &row : table.rows) {
         cells.clear();
         for (const QVariant &v : row)
-            cells << csvCell(v, locale, separator);
+            cells << csvCell(v, point, separator);
         out += cells.join(separator) + QLatin1String("\r\n");
     }
     return QByteArray("\xEF\xBB\xBF") + out.toUtf8();

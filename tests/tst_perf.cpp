@@ -16,6 +16,7 @@
 #include "core/Journal.h"
 #include "core/KeyList.h"
 #include "core/MainStats.h"
+#include "core/NumberFormat.h"
 #include "core/Recalc.h"
 #include "core/TsfFile.h"
 #include "core/Cp1251.h"
@@ -734,6 +735,39 @@ private slots:
         }
         QSettings().remove(QStringLiteral("JournalOn"));
         QFile::remove(JournalWriter(QCoreApplication::applicationDirPath()).path());
+    }
+
+    // Numbers with the system locale: Qt asks the OS for its decimal point on every call (macOS: CFLocale).
+    void numbers()
+    {
+        const QLocale loc;
+        measure(QStringLiteral("QLocale().decimalPoint() x100000"), 100000, [&] {
+            for (int i = 0; i < 100000; ++i)
+                loc.decimalPoint();
+        });
+        measure(QStringLiteral("formatFixed(v, 3, system) x100000"), 100000, [&] {
+            for (int i = 0; i < 100000; ++i)
+                formatFixed(i * 0.37, 3, loc);
+        });
+        measure(QStringLiteral("QLocale().toDouble x100000"), 100000, [&] {
+            const QString s = formatFixed(123.456, 3, loc);
+            for (int i = 0; i < 100000; ++i)
+                loc.toDouble(s);
+        });
+        MainWindow w;
+        for (int n : m_sizes) {
+            QVERIFY(w.openFile(tsf(n)));
+            const TextModel &m = w.m_model;
+            measure(QStringLiteral("keylist.rows all (export)"), n, [&] { KeyList::rows(m.klav, QLocale()); });
+            TableExport::Table keys;
+            measure(QStringLiteral("export keyTable"), n, [&] { keys = w.keyTable(); });
+            measure(QStringLiteral("export csv (toCsv)"), n, [&] { TableExport::toCsv(keys, QLocale()); });
+            const QVector<quint8> fingers = fingerSeries(m, FingerZones::standard());
+            const auto rows = ExtraStats::rows(
+                ExtraStats::collect(m, fingers, 0, m.size(), ExtraStats::Words, QString()), false, 0);
+            measure(QStringLiteral("extra toText words (%1 rows)").arg(rows.size()), n,
+                    [&] { ExtraStats::toText(rows, false, QLocale(), {}); });
+        }
     }
 
     // The auxiliary forms: made and shown once each time (the keyboard picture of Tkbd, Form8).

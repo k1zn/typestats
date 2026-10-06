@@ -252,7 +252,7 @@ void KlavogramWidget::resizeEvent(QResizeEvent *e)
 void KlavogramWidget::drawRuler(QPainter &p, int top, int rowHeight)
 {
     const QFontMetrics fm(m_font);
-    const QLocale loc;
+    const QString point = QLocale().decimalPoint(); // once per frame: for the system locale it is a call to the OS
     const StatsUnits units = Texts::units();
     const int w = width();
     // The first step whose labels do not run into each other.
@@ -260,7 +260,7 @@ void KlavogramWidget::drawRuler(QPainter &p, int top, int rowHeight)
     for (int i = 0; i < int(std::size(kRulerSteps)); ++i) {
         step = kRulerSteps[i];
         digits = kRulerDigits[i];
-        const QString widest = Stats::formatTime(int(float(w) / m_zoom + m_scrollMs), digits, loc, units) + QLatin1Char('W');
+        const QString widest = Stats::formatTime(int(float(w) / m_zoom + m_scrollMs), digits, point, units) + QLatin1Char('W');
         labelWidth = fm.horizontalAdvance(widest);
         if (step > int(float(labelWidth) / m_zoom))
             break;
@@ -277,7 +277,7 @@ void KlavogramWidget::drawRuler(QPainter &p, int top, int rowHeight)
         const int ms = int(v < 0.0f ? v - 0.5f : v + 0.5f);
         if (ms < 0)
             continue;
-        const QString label = Stats::formatTime(ms, digits, loc, units);
+        const QString label = Stats::formatTime(ms, digits, point, units);
         const int lw = fm.horizontalAdvance(label);
         p.setPen(Qt::black);
         p.drawText(QRect(int(x) - lw / 2, top - fm.height() - 1, lw, fm.height()), Qt::AlignCenter | Qt::TextDontClip, label);

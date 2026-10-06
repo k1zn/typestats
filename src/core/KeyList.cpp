@@ -26,6 +26,7 @@ QVector<KeyListRow> rows(const QVector<KlavRecord> &klav, const QLocale &loc, do
     qint64 pressT[256] = {};
     std::fill(std::begin(pressRow), std::end(pressRow), -1);
     qint64 prev = 0;
+    const QString point = loc.decimalPoint(); // once: for the system locale it is a call to the OS
     // Drawing times do not decrease: the window starts at the first record not before fromUs.
     const auto first = std::lower_bound(klav.begin(), klav.end(), fromUs,
                                         [](const KlavRecord &r, double v) { return double(r.tDraw) < v; });
@@ -37,7 +38,7 @@ QVector<KeyListRow> rows(const QVector<KlavRecord> &klav, const QLocale &loc, do
         const quint8 scan = r.flags & KeyRecord::ScanMask; // indexed by scan code, not VK
         if (!r.down) {
             if (pressRow[scan] >= 0) {
-                out[pressRow[scan]].duration = formatFixed(double(kExtMilli * (r.t - pressT[scan])), digits, loc);
+                out[pressRow[scan]].duration = formatFixed(double(kExtMilli * (r.t - pressT[scan])), digits, point);
                 pressRow[scan] = -1;
             }
             continue;
@@ -47,7 +48,7 @@ QVector<KeyListRow> rows(const QVector<KlavRecord> &klav, const QLocale &loc, do
         KeyListRow row;
         const float pause = float(kExtMilli * (r.t - prev));
         if (pause <= 59000.0f)
-            row.pause = formatFixed(double(pause), digits, loc);
+            row.pause = formatFixed(double(pause), digits, point);
         row.key = keyDisplayName(r.flags, r.ch, keyNames);
         if (row.key == QLatin1String("\r"))
             row.key = QStringLiteral("[Enter]");

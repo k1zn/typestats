@@ -278,9 +278,9 @@ void ExtraStatsWindow::showRows()
     {
         const QSignalBlocker blocker(m_list->selectionModel());
         m_listModel->setTable(m_sort.headers(averages, {tr("Скорость"), tr("Текст"), tr("Кол-во")}), int(m_rows.size()),
-                              [this](int row, int column) {
+                              [this, point = QLocale().decimalPoint()](int row, int column) {
                                   const ExtraStats::Row &r = m_rows[row];
-                                  return column == 0 ? ExtraStats::formatSpeed(r.speed, QLocale())
+                                  return column == 0 ? ExtraStats::formatSpeed(r.speed, point)
                                          : column == 1 ? r.text
                                                        : QString::number(r.value);
                               });
@@ -315,11 +315,11 @@ void ExtraStatsWindow::rowSelected(int row)
         return;
     }
     // All the occurrences of the text, slowest first.
-    const QLocale loc;
+    const QString point = QLocale().decimalPoint();
     m_lower = ExtraStats::occurrences(m_occ, m_rows[row].text);
     QVector<QStringList> table;
     for (const ExtraStats::Occurrence &o : m_lower)
-        table << QStringList{ExtraStats::formatSpeed(o.speed, loc), o.text};
+        table << QStringList{ExtraStats::formatSpeed(o.speed, point), o.text};
     {
         const QSignalBlocker blocker(m_lowerList->selectionModel());
         m_lowerModel->setTable({tr("Скорость"), tr("Текст")}, table);

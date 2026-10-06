@@ -976,7 +976,10 @@ bool MainWindow::eventFilter(QObject *o, QEvent *e)
 TableExport::Table MainWindow::keyTable() const
 {
     // SpeedButton7Click: every press of the recording - key, pause before it, how long it was held.
-    const QLocale loc;
+    // The numbers are the shown strings read back, so the table has exactly the shown values. Written and
+    // read in the C locale: the digits are the same in any locale, and the system one asks the OS for its
+    // separators on every number (580 -> 190 ms on 500k, Windows).
+    const QLocale loc = QLocale::c();
     const QString ms = QStringLiteral(", ") + Texts::units().ms;
     TableExport::Table table;
     table.header = {tr("Клавиша"), tr("Пауза") + ms, tr("Длительность") + ms};

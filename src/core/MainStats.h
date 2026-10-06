@@ -53,6 +53,8 @@ void speedAndHold(const QVector<KlavRecord> &klav, int rb, int re, quint32 split
 
 // FUN_0040332c
 QString formatTime(int ms, int digits, const QLocale &loc, const StatsUnits &u = {});
+// The same with the decimal separator given (formatFixed).
+QString formatTime(int ms, int digits, QStringView point, const StatsUnits &u = {});
 // One string per MainStats::Row, as the original shows them.
 QStringList format(const MainStats &s, const QLocale &loc, const StatsUnits &u = {});
 // Row captions (Form8.CheckListBox1).
