@@ -160,6 +160,15 @@ elseif(TS_FILES)
     set_source_files_properties(${QM_FILES} PROPERTIES GENERATED TRUE)
     qt_add_resources(TypingStatistics i18n PREFIX /i18n BASE ${CMAKE_BINARY_DIR}/i18n FILES ${QM_FILES})
 endif()
+# Qt's own texts in Russian (Yes/No/Cancel/Close, the file dialog outside Windows): the program is a single file,
+# so the translation is inside it. A static Qt has no translations: take them from a shared one (TS_QT_TRANSLATIONS).
+set(TS_QT_TRANSLATIONS "${QT6_INSTALL_PREFIX}/${QT6_INSTALL_TRANSLATIONS}" CACHE PATH "Qt's translations (qtbase_ru.qm)")
+if(EXISTS "${TS_QT_TRANSLATIONS}/qtbase_ru.qm")
+    qt_add_resources(TypingStatistics qt_i18n PREFIX /i18n BASE "${TS_QT_TRANSLATIONS}"
+                     FILES "${TS_QT_TRANSLATIONS}/qtbase_ru.qm")
+else()
+    message(STATUS "qtbase_ru.qm not found in TS_QT_TRANSLATIONS: Qt's buttons stay in English")
+endif()
 
 # --- tests ---
 enable_testing()

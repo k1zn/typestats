@@ -32,6 +32,8 @@ int main(int argc, char *argv[])
     QTranslator translator;
     if (language != QLatin1String("Russian") && translator.load(QStringLiteral(":/i18n/typestats_en.qm")))
         app.installTranslator(&translator);
+    else if (language == QLatin1String("Russian") && translator.load(QStringLiteral(":/i18n/qtbase_ru.qm")))
+        app.installTranslator(&translator); // Qt's own buttons and dialogs
 
     // The look of the original: a classic light window with compact controls and the 8 pt dialog font
     // its layout was made for.

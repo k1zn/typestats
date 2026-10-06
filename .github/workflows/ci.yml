@@ -18,14 +18,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       # The shared Qt: tests (the static one has no offscreen platform) and lrelease; MinGW 13.1.
-      # Only what the build needs (qtbase: the libraries, plugins, *deployqt; qttools: lrelease): the full set is
+      # Only what the build needs (qtbase: the libraries, plugins, *deployqt; qttools: lrelease; qttranslations:
+      # qtbase_ru.qm, built into the exe): the full set is
       # 1.2 GB on macOS, and unpacking it took minutes on the Intel runner.
       - uses: jurplel/install-qt-action@v4
         with:
           version: ${{ env.QT_VERSION }}
           arch: win64_mingw
           tools: tools_mingw1310
-          archives: qtbase qttools
+          archives: qtbase qttools qttranslations
           cache: true
       - uses: lukka/get-cmake@latest
       - name: MinGW of Qt first in PATH
@@ -56,6 +57,7 @@ jobs:
           env -u Qt6_DIR -u QT_PLUGIN_PATH -u CMAKE_PREFIX_PATH \
             cmake -S . -B build-static -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ \
               -DCMAKE_PREFIX_PATH=C:/qt-static -DQt6_DIR=C:/qt-static/lib/cmake/Qt6 -DTS_LRELEASE="$lrelease" \
+              -DTS_QT_TRANSLATIONS="$(cygpath -m "$QT_ROOT_DIR")/translations" \
               "-DCMAKE_CXX_FLAGS=-ffunction-sections -fdata-sections" "-DCMAKE_C_FLAGS=-ffunction-sections -fdata-sections" \
               "-DCMAKE_EXE_LINKER_FLAGS=-s -Wl,--gc-sections"
           cmake --build build-static --target TypingStatistics
@@ -104,7 +106,7 @@ jobs:
           version: ${{ env.QT_VERSION }}
           arch: linux_gcc_64
           # icu: qtbase is linked to it; qtwayland: the Wayland plugin of the AppImage.
-          archives: qtbase qttools icu qtwayland
+          archives: qtbase qttools qttranslations icu qtwayland
           cache: true
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=${{ matrix.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} -DCMAKE_INSTALL_PREFIX=/usr -DTS_UDEV_RULES_DIR=/usr/lib/udev/rules.d ${{ matrix.options }}
@@ -140,7 +142,7 @@ jobs:
         with:
           version: ${{ env.QT_VERSION }}
           arch: clang_64
-          archives: qtbase qttools
+          archives: qtbase qttools qttranslations
           cache: true
       - uses: lukka/get-cmake@latest
       - name: Configure
