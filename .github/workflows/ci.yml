@@ -1,10 +1,26 @@
 # Builds, tests and packages the port on Windows, Linux and macOS (re/crossplatform.md, step 7).
 name: CI
 
+# A commit that touches only notes and pictures builds nothing. Tags (releases) are not filtered by paths.
 on:
   push:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 're/**'
+      - '.gitignore'
   pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 're/**'
+      - '.gitignore'
   workflow_dispatch:
+
+# One build per commit: a release tag pushed after its branch cancels the branch's run of the same commit.
+concurrency:
+  group: ci-${{ github.sha }}
+  cancel-in-progress: true
 
 env:
   QT_VERSION: 6.8.3

@@ -76,25 +76,76 @@ def request_stamp(digest, workdir, service):
         return f.read()
 
 
+def read_records(path):
+    """(dt, flags, ch, comment) of the data lines of a .tsf (version 1)."""
+    out = []
+    with open(path, encoding="cp1251") as f:
+        for line in f.read().splitlines():
+            data, _, comment = line.partition("\t;")
+            parts = data.split()
+            if len(parts) != 2 or "=" in data:
+                continue
+            try:
+                dt, packed = int(parts[0], 16), int(parts[1], 16)
+            except ValueError:
+                continue
+            out.append((dt, packed & 0xFFFFFFFF, packed >> 32, comment))
+    return out
+
+
+def normalized(records):
+    """Recalc::normalized: no leading releases, dt of the first 60 s, auto-repeated modifiers dropped (their time to
+    the next record), the in-memory marks cleared."""
+    out, down, acc, started = [], set(), 0, False
+    for dt, flags, ch, comment in records:
+        up = bool(flags & KEY_UP)
+        if not started:
+            if up:
+                continue
+            started, acc = True, 60000000
+        else:
+            acc += dt
+        vk = (flags >> 16) & 0xFF
+        keep = True
+        if up:
+            down.discard(vk)
+        else:
+            keep = vk not in down or not (vk in (0x5B, 0x5C) or 0xA0 <= vk <= 0xA5)
+            down.add(vk)
+        if keep:
+            out.append((acc & 0xFFFFFFFF, flags & ~(0x100 | 0x40000000), ch, comment))
+            acc = 0
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("out")
     ap.add_argument("--compress", type=float, default=1.0)
     ap.add_argument("--services", default="DigiCert,Sectigo,GlobalSign", help="the authorities, in turn")
+    ap.add_argument("--replay", help="a .tsf to play again on the clock (its normalized records, its own timing)")
     args = ap.parse_args()
     services = [s for s in SERVICES if s[0] in args.services.split(",")]
-    rng = random.Random(1)
-    text = "the quick brown fox jumps over the lazy dog "
-    # Planned events: (time, char, up), a pause of 3 s after the first sentence.
-    plan, t = [], 0.3
-    for i, c in enumerate(text * 2):
-        if i == len(text):
-            t += 3.0
-        hold = rng.uniform(0.06, 0.12)
-        plan.append((t, c, False))
-        plan.append((t + hold, c, True))
-        t += rng.uniform(0.09, 0.26)
-    plan.sort()
+    # Planned events: (time, flags, char, dt as written or None - the real one, comment).
+    plan = []
+    if args.replay:
+        t = 0.3
+        for i, (dt, flags, ch, comment) in enumerate(normalized(read_records(args.replay))):
+            if i:
+                t += dt / 1e6
+            plan.append((t, flags, ch, dt, comment))
+    else:
+        rng = random.Random(1)
+        text = "the quick brown fox jumps over the lazy dog "
+        t = 0.3  # a pause of 3 s after the first sentence
+        for i, c in enumerate(text * 2):
+            if i == len(text):
+                t += 3.0
+            hold = rng.uniform(0.06, 0.12)
+            plan.append((t, flags_of(c, False), ord(c), None, ""))
+            plan.append((t + hold, flags_of(c, True), ord(c), None, ""))
+            t += rng.uniform(0.09, 0.26)
+        plan.sort()
 
     workdir = tempfile.mkdtemp()
     start = time.perf_counter()
@@ -118,23 +169,31 @@ def main():
         previous, stamped_end, last_stamp_record_time = digest, end, times[-1]
         print(f"stamp {len(stamps)}: {end} records, delay {delay} ms, {services[(service - 1) % len(services)][0]}")
 
-    for when, c, up in plan:
+    comments = []
+    for when, flags, ch, written, comment in plan:
         wait = start + when - time.perf_counter()
         if wait > 0:
             time.sleep(wait)
         now = time.perf_counter()
-        # The first record: dt 60 s, as the normalization makes it; then the real gaps, "compressed" if asked.
-        dt = 60000000 if not records else int((now - times[-1]) * 1e6 * args.compress)
-        flags = flags_of(c, up)
-        records.append((dt, flags, ord(c)))
+        # The first record: dt 60 s, as the normalization makes it; then the real gaps, "compressed" if asked
+        # (a replayed record keeps its own dt: it comes at that time).
+        if not records:
+            dt = 60000000
+        elif written is not None:
+            dt = written
+        else:
+            dt = int((now - times[-1]) * 1e6 * args.compress)
+        records.append((dt, flags, ch))
+        comments.append(comment)
         times.append(now)
-        encoded += encode(dt, flags, ord(c))
+        encoded += encode(dt, flags, ch)
         if last_stamp_record_time is None or now - last_stamp_record_time >= INTERVAL:
             stamp()
     time.sleep(IDLE)
     stamp()  # the idle one
 
-    lines = ["%08X %012X" % (dt, (ch << 32) | flags) for dt, flags, ch in records]
+    lines = ["%08X %012X" % (dt, (ch << 32) | flags) + ("\t;" + comment if comment else "")
+             for (dt, flags, ch), comment in zip(records, comments)]
     lines += ["tsfVersion=1", "autor=make_stamped.py", "date=" + time.strftime("%d.%m.%Y %H:%M:%S")]
     lines += ["Stamp%d=%d %d 0 %s" % (i + 1, end, delay, __import__("base64").b64encode(token).decode())
               for i, (end, delay, token) in enumerate(stamps)]
