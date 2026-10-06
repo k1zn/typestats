@@ -8,8 +8,8 @@
 #include <optional>
 
 // RFC 3161 time stamps: the request, the response, and the check of a token (CMS SignedData over TSTInfo, signed by
-// a time stamping authority whose certificate leads to one of the roots pinned here). Only RSA signatures - the
-// services the program uses (DigiCert, Sectigo, GlobalSign) sign with RSA.
+// a time stamping authority whose certificate leads to one of the roots pinned here). Only RSA signatures and
+// SHA-2 - the services the program uses (DigiCert, Sectigo, GlobalSign, Certum, SwissSign, Microsoft) sign so.
 namespace TimeStamp {
 
 // TimeStampReq for a SHA-256 imprint.

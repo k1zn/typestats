@@ -15,20 +15,39 @@
 
 ## Службы
 
-RFC 3161 по HTTP (ответ подписан службой, запрос — только хэш): DigiCert `http://timestamp.digicert.com`,
-Sectigo `http://timestamp.sectigo.com`, GlobalSign `http://timestamp.globalsign.com/tsa/r6advanced1` — по очереди,
-начиная с ответившей последней; ожидание 5 с, затем следующая. Все три подписывают RSA (freetsa и SSL.com — ECDSA, не
-взяты). Время в ответе — с точностью до секунды (дробей никто не даёт).
+RFC 3161 по HTTP (ответ подписан службой, запрос — только хэш), по очереди, начиная с ответившей последней; ожидание
+5 с, затем следующая. Шесть компаний разных стран — на случай, если какая-то станет недоступна (2026-10-06 все
+отвечали из РФ за 0,4–1,0 с):
 
-Корни закреплены в программе (`src/core/StampRoots.inc`, SubjectPublicKeyInfo), сверены с независимыми копиями:
+| Служба | Адрес | Страна |
+|---|---|---|
+| DigiCert | `http://timestamp.digicert.com` | США |
+| Sectigo | `http://timestamp.sectigo.com` | Великобритания/США |
+| GlobalSign | `http://timestamp.globalsign.com/tsa/r6advanced1` | Бельгия/Япония |
+| Certum (Asseco) | `http://time.certum.pl` | Польша |
+| SwissSign | `http://tsa.swisssign.net` | Швейцария |
+| Microsoft | `http://timestamp.acs.microsoft.com` | США |
+
+Все подписывают RSA и SHA-2. Время в ответе — с точностью до секунды (дробей никто не даёт). Не взяты: Apple
+(`timestamp.apple.com/ts01` — дайджест подписи SHA-1, проверка его не принимает), Entrust (на деле — подписант
+Sectigo), QuoVadis (DigiCert), freetsa и SSL.com (ECDSA — понадобилась бы проверка на эллиптических кривых),
+российские службы (КриптоПро и др.: ГОСТ Р 34.10/34.11, запрос с SHA-256 отклоняют). Сертификаты подписантов
+меняются (у Microsoft текущий — до 22.10.2026, у Apple — до 13.11.2026): ничего не ломается, служба присылает новый
+вместе с меткой, старые метки проверяются на момент выдачи.
+
+Корни закреплены в программе (`src/core/StampRoots.inc`, SubjectPublicKeyInfo), сверены с независимыми копиями
+(и `openssl ts -verify` с ними принимает метки каждой службы):
 
 | Корень | SHA-256 SPKI | Сверка |
 |---|---|---|
 | DigiCert Trusted Root G4 | `59df317b…364729c` | хранилище сертификатов Windows |
 | Sectigo Public Time Stamping Root R46 | `a4db8668…3824795` | самоподписанный корень с crt.sectigo.com |
 | GlobalSign Timestamping Root R45 | `16b0d550…bc5ffac` | самоподписанный корень с secure.globalsign.com |
+| Certum Trusted Network CA 2 | `6b3b57e9…7f3b2b52` | хранилище сертификатов Windows |
+| SwissSign Signature Services Root 2020 - 2 | `dff8cab3…283965dfd` | самоподписанный корень с swisssign.net (HTTPS) |
+| Microsoft Identity Verification Root CA 2020 | `dedb13bc…09028f07` | хранилище сертификатов Windows (в ответе службы корня нет: промежуточный сертификат проверяется закреплённым ключом напрямую) |
 
-Сроки ключей корней — до 2038/2046; служба сменит корень — список в программе обновить (старые файлы проверяются и
+Сроки ключей корней — 2034–2050; служба сменит корень — список в программе обновить (старые файлы проверяются и
 дальше).
 
 ## Проверка токена (`src/core/TimeStamp`, без OpenSSL)
@@ -107,7 +126,8 @@ StampCert<i>=<сертификат службы, DER, base64>
 
 ## Тесты
 
-- `tests/golden/stamps/stamped.tsf`, `compressed.tsf` — `re/scripts/make_stamped.py` (своя реализация хэша на Python,
+- `tests/golden/stamps/stamped.tsf`, `compressed.tsf`, `more.tsf` (Certum, SwissSign, Microsoft) —
+  `re/scripts/make_stamped.py` (своя реализация хэша на Python,
   метки настоящих служб, записи «набираются» по часам; `--compress 0.85` — записи утверждают набор на 15 % быстрее
   настоящего). Программа их принимает → обе реализации понимают формат одинаково.
 - `tst_stamps`: DER, запрос, токены (подпись, время, без сертификатов), RSA, отчёт, сжатое время → `Partial`, подмены

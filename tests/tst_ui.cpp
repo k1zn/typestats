@@ -1030,34 +1030,38 @@ private slots:
         QCOMPARE(sent.size(), 1);
         key(u'c', 6000000, true);
         QCOMPARE(sent.size(), 2);
-        // An authority fails: the next one at once, with a request of its own.
+        // An authority fails: the next one at once, with a request of its own; then every other one.
+        const int services = int(StampRecorder::services().size());
+        QVERIFY(services >= 3);
         sent[1].done({}, QStringLiteral("down"));
         QCOMPARE(sent.size(), 3);
         QCOMPARE(sent[2].service, 1);
         sent[2].done(QByteArray("garbage"), {});
-        QCOMPARE(sent.size(), 4);
-        QCOMPARE(sent[3].service, 2);
-        sent[3].done({}, QStringLiteral("down"));
-        QCOMPARE(sent.size(), 4); // all failed: it waits
+        for (int i = 2; i < services; ++i) {
+            QCOMPARE(sent.size(), i + 2);
+            QCOMPARE(sent.last().service, i);
+            sent.last().done({}, QStringLiteral("down"));
+        }
+        QCOMPARE(sent.size(), services + 1); // all failed: it waits
         QVERIFY(s.lastError().contains(QStringLiteral("down")));
         QCOMPARE(doc.stamps.size(), 1);
         // Recording stops: what is left is stamped now (the authority that answered last goes first).
         s.captureChanged(false);
-        QCOMPARE(sent.size(), 5);
-        QCOMPARE(sent[4].service, 0);
+        QCOMPARE(sent.size(), services + 2);
+        QCOMPARE(sent.last().service, 0);
         // The records replaced while it was on its way (an edit, another document): the answer is dropped.
         s.attach(&doc);
-        sent[4].done(fakeToken(sent[4].imprint), {});
+        sent.last().done(fakeToken(sent.last().imprint), {});
         QCOMPARE(doc.stamps.size(), 1);
         // After the last key, the idle stamp.
         s.captureChanged(true);
         key(u'd', 1000);
-        QCOMPARE(sent.size(), 6); // a new session starts with a stamp
-        sent[5].done(fakeToken(sent[5].imprint), {});
+        QCOMPARE(sent.size(), services + 3); // a new session starts with a stamp
+        sent.last().done(fakeToken(sent.last().imprint), {});
         QCOMPARE(doc.stamps.size(), 2);
         key(u'd', 1000, true);
-        QCOMPARE(sent.size(), 6);
-        QTRY_COMPARE_WITH_TIMEOUT(sent.size(), 7, Stamps::kIdleMs + 2000);
+        QCOMPARE(sent.size(), services + 3);
+        QTRY_COMPARE_WITH_TIMEOUT(sent.size(), services + 4, Stamps::kIdleMs + 2000);
     }
 
     void stampLive()

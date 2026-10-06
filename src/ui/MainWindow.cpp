@@ -742,9 +742,9 @@ void MainWindow::showProof()
         lines << QString() << tr("Последняя ошибка: %1").arg(m_stamps->lastError());
     QMessageBox box(QMessageBox::Information, appTitle(), lines.join(u'\n'), QMessageBox::Ok, this);
     box.setInformativeText(
-        tr("Метки ставят службы времени DigiCert, Sectigo и GlobalSign: они подтверждают, что записи были набраны в "
-           "это время и не менялись позже. Наружу уходят только хэши, без вашего набранного текста. Включается в "
-           "настройках."));
+        tr("Метки ставят службы времени DigiCert, Sectigo, GlobalSign, Certum, SwissSign и Microsoft: они "
+           "подтверждают, что записи были набраны в это время и не менялись позже. Наружу уходят только хэши, без "
+           "вашего набранного текста. Включается в настройках."));
     box.exec();
 }
 

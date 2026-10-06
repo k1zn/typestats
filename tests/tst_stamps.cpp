@@ -148,6 +148,16 @@ private slots:
         QCOMPARE(r.injected, 0);
     }
 
+    void moreAuthorities()
+    {
+        // The reserve: Certum, SwissSign, Microsoft (their roots pinned like the first three).
+        const Stamps::Report r = report(load("more.tsf"));
+        QCOMPARE(r.status, Stamps::Report::Status::Confirmed);
+        QCOMPARE(r.bad, 0);
+        QCOMPARE(r.confirmed, r.records);
+        QCOMPARE(r.authorities, (QStringList{"Certum", "Microsoft", "SwissSign"}));
+    }
+
     void compressedTime()
     {
         // The records claim 15 % faster typing than the real one: the hashes match, the time does not.

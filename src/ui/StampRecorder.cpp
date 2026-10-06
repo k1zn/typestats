@@ -10,11 +10,15 @@
 
 namespace {
 
-// RFC 3161 over plain HTTP: the answer is signed, the request is a hash.
+// RFC 3161 over plain HTTP: the answer is signed, the request is a hash. Companies of different countries, so that
+// one of them going away or out of reach leaves the others (re/stamps.md).
 const char *const kServices[] = {
     "http://timestamp.digicert.com",
     "http://timestamp.sectigo.com",
     "http://timestamp.globalsign.com/tsa/r6advanced1",
+    "http://time.certum.pl",
+    "http://tsa.swisssign.net",
+    "http://timestamp.acs.microsoft.com",
 };
 constexpr int kServiceCount = int(std::size(kServices));
 constexpr int kTimeoutMs = 5000; // then the next authority

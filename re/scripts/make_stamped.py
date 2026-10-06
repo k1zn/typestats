@@ -4,6 +4,7 @@ written independently of the program's code.
 
     python re/scripts/make_stamped.py tests/golden/stamps/stamped.tsf
     python re/scripts/make_stamped.py tests/golden/stamps/compressed.tsf --compress 0.85
+    python re/scripts/make_stamped.py tests/golden/stamps/more.tsf --services Certum,SwissSign,Microsoft
 
 --compress: the records claim a faster typing than the real one (as a modified program would): the stamps then do
 not confirm the time. Needs openssl in PATH (Git Bash has it) and the network; ~30 s.
@@ -22,6 +23,9 @@ SERVICES = [
     ("DigiCert", "http://timestamp.digicert.com"),
     ("Sectigo", "http://timestamp.sectigo.com"),
     ("GlobalSign", "http://timestamp.globalsign.com/tsa/r6advanced1"),
+    ("Certum", "http://time.certum.pl"),
+    ("SwissSign", "http://tsa.swisssign.net"),
+    ("Microsoft", "http://timestamp.acs.microsoft.com"),
 ]
 INTERVAL = 10.0  # Stamps::kIntervalMs
 IDLE = 2.0       # Stamps::kIdleMs
@@ -76,7 +80,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("out")
     ap.add_argument("--compress", type=float, default=1.0)
+    ap.add_argument("--services", default="DigiCert,Sectigo,GlobalSign", help="the authorities, in turn")
     args = ap.parse_args()
+    services = [s for s in SERVICES if s[0] in args.services.split(",")]
     rng = random.Random(1)
     text = "the quick brown fox jumps over the lazy dog "
     # Planned events: (time, char, up), a pause of 3 s after the first sentence.
@@ -106,11 +112,11 @@ def main():
         end = len(records)
         delay = int((time.perf_counter() - times[-1]) * 1000)
         digest = stamp_hash(previous, end - stamped_end, delay, encoded[stamped_end * 12:end * 12])
-        token = request_stamp(digest, workdir, SERVICES[service % len(SERVICES)])
+        token = request_stamp(digest, workdir, services[service % len(services)])
         service += 1
         stamps.append((end, delay, token))
         previous, stamped_end, last_stamp_record_time = digest, end, times[-1]
-        print(f"stamp {len(stamps)}: {end} records, delay {delay} ms, {SERVICES[(service - 1) % 3][0]}")
+        print(f"stamp {len(stamps)}: {end} records, delay {delay} ms, {services[(service - 1) % len(services)][0]}")
 
     for when, c, up in plan:
         wait = start + when - time.perf_counter()

@@ -24,7 +24,7 @@ QByteArray imprintOf(const QByteArray &token)
 
 QString shortName(const QString &commonName)
 {
-    for (const char *name : {"DigiCert", "Sectigo", "GlobalSign"})
+    for (const char *name : {"DigiCert", "Sectigo", "GlobalSign", "Certum", "SwissSign", "Microsoft"})
         if (commonName.contains(QLatin1String(name), Qt::CaseInsensitive))
             return QLatin1String(name);
     return commonName;
