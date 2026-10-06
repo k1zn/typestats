@@ -942,9 +942,10 @@ void MainWindow::askLabel(int record)
     bool ok = false;
     const QString text = QInputDialog::getText(this, tr("Текстовая метка"), tr("Текст метки"), QLineEdit::Normal,
                                                m_doc.records[record].comment, &ok);
-    if (ok)
+    if (ok) {
         m_doc.records[record].comment = text;
         m_unsaved = true;
+    }
     const int scroll = m_text->verticalScrollBar()->value();
     recalculate();
     m_text->verticalScrollBar()->setValue(scroll);
