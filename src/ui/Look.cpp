@@ -129,9 +129,20 @@ void applyTheme(bool dark)
 
 } // namespace
 
+void applySavedTheme()
+{
+    QSettings settings;
+    if (!settings.contains(kKey)) {
+        // The first start takes the theme of the system, and from then on the saved one counts.
+        QGuiApplication::styleHints()->unsetColorScheme();
+        settings.setValue(kKey, QGuiApplication::styleHints()->colorScheme() == Qt::ColorScheme::Dark);
+    }
+    applyTheme(settings.value(kKey).toBool());
+}
+
 void apply()
 {
-    applyTheme(QSettings().value(kKey, false).toBool());
+    applySavedTheme();
 #ifdef Q_OS_WIN
     QApplication::setFont(QFont(QStringLiteral("Microsoft Sans Serif"), 8));
 #else

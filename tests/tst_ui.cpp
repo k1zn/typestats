@@ -399,7 +399,18 @@ private slots:
         QVERIFY(!Look::isDark());
         QVERIFY(!QSettings().value(QStringLiteral("DarkTheme")).toBool());
         QCOMPARE(w.m_legend->palette().color(QPalette::Window), QColor(255, 255, 200));
+        QCOMPARE(w.m_legend->palette().color(QPalette::WindowText), QColor(Qt::black)); // the frame
         QCOMPARE(foregrounds(w.m_text->document()), light);
+
+        // The first start takes the system's theme (offscreen has none: light) and keeps it; later the saved one.
+        QSettings().remove(QStringLiteral("DarkTheme"));
+        Look::applySavedTheme();
+        QVERIFY(!Look::isDark());
+        QCOMPARE(QSettings().value(QStringLiteral("DarkTheme")), QVariant(false));
+        QSettings().setValue(QStringLiteral("DarkTheme"), true);
+        Look::applySavedTheme();
+        QVERIFY(Look::isDark());
+        Look::setDark(false);
     }
 
     void panelButtons()

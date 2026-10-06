@@ -122,6 +122,7 @@ void LegendPanel::updateColors()
 {
     QPalette pal = palette();
     pal.setColor(QPalette::Window, Look::colors().legend);
+    pal.setColor(QPalette::WindowText, Look::colors().keyEdge); // the frame: black, and not light in the dark theme
     setPalette(pal);
 }
 

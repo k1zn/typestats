@@ -7,11 +7,14 @@
 // Plus a dark theme of the remake (the original has none), switched by the button in the corner of the toolbar.
 namespace Look {
 
-// Style, palette and font of the application, in the theme saved by the user (`DarkTheme`). Windows: the native style
+// Style, palette and font of the application, in the theme saved by the user (`DarkTheme`; at the first start the
+// system's). Windows: the native style
 // with the font of the original. Elsewhere: Fusion with a light palette of classic Windows colours (a dark desktop
 // theme would leave the self-drawn white panes in a dark window) and a font of the same pixel size. The dark theme is
 // Fusion with a dark palette everywhere (the native style of Windows has no dark variant).
 void apply();
+// Only the theme of apply(): the saved one; at the first start (no `DarkTheme` yet) the system's, which is saved.
+void applySavedTheme();
 
 // Switches the theme now and saves it (`save` = false: for this run only, `--theme`). The self-drawn panes take their colours from colors() when they paint; what
 // keeps colours of its own (the text, panels with a palette) is refreshed by its owner (MainWindow::setDarkTheme).
