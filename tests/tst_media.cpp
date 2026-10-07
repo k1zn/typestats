@@ -1,6 +1,7 @@
 // The webcam's codecs (re/webcam.md): YUV conversions, AV1 (libaom realtime), Opus.
 
 #include "core/MediaClip.h"
+#include "core/TsfFile.h"
 #include "core/WebmWriter.h"
 #include "media/Av1Codec.h"
 #include "media/Capture.h"
@@ -195,6 +196,12 @@ private slots:
             QFile f(QString::fromLocal8Bit(out));
             QVERIFY(f.open(QIODevice::WriteOnly));
             f.write(w);
+        }
+        // A .tsf with this video (tsstat --extract-video by hand).
+        if (const QByteArray out = qgetenv("TS_MEDIA_TSF"); !out.isEmpty()) {
+            TsfDocument doc;
+            doc.webcam = clip.serialize();
+            QVERIFY(Tsf::write(QString::fromLocal8Bit(out), doc, true));
         }
     }
 

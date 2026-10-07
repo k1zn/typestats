@@ -29,6 +29,7 @@
 #include "core/KeyList.h"
 #include "core/MainStats.h"
 #include "core/NumberFormat.h"
+#include "core/WebmWriter.h"
 #include "platform/FileAssociation.h"
 
 #include <QApplication>
@@ -162,6 +163,7 @@ MainWindow::MainWindow(QWidget *parent)
     });
     connect(m_video, &VideoWindow::visibilityChanged, this, &MainWindow::updateVideoMode);
     connect(m_video, &VideoWindow::playToggled, this, &MainWindow::playVideo);
+    connect(m_video, &VideoWindow::saveRequested, this, &MainWindow::saveVideo);
     m_playTimer = new QTimer(this);
     m_playTimer->setInterval(33);
     connect(m_playTimer, &QTimer::timeout, this, &MainWindow::playTick);
@@ -897,8 +899,10 @@ void MainWindow::captureToggled(bool on)
     }
     if (!m_opening)
         m_stamps->captureChanged(on);
+#ifdef TS_HAVE_WEBCAM
     if (m_webcam)
         m_webcam->setCapture(on);
+#endif
     m_text->setFocus();
 }
 
@@ -967,8 +971,10 @@ void MainWindow::deletePreset()
 void MainWindow::startCapture()
 {
     m_hook.start();
+#ifdef TS_HAVE_WEBCAM
     if (m_webcam)
         m_webcam->setCapture(m_capture->isChecked());
+#endif
 }
 
 void MainWindow::offerFileAssociation()
@@ -1746,12 +1752,14 @@ void MainWindow::setDocument(const TsfDocument &doc, const QString &title, bool 
         m_clip = MediaClip();
     m_doc.webcam.clear();
     m_docEndUs = DocTime::end(m_doc.records);
+#ifdef TS_HAVE_WEBCAM
     if (m_webcam) {
         m_webcam->setClip(&m_clip);
         m_video->setClip(&m_clip);
         syncWebcamClock();
         updateVideoMode();
     }
+#endif
     keepRoomForRecording();
     m_stamps->attach(&m_doc);
     setTitle(title);
@@ -1929,17 +1937,19 @@ void MainWindow::clear()
 
 void MainWindow::syncWebcamClock()
 {
+#ifdef TS_HAVE_WEBCAM
     if (m_webcam)
         m_webcam->setClock(m_docEndUs, m_recorder.timerUs());
+#endif
 }
 
 void MainWindow::showVideo()
 {
-    if (!m_video)
-        return;
+#ifdef TS_HAVE_WEBCAM
     m_video->show();
     m_video->raise();
     updateVideoMode();
+#endif
 }
 
 void MainWindow::videoProperties()
@@ -2037,13 +2047,37 @@ void MainWindow::playVideo(bool play)
 {
     if (!m_playTimer)
         return;
+#ifdef TS_HAVE_WEBCAM
     if (!play) {
         m_playTimer->stop();
+        m_video->stopSound();
         return;
     }
     m_playFromUs = klavogramDocTimeUs();
+    m_video->startSound(m_playFromUs);
+    m_video->feedSound(m_playFromUs);
     m_playClock.start();
     m_playTimer->start();
+#else
+    Q_UNUSED(play);
+#endif
+}
+
+void MainWindow::saveVideo()
+{
+#ifdef TS_HAVE_WEBCAM
+    if (m_clip.isEmpty())
+        return;
+    QString path = QFileDialog::getSaveFileName(this, {}, QFileInfo(m_path).completeBaseName(),
+                                                QStringLiteral("WebM (*.webm)"));
+    if (path.isEmpty())
+        return;
+    if (QFileInfo(path).suffix().isEmpty())
+        path += QStringLiteral(".webm");
+    QFile f(path);
+    if (!f.open(QIODevice::WriteOnly) || f.write(Webm::write(m_clip)) < 0)
+        QMessageBox::warning(this, appTitle(), tr("Не удалось сохранить файл %1").arg(path));
+#endif
 }
 
 void MainWindow::playTick()
@@ -2054,8 +2088,12 @@ void MainWindow::playTick()
         m_playTimer->stop();
 #ifdef TS_HAVE_WEBCAM
         m_video->setPlaying(false);
+        m_video->stopSound();
 #endif
         return;
     }
     scrollKlavogramToDocTime(now);
+#ifdef TS_HAVE_WEBCAM
+    m_video->feedSound(now);
+#endif
 }

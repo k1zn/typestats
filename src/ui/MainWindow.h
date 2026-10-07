@@ -130,6 +130,7 @@ private:
     qint64 klavogramDocTimeUs() const;
     void scrollKlavogramToDocTime(qint64 docUs);
     void playVideo(bool play);
+    void saveVideo();
     void playTick();
     // The recorder learns where the document's time is (after a record, an edit, another document).
     void syncWebcamClock();

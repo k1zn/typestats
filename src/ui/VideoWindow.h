@@ -6,7 +6,9 @@
 #include <QWidget>
 #include <memory>
 
+class AudioOut;
 class Av1Decoder;
+class OpusAudioDecoder;
 class QLabel;
 class QToolButton;
 
@@ -29,12 +31,17 @@ public:
     // The frame at the document's time.
     void showTime(qint64 docUs);
     void setPlaying(bool playing);
+    // The sound of the clip while playing: from a time, then kept a little ahead of the time played.
+    void startSound(qint64 docUs);
+    void feedSound(qint64 docUs);
+    void stopSound();
     const QImage &image() const { return m_image; }
     // The message instead of a picture ("no video here", the camera's error).
     void setMessage(const QString &text);
 
 signals:
     void playToggled(bool play);
+    void saveRequested(); // "Сохранить видео…": the clip as a WebM file
     void visibilityChanged(bool visible);
 
 protected:
@@ -53,7 +60,13 @@ private:
     int m_key = -1, m_decoded = -1;  // the key frame and the last frame the decoder has had
     QImage m_image;
     QString m_message;
+    std::unique_ptr<AudioOut> m_soundOut;
+    std::unique_ptr<OpusAudioDecoder> m_soundDecoder;
+    bool m_sound = false;
+    int m_soundNext = -1;      // the next audio packet to decode
+    qint64 m_soundEndUs = 0;   // the document's time up to which the sound is queued
     QToolButton *m_play = nullptr;
+    QToolButton *m_save = nullptr;
     QLabel *m_time = nullptr;
     QLabel *m_rec = nullptr;
 };

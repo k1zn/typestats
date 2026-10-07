@@ -11,6 +11,8 @@
 //   tsstat --to-journal out.tsj file.tsf    the records of the file as a journal (re/journal.md)
 //   tsstat --verify file.tsf                the time stamps of the recording (re/stamps.md); exit code 0 - all
 //                                           the records confirmed, 1 - not all, 2 - stamps that do not check
+//   tsstat --extract-video out.webm file.tsf  the webcam recording of the file as WebM (re/webcam.md); exit code 1 -
+//                                           there is none
 
 #include "core/ExtraStats.h"
 #include "core/FingerZones.h"
@@ -18,6 +20,7 @@
 #include "core/MainStats.h"
 #include "core/Stamps.h"
 #include "core/TsfFile.h"
+#include "core/WebmWriter.h"
 
 #include <QCoreApplication>
 #include <QDateTime>
@@ -36,7 +39,7 @@ int main(int argc, char *argv[])
     bool averages = false, descending = false;
     QString pattern;
     ExtraStats::CharFilter filter;
-    QString file, journalOut;
+    QString file, journalOut, videoOut;
     bool verify = false;
     for (int i = 1; i < args.size(); ++i) {
         const QString &a = args[i];
@@ -59,6 +62,8 @@ int main(int argc, char *argv[])
             verify = true;
         else if (a == QLatin1String("--to-journal") && i + 1 < args.size())
             journalOut = args[++i];
+        else if (a == QLatin1String("--extract-video") && i + 1 < args.size())
+            videoOut = args[++i];
         else if (a == QLatin1String("--avg"))
             averages = true;
         else if (a == QLatin1String("--sort") && i + 1 < args.size())
@@ -94,6 +99,13 @@ int main(int argc, char *argv[])
         for (const KeyRecord &r : doc.records)
             f.write(Journal::encode(r));
         return 0;
+    }
+    if (!videoOut.isEmpty()) {
+        MediaClip clip;
+        if (doc.webcam.isEmpty() || !MediaClip::parse(doc.webcam, clip))
+            return 1;
+        QFile f(videoOut);
+        return f.open(QIODevice::WriteOnly) && f.write(Webm::write(clip)) >= 0 ? 0 : 1;
     }
     if (verify) {
         const Stamps::Report r = Stamps::verify(Recalc::normalized(doc.records), doc.stamps, doc.stampCertificates);
