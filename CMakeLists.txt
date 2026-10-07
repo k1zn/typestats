@@ -19,7 +19,7 @@ option(TS_SOFT_EXT80 "Software 80-bit arithmetic even where long double is x87" 
 # The same floating-point results everywhere: no fused multiply-add (GCC contracts by default on
 # arm64, Clang within expressions).
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    add_compile_options(-ffp-contract=off)
+    add_compile_options($<$<COMPILE_LANGUAGE:C,CXX>:-ffp-contract=off>)
 endif()
 
 # Network: the time stamps of a recording (re/stamps.md), RFC 3161 over plain HTTP.
@@ -30,6 +30,13 @@ find_package(Qt6 QUIET COMPONENTS LinguistTools)
 # --- third party ---
 set(BUILD_SHARED_LIBS OFF)
 add_subdirectory(third_party/QXlsx EXCLUDE_FROM_ALL)
+# The webcam (re/webcam.md): without it the video buttons stay disabled.
+option(TS_WEBCAM "Webcam recording: AV1 and Opus codecs" ON)
+if(TS_WEBCAM)
+    set(CMAKE_AUTOMOC OFF)
+    include(cmake/Media.cmake)
+    set(CMAKE_AUTOMOC ON)
+endif()
 
 # Warnings for our own code (the targets below), not for the third-party code above.
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
@@ -93,6 +100,15 @@ elseif(UNIX)
         target_compile_definitions(tsplatform PRIVATE TS_HAVE_DBUS)
     endif()
     message(STATUS "Linux keyboard: xkbregistry ${XKBREGISTRY_FOUND}, X11 ${XKBX11_FOUND}, D-Bus ${Qt6DBus_FOUND}")
+endif()
+
+# --- the webcam's codecs (re/webcam.md) ---
+if(TS_WEBCAM)
+    file(GLOB MEDIA_SOURCES CONFIGURE_DEPENDS src/media/*.cpp src/media/*.h)
+    add_library(tsmedia STATIC ${MEDIA_SOURCES})
+    target_include_directories(tsmedia PUBLIC src)
+    target_link_libraries(tsmedia PUBLIC Qt6::Gui PRIVATE ts_aom ts_opus)
+    target_compile_definitions(tsmedia PUBLIC TS_HAVE_WEBCAM)
 endif()
 
 # --- application ---
@@ -182,6 +198,9 @@ foreach(src ${TEST_SOURCES})
     if(name STREQUAL "tst_evdev" AND (WIN32 OR APPLE)) # the Linux backend
         continue()
     endif()
+    if(name STREQUAL "tst_media" AND NOT TS_WEBCAM)
+        continue()
+    endif()
     add_executable(${name} ${src})
     # One library each (they bring tscore along): the macOS linker warns of a library given twice.
     if(name MATCHES "^tst_(ui|perf)")
@@ -189,6 +208,8 @@ foreach(src ${TEST_SOURCES})
         target_sources(${name} PRIVATE resources/resources.qrc)
     elseif(name MATCHES "^tst_(platform|evdev)$")
         target_link_libraries(${name} PRIVATE tsplatform)
+    elseif(name STREQUAL "tst_media")
+        target_link_libraries(${name} PRIVATE tsmedia tscore)
     else()
         target_link_libraries(${name} PRIVATE tscore)
     endif()

@@ -45,6 +45,8 @@ jobs:
           archives: qtbase qttools qttranslations
           cache: true
       - uses: lukka/get-cmake@latest
+      # libaom's x86 assembly (the webcam's AV1, re/webcam.md).
+      - uses: ilammy/setup-nasm@v1
       - name: MinGW of Qt first in PATH
         run: echo "$IQTA_TOOLS/mingw1310_64/bin" >> "$GITHUB_PATH"
       - name: Configure
@@ -114,7 +116,7 @@ jobs:
           # of the list (archive.ubuntu.com) instead of waiting minutes on every file.
           echo 'Acquire::http::Timeout "15"; Acquire::https::Timeout "15"; Acquire::Retries "3";' | sudo tee /etc/apt/apt.conf.d/99ci-timeouts
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends ninja-build libgl-dev libegl-dev \
+          sudo apt-get install -y --no-install-recommends ninja-build nasm libgl-dev libegl-dev \
             libxkbcommon-dev libxkbcommon-x11-dev libxkbregistry-dev libxcb1-dev libxcb-xkb-dev xkb-data \
             fonts-liberation libxcb-cursor0 libfuse2
       - uses: jurplel/install-qt-action@v4
@@ -160,6 +162,8 @@ jobs:
           archives: qtbase qttools qttranslations
           cache: true
       - uses: lukka/get-cmake@latest
+      - uses: ilammy/setup-nasm@v1
+        if: matrix.arch == 'x86_64'
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }}
       - name: Build
