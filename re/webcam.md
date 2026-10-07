@@ -94,7 +94,15 @@ WebM (`Webm::write`) начинается с ключевого кадра.
 
 - `src/core/MediaClip`, `Z85`, `WebmWriter`; строки `.tsf` — `TsfFile`; `DocTime` — время документа и модели.
 - `src/media`: `Av1Codec` (libaom), `OpusCodec`, `Yuv`, `Capture` (Windows — Media Foundation, загружается при запуске:
-  в Windows N его нет без Media Feature Pack), `AudioOut` (Windows — waveOut). macOS и Linux — заглушки (шаг 8).
+  в Windows N его нет без Media Feature Pack; виртуальные камеры — `CaptureDShow`, см. ниже), `AudioOut` (Windows —
+  waveOut). macOS и Linux — заглушки (шаг 8).
+- **Виртуальные камеры Windows** (OBS Virtual Camera, 2026-10-07): это фильтры DirectShow в категории video input без
+  устройства за ними — Media Foundation их не видит. `CaptureDShow` добавляет в список фильтры этой категории без
+  свойства `DevicePath` (у настоящих камер оно есть, их перечисляет MF), id — `dshow:` + имя моникёра. Захват: граф
+  источник → Sample Grabber (qedit.dll; устарел, но есть в Windows 11) → Null Renderer, без часов графа (кадры не
+  ждут времени показа); формат — ближайший к нужному через `IAMStreamConfig`, NV12/I420/YUY2/RGB читаются сами, иное —
+  через декодер, который ставит DirectShow. Время кадра — время прихода (виртуальная камера отдаёт кадр, когда делает).
+  OBS отдаёт свой размер вывода (здесь 1920×1080), запись уменьшает. `tst_media::virtualCamera` — если такая камера есть.
 - `src/ui/WebcamRecorder` — устройства, кодеры в своём потоке, время кадров по таймеру хука (`Recorder::timerUs`:
   `T = Σdt + (s − таймер)` — ровно то время, которое получила бы запись в момент `s`); пакеты до первого события ждут.
   Частота пресета соблюдается отбрасыванием кадров; кодер не успевает — кадр отбрасывается (очередь ≤ 2).

@@ -108,7 +108,9 @@ if(TS_WEBCAM)
         src/media/OpusCodec.h src/media/OpusCodec.cpp src/media/Capture.h)
     list(APPEND MEDIA_SOURCES src/media/AudioOut.h)
     if(WIN32)
-        list(APPEND MEDIA_SOURCES src/media/CaptureWin.cpp src/media/AudioOutWin.cpp) # Media Foundation, waveOut
+        # Media Foundation (DirectShow for virtual cameras), waveOut
+        list(APPEND MEDIA_SOURCES src/media/CaptureWin.cpp src/media/CaptureDShow.h src/media/CaptureDShow.cpp
+             src/media/AudioOutWin.cpp)
     elseif(APPLE)
         # AVFoundation, AudioQueue.
         enable_language(OBJCXX)
@@ -125,7 +127,7 @@ if(TS_WEBCAM)
     target_include_directories(tsmedia PUBLIC src)
     target_link_libraries(tsmedia PUBLIC Qt6::Gui PRIVATE ts_aom ts_opus)
     if(WIN32)
-        target_link_libraries(tsmedia PRIVATE mfuuid ole32 winmm)
+        target_link_libraries(tsmedia PRIVATE mfuuid strmiids ole32 oleaut32 winmm)
     elseif(APPLE)
         target_link_libraries(tsmedia PRIVATE "-framework AVFoundation" "-framework CoreMedia" "-framework CoreVideo"
                               "-framework AudioToolbox" "-framework Foundation")

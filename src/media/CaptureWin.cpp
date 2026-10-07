@@ -2,6 +2,7 @@
 // none without its Media Feature Pack, and the program must start there all the same.
 
 #include "Capture.h"
+#include "CaptureDShow.h"
 #include "platform/HookClock.h"
 
 #include <windows.h>
@@ -190,6 +191,11 @@ struct Camera::Impl
 
 void Camera::Impl::run(QString id, QSize want, int fps)
 {
+    if (DShow::isId(id)) {
+        DShow::run(q, id, want, fps, stop);
+        active = false;
+        return;
+    }
     MfSession mf;
     QString error;
     Com<IMFMediaSource> source;
@@ -307,7 +313,8 @@ Camera::~Camera()
 
 QList<CaptureDevice> Camera::devices()
 {
-    return devicesOf(MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_GUID, MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_SYMBOLIC_LINK);
+    return devicesOf(MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_GUID, MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_SYMBOLIC_LINK)
+           + DShow::cameras();
 }
 
 void Camera::start(const QString &deviceId, QSize size, int fps)

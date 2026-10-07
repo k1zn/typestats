@@ -115,6 +115,10 @@ Special thanks to Urikor (for the great site and the hosting), Avtandilina, Dron
         <source>Нет PulseAudio (libpulse-simple)</source>
         <translation>No PulseAudio (libpulse-simple)</translation>
     </message>
+    <message>
+        <source>В Windows нет Sample Grabber DirectShow (qedit.dll)</source>
+        <translation>Windows has no DirectShow Sample Grabber (qedit.dll)</translation>
+    </message>
 </context>
 <context>
     <name>ExtraStatsWindow</name>

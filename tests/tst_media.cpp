@@ -13,7 +13,9 @@
 #include <QPainter>
 #include <QTest>
 
+#include <atomic>
 #include <cmath>
+#include <mutex>
 
 namespace {
 
@@ -212,6 +214,40 @@ private slots:
             qInfo("camera: %s", qPrintable(d.name));
         for (const CaptureDevice &d : Microphone::devices())
             qInfo("microphone: %s", qPrintable(d.name));
+    }
+
+    void virtualCamera()
+    {
+        // A camera with no device behind it (OBS Virtual Camera: DirectShow on Windows) - frames from it switch no
+        // camera on. Skipped where there is none.
+        CaptureDevice cam;
+        for (const CaptureDevice &d : Camera::devices())
+            if (d.id.startsWith(QLatin1String("dshow:")))
+                cam = d;
+        if (cam.id.isEmpty())
+            QSKIP("no virtual camera");
+        Camera camera;
+        std::atomic<int> frames{0};
+        QSize size, frameSize;
+        QString error;
+        std::mutex lock;
+        connect(&camera, &Camera::started, &camera, [&](QSize s) { std::lock_guard g(lock); size = s; },
+                Qt::DirectConnection);
+        connect(&camera, &Camera::failed, &camera, [&](const QString &e) { std::lock_guard g(lock); error = e; },
+                Qt::DirectConnection);
+        connect(&camera, &Camera::frame, &camera, [&](const I420Frame &f, qint64) {
+                    std::lock_guard g(lock);
+                    frameSize = QSize(f.width, f.height);
+                    ++frames;
+                }, Qt::DirectConnection);
+        camera.start(cam.id, QSize(640, 360), 15);
+        QTRY_VERIFY_WITH_TIMEOUT(frames >= 3 || !error.isEmpty(), 10000);
+        camera.stop();
+        std::lock_guard g(lock);
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+        QVERIFY(size.width() >= 2);
+        QCOMPARE(frameSize, size);
+        qInfo("%s: %dx%d", qPrintable(cam.name), size.width(), size.height());
     }
 
     void opusRoundTrip()

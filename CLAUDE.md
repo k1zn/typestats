@@ -169,7 +169,7 @@ src/cli/tsstat.cpp  консольная утилита: `tsstat [--split MS] [-
                     `--extract-video out.webm f.tsf` — видео файла
 src/media/          библиотека `tsmedia` (при `TS_WEBCAM`): `Av1Codec` (libaom realtime: `cpu-used` 10, без задержки, ключ раз
                     в 4 с), `OpusCodec` (моно 48 кГц, 16 кбит/с, ресемплинг), `Yuv`, `Capture` (Camera/Microphone: Windows —
-                    `CaptureWin.cpp`, Media Foundation через `LoadLibrary`; `mac/CaptureMac.mm`; `linux/CaptureLinux.cpp`),
+                    `CaptureWin.cpp`, Media Foundation через `LoadLibrary`, виртуальные камеры (OBS) — `CaptureDShow.cpp`, DirectShow; `mac/CaptureMac.mm`; `linux/CaptureLinux.cpp`),
                     `AudioOut` (waveOut / AudioQueue / PulseAudio)
 src/platform/       библиотека `tsplatform`. `KeyboardHook.h`: сигналы `key(HookEvent{timeUs, flags, ch, chars, firstCh,
                     window, ownWindow})` в потоке GUI, `failed(причина)`, `started()`; статические `toUnicode`/`clearDeadKey`/
