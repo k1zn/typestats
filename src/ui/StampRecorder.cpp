@@ -184,12 +184,15 @@ void StampRecorder::send()
     m_pending.end = n;
     m_pending.raw = m_raw;
     m_pending.delayMs = quint32(m_sinceKept.elapsed());
-    // The packets the encoders gave so far (chain v2, re/stamps.md).
+    // The packets the encoders gave so far (chain v3, re/stamps.md).
     const int mediaFrom = stampedMediaEnd(), mediaTo = m_clip ? int(m_clip->packets.size()) : 0;
     for (int i = int(m_packetHashes.size() / 32); i < mediaTo; ++i)
         m_packetHashes += Stamps::packetHash(m_clip->packets[i]);
     m_pending.mediaEnd = mediaTo;
-    m_pending.imprint = m_chain.hashV2(previous, last, n, m_pending.delayMs,
+    // The key of the records' salts (chain v3): a block may then show some of them, and the others stay hashes.
+    m_pending.key.resize(Stamps::kKeySize);
+    QRandomGenerator::system()->fillRange(reinterpret_cast<quint32 *>(m_pending.key.data()), Stamps::kKeySize / 4);
+    m_pending.imprint = m_chain.hashV3(previous, last, n, m_pending.delayMs, m_pending.key,
                                        QByteArrayView(m_packetHashes).sliced(qsizetype(mediaFrom) * 32,
                                                                              qsizetype(mediaTo - mediaFrom) * 32),
                                        mediaTo - mediaFrom);
@@ -232,8 +235,9 @@ void StampRecorder::received(quint64 generation, const QByteArray &token, const 
     stamp.end = m_pending.end;
     stamp.delayMs = m_pending.delayMs;
     stamp.token = TimeStamp::withoutCertificates(token);
-    stamp.version = 2;
+    stamp.version = Stamps::kVersion;
     stamp.mediaEnd = m_pending.mediaEnd;
+    stamp.key = m_pending.key;
     m_doc->stamps.append(stamp);
     m_cover = {m_pending.raw, m_pending.mediaEnd, m_doc->stamps.size()};
     m_sessionStamped = true;

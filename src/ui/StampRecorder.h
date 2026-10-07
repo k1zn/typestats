@@ -31,7 +31,7 @@ public:
     // records were replaced (an edit; `another` - another document): the chain is built anew, a request in flight
     // dropped.
     void attach(TsfDocument *doc, bool another = false);
-    // The webcam's clip of the document: its packets go under the stamps with the records (chain v2).
+    // The webcam's clip of the document: its packets go under the stamps with the records (chain v3).
     void setClip(const MediaClip *clip) { m_clip = clip; m_packetHashes.clear(); }
     // Records were appended to the document (typing).
     void recordsAdded();
@@ -90,6 +90,7 @@ private:
         qsizetype raw = 0; // the document's records it holds
         quint32 delayMs = 0;
         QByteArray imprint;
+        QByteArray key;    // of the salts (chain v3)
         int service = 0;
         int tries = 0;     // authorities that failed this time
         QString errors;

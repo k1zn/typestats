@@ -169,8 +169,8 @@ bool parseHex64(QStringView word, quint64 &out)
     return ok;
 }
 
-// The parts of a stamp's chunk not in the document (re/stamps.md, "Скрытые части"): "R<k>", "U<k>", "H<z85>",
-// "L<count>:<duration>:<hex>", "V<k>", "W<hex>".
+// The parts of a stamp's chunk not in the document (re/stamps.md, "Скрытые части"): "R<k>[:<z85>]", "U<k>", "H<z85>",
+// "L<count>:<duration>:<hex>", "C<count>:<duration>:<z85>", "V<k>", "W<hex>".
 std::optional<StampPart> parsePart(QStringView word)
 {
     if (word.size() < 2)
@@ -179,21 +179,34 @@ std::optional<StampPart> parsePart(QStringView word)
     StampPart p;
     bool ok = true;
     switch (word[0].unicode()) {
-    case u'R': p.kind = StampPart::Records; p.count = rest.toInt(&ok); break;
+    case u'R': {
+        const qsizetype colon = rest.indexOf(u':');
+        p.kind = StampPart::Records;
+        p.count = rest.left(colon).toInt(&ok);
+        if (ok && colon >= 0) {
+            p.data = Z85::decode(rest.mid(colon + 1), &ok);
+            ok = ok && p.data.size() == qsizetype(p.count) * 16;
+        }
+        break;
+    }
     case u'U': p.kind = StampPart::Unstamped; p.count = rest.toInt(&ok); break;
     case u'V': p.kind = StampPart::Packets; p.count = rest.toInt(&ok); break;
     case u'H': p.kind = StampPart::Hidden; p.data = Z85::decode(rest, &ok); break;
     case u'W': p.kind = StampPart::HiddenPacket; p.data = QByteArray::fromHex(rest.toLatin1()); ok = p.data.size() == 32; break;
-    case u'L': {
-        const QList<QStringView> f = rest.split(u':');
+    case u'L':
+    case u'C': {
+        // The first two colons only: Z85 has colons of its own.
+        const qsizetype c1 = rest.indexOf(u':'), c2 = c1 < 0 ? -1 : rest.indexOf(u':', c1 + 1);
         bool okCount = false, okDuration = false;
-        if (f.size() != 3)
+        if (c2 < 0)
             return std::nullopt;
-        p.kind = StampPart::Leaf;
-        p.count = f[0].toInt(&okCount);
-        p.durationUs = f[1].toULongLong(&okDuration);
-        p.data = QByteArray::fromHex(f[2].toLatin1());
-        ok = okCount && okDuration && p.data.size() == 32;
+        const bool leaf = word[0] == u'L';
+        p.kind = leaf ? StampPart::Leaf : StampPart::Commitments;
+        p.count = rest.left(c1).toInt(&okCount);
+        p.durationUs = rest.sliced(c1 + 1, c2 - c1 - 1).toULongLong(&okDuration);
+        const QStringView data = rest.sliced(c2 + 1);
+        p.data = leaf ? QByteArray::fromHex(data.toLatin1()) : Z85::decode(data, &ok);
+        ok = ok && okCount && okDuration && p.data.size() == (leaf ? 32 : qsizetype(p.count) * 32);
         break;
     }
     default:
@@ -207,20 +220,24 @@ std::optional<StampPart> parsePart(QStringView word)
 QString partText(const StampPart &p)
 {
     switch (p.kind) {
-    case StampPart::Records: return QStringLiteral("R%1").arg(p.count);
+    case StampPart::Records:
+        return QStringLiteral("R%1").arg(p.count) + (p.data.isEmpty() ? QString() : u':' + Z85::encode(p.data));
     case StampPart::Unstamped: return QStringLiteral("U%1").arg(p.count);
     case StampPart::Packets: return QStringLiteral("V%1").arg(p.count);
     case StampPart::Hidden: return QLatin1Char('H') + Z85::encode(p.data);
     case StampPart::HiddenPacket: return QLatin1Char('W') + QString::fromLatin1(p.data.toHex());
     case StampPart::Leaf:
         return QStringLiteral("L%1:%2:").arg(p.count).arg(p.durationUs) + QString::fromLatin1(p.data.toHex());
+    case StampPart::Commitments:
+        return QStringLiteral("C%1:%2:").arg(p.count).arg(p.durationUs) + Z85::encode(p.data);
     }
     return {};
 }
 
-// The time stamps (re/stamps.md): "Stamp<i>=<end> <delay ms> <flags> <token, base64>[ <media end>]",
+// The time stamps (re/stamps.md): "Stamp<i>=<end> <delay ms> <flags> <token, base64>[ <media end> <key, z85, or ->]",
 // "StampHidden<i>=<stamp> <previous imprint, hex, or -> <parts>" and "StampCert<i>=<certificate, base64>", in the
-// order of i. Flags: 1 - voided, 2 - the chain v2 (then the media end follows).
+// order of i. Flags: 1 - voided, then the version of the chain - 1 (1.1.0 wrote 0 or 1: v1); from v2 on the media end
+// follows, from v3 the key.
 void readStamps(const QList<QStringView> &lines, TsfDocument &doc)
 {
     QMap<int, Stamp> stamps;
@@ -252,7 +269,7 @@ void readStamps(const QList<QStringView> &lines, TsfDocument &doc)
             continue;
         }
         const QList<QStringView> parts = value.split(u' ', Qt::SkipEmptyParts);
-        if (parts.size() != 4 && parts.size() != 5)
+        if (parts.size() < 4 || parts.size() > 6)
             continue;
         Stamp s;
         bool okEnd = false, okDelay = false, okFlags = false, okMedia = true;
@@ -260,10 +277,12 @@ void readStamps(const QList<QStringView> &lines, TsfDocument &doc)
         s.delayMs = parts[1].toUInt(&okDelay);
         const int flags = parts[2].toInt(&okFlags);
         s.voided = flags & 1;
-        s.version = flags & 2 ? 2 : 1;
+        s.version = (flags >> 1) + 1;
         s.token = QByteArray::fromBase64(parts[3].toLatin1());
-        if (s.version == 2)
-            s.mediaEnd = parts.size() == 5 ? parts[4].toInt(&okMedia) : -1;
+        if (s.version >= 2)
+            s.mediaEnd = parts.size() >= 5 ? parts[4].toInt(&okMedia) : -1;
+        if (s.version >= 3 && parts.size() == 6 && parts[5] != u"-")
+            s.key = Z85::decode(parts[5], &okMedia);
         if (okEnd && okDelay && okFlags && okMedia && s.mediaEnd >= 0 && !s.token.isEmpty())
             stamps.insert(index, s);
     }
@@ -449,11 +468,13 @@ QStringList serialize(const TsfDocument &doc, bool sign)
     // The time stamps (the port's own, re/stamps.md).
     for (int i = 0; i < doc.stamps.size(); ++i) {
         const Stamp &s = doc.stamps[i];
-        const int flags = (s.voided ? 1 : 0) | (s.version >= 2 ? 2 : 0);
+        const int flags = (s.voided ? 1 : 0) | (std::max(1, s.version) - 1) << 1;
         QString line = QStringLiteral("Stamp%1=%2 %3 %4 ").arg(i + 1).arg(s.end).arg(s.delayMs).arg(flags)
                        + QString::fromLatin1(s.token.toBase64());
         if (s.version >= 2)
             line += QStringLiteral(" %1").arg(s.mediaEnd);
+        if (s.version >= 3)
+            line += u' ' + (s.key.isEmpty() ? QStringLiteral("-") : Z85::encode(s.key));
         lines.append(line);
     }
     for (int i = 0, n = 0; i < doc.stamps.size(); ++i) {

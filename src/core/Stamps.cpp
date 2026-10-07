@@ -23,6 +23,13 @@ QByteArray sha256(QByteArrayView data)
     return QCryptographicHash::hash(data, QCryptographicHash::Sha256);
 }
 
+// SHA-256 of two pieces into 32 bytes at `out`, with nothing allocated (the salts: two hashes for each record).
+void sha256Into(char *out, QByteArrayView a, QByteArrayView b)
+{
+    const QByteArrayView parts[] = {a, b};
+    QCryptographicHash::hashInto(QSpan<char>(out, 32), QSpan<const QByteArrayView>(parts), QCryptographicHash::Sha256);
+}
+
 QByteArray imprintOf(const QByteArray &token)
 {
     const std::optional<TimeStamp::Info> info = TimeStamp::info(token);
@@ -45,12 +52,20 @@ quint32 dtOf(QByteArrayView encoded)
 // A record of the chunk of a stamp as the chain had it.
 struct RecItem
 {
-    enum Kind { Present, Unstamped, Hidden, Leaf } kind = Present;
+    enum Kind { Present, Unstamped, Hidden, Leaf, Commitment } kind = Present;
     int doc = -1;           // Present, Unstamped: the record of the document
-    QByteArray encoded;     // Present, Hidden: 12 bytes; Leaf: the hash of its group
+    QByteArray encoded;     // Present, Hidden: 12 bytes; Leaf: the hash of its group; Commitment: the record's hash
     int count = 1;          // Leaf: records of the group
-    quint64 durationUs = 0; // Leaf
+    quint64 durationUs = 0; // Leaf; Commitment: the dt of the hidden records up to this one (on the last of a part)
+    QByteArray salt;        // Present, v3
 };
+
+bool isVersionChecked(int version)
+{
+    return version == 1 || version == kVersion;
+}
+
+quint64 durationOf(const RecItem &r);
 
 struct PacketItem
 {
@@ -86,7 +101,7 @@ public:
                     continue;
                 }
                 for (const StampPart &p : s.parts) {
-                    if (p.kind == StampPart::Hidden || p.kind == StampPart::Leaf)
+                    if (p.kind == StampPart::Hidden || p.kind == StampPart::Leaf || p.kind == StampPart::Commitments)
                         return true;
                     if (p.kind == StampPart::Records || p.kind == StampPart::Unstamped)
                         return false;
@@ -109,7 +124,8 @@ Layout layOut(const Stamp &s, int recordCursor, int packetCursor, const Records 
     Layout l;
     const int n = records.size();
     const int clipPackets = clip ? int(clip->packets.size()) : 0;
-    auto present = [&](int count, RecItem::Kind kind) {
+    int j = 0; // the number of the next record of the chunk (v3 salts)
+    auto present = [&](int count, RecItem::Kind kind, const QByteArray &salts = {}) {
         for (int i = 0; i < count; ++i, ++recordCursor) {
             if (recordCursor >= n) {
                 l.ok = false;
@@ -120,7 +136,11 @@ Layout layOut(const Stamp &s, int recordCursor, int packetCursor, const Records 
             item.doc = recordCursor;
             if (kind == RecItem::Present) {
                 item.encoded = records.at(recordCursor).toByteArray();
+                if (s.version >= 2)
+                    item.salt = !salts.isEmpty() ? salts.mid(qsizetype(i) * kSaltSize, kSaltSize)
+                                : !s.key.isEmpty() ? salt(s.key, quint32(j)) : QByteArray();
                 ++l.present;
+                ++j;
             }
             l.records.append(item);
         }
@@ -153,7 +173,7 @@ Layout layOut(const Stamp &s, int recordCursor, int packetCursor, const Records 
         for (const StampPart &p : s.parts) {
             switch (p.kind) {
             case StampPart::Records:
-                present(p.count, RecItem::Present);
+                present(p.count, RecItem::Present, p.data);
                 break;
             case StampPart::Unstamped:
                 present(p.count, RecItem::Unstamped);
@@ -164,14 +184,25 @@ Layout layOut(const Stamp &s, int recordCursor, int packetCursor, const Records 
                     break;
                 }
                 for (qsizetype i = 0; i < p.data.size(); i += 12)
-                    l.records.append({RecItem::Hidden, -1, p.data.mid(i, 12), 1, 0});
+                    l.records.append({RecItem::Hidden, -1, p.data.mid(i, 12), 1, 0, {}});
                 break;
             case StampPart::Leaf:
                 if (s.version < 2 || p.count < 1 || p.count > kGroup || p.data.size() != 32) {
                     l.ok = false;
                     break;
                 }
-                l.records.append({RecItem::Leaf, -1, p.data, p.count, p.durationUs});
+                l.records.append({RecItem::Leaf, -1, p.data, p.count, p.durationUs, {}});
+                j += p.count;
+                break;
+            case StampPart::Commitments:
+                if (s.version < 2 || p.count < 1 || p.count > kGroup || p.data.size() != qsizetype(p.count) * 32) {
+                    l.ok = false;
+                    break;
+                }
+                for (int i = 0; i < p.count; ++i)
+                    l.records.append({RecItem::Commitment, -1, p.data.mid(qsizetype(i) * 32, 32), 1,
+                                      i == p.count - 1 ? p.durationUs : 0, {}});
+                j += p.count;
                 break;
             case StampPart::Packets:
                 if (s.version < 2)
@@ -229,8 +260,10 @@ QByteArray imprint(const Stamp &s, const Layout &l, QByteArrayView previous)
             n += r.count;
             continue;
         }
-        group += r.encoded;
-        duration += dtOf(r.encoded);
+        if (r.kind == RecItem::Hidden || (r.kind == RecItem::Present && r.salt.size() != kSaltSize))
+            return {}; // a record of v1 or one with no salt: not of this chain
+        group += r.kind == RecItem::Commitment ? r.encoded : commitment(r.salt, r.encoded);
+        duration += durationOf(r);
         ++n;
         if (++inGroup == kGroup)
             flush();
@@ -239,29 +272,43 @@ QByteArray imprint(const Stamp &s, const Layout &l, QByteArrayView previous)
     QByteArray packets;
     for (const PacketItem &p : l.packets)
         packets += p.hash;
-    return chunkHashV2(previous, n, s.delayMs, sha256(leaves), int(l.packets.size()), packets);
+    return chunkHashV3(previous, n, s.delayMs, sha256(leaves), int(l.packets.size()), packets);
 }
 
 quint64 durationOf(const RecItem &r)
 {
-    return r.kind == RecItem::Leaf ? r.durationUs : r.kind == RecItem::Unstamped ? 0 : dtOf(r.encoded);
+    switch (r.kind) {
+    case RecItem::Leaf:
+    case RecItem::Commitment: return r.durationUs;
+    case RecItem::Unstamped: return 0;
+    default: return dtOf(r.encoded);
+    }
+}
+
+// The hash of a record of a chunk v3 as its group takes it.
+QByteArray commitmentOf(const RecItem &r)
+{
+    return r.kind == RecItem::Commitment ? r.encoded : commitment(r.salt, r.encoded);
 }
 
 // The parts of a chunk whose records `keep` says are in the new document (their new indexes follow in order) and
-// whose packets `keepPacket` says are: whole hidden groups become leaves (v2), the rest stays as records.
+// whose packets `keepPacket` says are. v3: whole hidden groups become leaves, the hidden records of a group cut by the
+// edge their hashes; `withSalts` - the records kept carry their salts (the new stamp has no key). v1: the records
+// not kept go as they are.
 QList<StampPart> partsOf(const Stamp &s, const Layout &l, const std::function<bool(const RecItem &)> &keep,
-                         const std::function<bool(const PacketItem &)> &keepPacket, int *revealed)
+                         const std::function<bool(const PacketItem &)> &keepPacket, bool withSalts, int *revealed)
 {
     QList<StampPart> parts;
     auto add = [&parts](StampPart::Kind kind, int count, const QByteArray &data = {}) {
-        if (!parts.isEmpty() && parts.last().kind == kind && kind != StampPart::Leaf && kind != StampPart::HiddenPacket) {
+        if (!parts.isEmpty() && parts.last().kind == kind
+            && (kind == StampPart::Records || kind == StampPart::Hidden || kind == StampPart::Packets)) {
             parts.last().count += count;
             parts.last().data += data;
         } else {
             parts.append({kind, count, 0, data});
         }
     };
-    // The records in groups (v2), as the hash takes them.
+    // The records in groups (v3), as the hash takes them.
     QList<RecItem> stamped;
     for (const RecItem &r : l.records)
         if (r.kind != RecItem::Unstamped)
@@ -286,11 +333,35 @@ QList<StampPart> partsOf(const Stamp &s, const Layout &l, const std::function<bo
                 QByteArray group;
                 quint64 duration = 0;
                 for (qsizetype k = i; k < end; ++k) {
-                    group += stamped[k].encoded;
-                    duration += dtOf(stamped[k].encoded);
+                    group += commitmentOf(stamped[k]);
+                    duration += durationOf(stamped[k]);
                 }
                 parts.append({StampPart::Leaf, int(end - i), duration, sha256(group)});
             }
+        } else if (s.version >= 2) {
+            // A group cut by an edge: the records kept as they are, each run of the others as their hashes.
+            QByteArray hidden;
+            int count = 0;
+            quint64 duration = 0;
+            auto flushHidden = [&] {
+                if (count)
+                    parts.append({StampPart::Commitments, count, duration, hidden});
+                hidden.clear();
+                count = 0;
+                duration = 0;
+            };
+            for (qsizetype k = i; k < end; ++k) {
+                const RecItem &r = stamped[k];
+                if (r.kind == RecItem::Present && keep(r)) {
+                    flushHidden();
+                    add(StampPart::Records, 1, withSalts ? r.salt : QByteArray());
+                } else {
+                    hidden += commitmentOf(r);
+                    ++count;
+                    duration += durationOf(r);
+                }
+            }
+            flushHidden();
         } else {
             for (qsizetype k = i; k < end; ++k) {
                 const RecItem &r = stamped[k];
@@ -307,7 +378,7 @@ QList<StampPart> partsOf(const Stamp &s, const Layout &l, const std::function<bo
     }
     int unstamped = 0; // records of a voided stamp left in the document
     for (const RecItem &r : l.records)
-        if (r.kind == RecItem::Unstamped && keep(RecItem{RecItem::Present, r.doc, {}, 1, 0}))
+        if (r.kind == RecItem::Unstamped && keep(RecItem{RecItem::Present, r.doc, {}, 1, 0, {}}))
             ++unstamped;
     if (unstamped)
         parts.append({StampPart::Unstamped, unstamped, 0, {}});
@@ -347,6 +418,23 @@ QByteArray chunkHash(QByteArrayView previousImprint, int length, quint32 delayMs
     return h.result();
 }
 
+QByteArray salt(QByteArrayView key, quint32 j)
+{
+    // A hash with the key in front is enough here: the other salts are not extensions of a known input but inputs of
+    // the same length with another j, and the output is cut.
+    char index[4], out[32];
+    qToLittleEndian<quint32>(j, index);
+    sha256Into(out, key, QByteArrayView(index, 4));
+    return QByteArray(out, kSaltSize);
+}
+
+QByteArray commitment(QByteArrayView salt, QByteArrayView encodedRecord)
+{
+    QByteArray out(32, Qt::Uninitialized);
+    sha256Into(out.data(), salt, encodedRecord);
+    return out;
+}
+
 QByteArray leaf(int count, quint64 durationUs, QByteArrayView groupHash)
 {
     QByteArray in(9, Qt::Uninitialized);
@@ -355,15 +443,21 @@ QByteArray leaf(int count, quint64 durationUs, QByteArrayView groupHash)
     return sha256(in + groupHash.toByteArray());
 }
 
-QByteArray recordsHash(QByteArrayView encoded)
+QByteArray recordsHash(QByteArrayView encoded, QByteArrayView key)
 {
     QByteArray leaves;
     for (qsizetype i = 0; i < encoded.size(); i += 12 * kGroup) {
         const QByteArrayView group = encoded.sliced(i, std::min<qsizetype>(12 * kGroup, encoded.size() - i));
         quint64 duration = 0;
-        for (qsizetype k = 0; k < group.size(); k += 12)
+        QByteArray commitments(group.size() / 12 * 32, Qt::Uninitialized);
+        for (qsizetype k = 0; k < group.size(); k += 12) {
             duration += dtOf(group.sliced(k, 12));
-        leaves += leaf(int(group.size() / 12), duration, sha256(group));
+            char index[4], salted[32];
+            qToLittleEndian<quint32>(quint32((i + k) / 12), index);
+            sha256Into(salted, key, QByteArrayView(index, 4));
+            sha256Into(commitments.data() + k / 12 * 32, QByteArrayView(salted, kSaltSize), group.sliced(k, 12));
+        }
+        leaves += leaf(int(group.size() / 12), duration, sha256(commitments));
     }
     return sha256(leaves);
 }
@@ -373,11 +467,11 @@ QByteArray packetHash(const MediaPacket &p)
     return sha256(MediaClip::packetBytes(p));
 }
 
-QByteArray chunkHashV2(QByteArrayView previousImprint, int records, quint32 delayMs, QByteArrayView recordsHash,
+QByteArray chunkHashV3(QByteArrayView previousImprint, int records, quint32 delayMs, QByteArrayView recordsHash,
                        int packets, QByteArrayView packetHashes)
 {
     QCryptographicHash h(QCryptographicHash::Sha256);
-    h.addData(QByteArrayView("TypingStatistics stamps 2"));
+    h.addData(QByteArrayView("TypingStatistics stamps 3"));
     const char size = char(previousImprint.size());
     h.addData(QByteArrayView(&size, 1));
     h.addData(previousImprint);
@@ -415,15 +509,16 @@ QByteArray Chain::hash(QByteArrayView previousImprint, int from, int to, quint32
     return chunkHash(previousImprint, to - from, delayMs, QByteArrayView(m_encoded).sliced(from * 12, (to - from) * 12));
 }
 
-QByteArray Chain::hashV2(QByteArrayView previousImprint, int from, int to, quint32 delayMs, QByteArrayView packetHashes,
-                         int packets) const
+QByteArray Chain::hashV3(QByteArrayView previousImprint, int from, int to, quint32 delayMs, QByteArrayView key,
+                         QByteArrayView packetHashes, int packets) const
 {
-    return chunkHashV2(previousImprint, to - from, delayMs,
-                       recordsHash(QByteArrayView(m_encoded).sliced(from * 12, (to - from) * 12)), packets, packetHashes);
+    return chunkHashV3(previousImprint, to - from, delayMs,
+                       recordsHash(QByteArrayView(m_encoded).sliced(from * 12, (to - from) * 12), key), packets,
+                       packetHashes);
 }
 
 Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QList<QByteArray> &certificates,
-              const MediaClip *clip, qint64 clipModelOffsetUs, std::optional<quint32> firstDtUs)
+              const MediaClip *clip, qint64 clipModelOffsetUs, std::optional<quint32> firstDtUs, Cache *cache)
 {
     Report rep;
     rep.records = int(normalized.size());
@@ -454,6 +549,17 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
     for (int k = 0; k < stamps.size(); ++k) {
         const Stamp &s = stamps[k];
         const QByteArray previous = k == 0 ? s.previous : imprintOf(stamps[k - 1].token);
+        if (!isVersionChecked(s.version)) {
+            // Not this program's to check: its records are not stamped, but nothing is broken; the chain goes on
+            // after it (its chunk ends where it says).
+            ++rep.unknown;
+            lastGoodEnd = -1;
+            if (structure && (s.end < recordCursor || s.mediaEnd < packetCursor))
+                structure = false;
+            recordCursor = s.end;
+            packetCursor = s.mediaEnd;
+            continue;
+        }
         bool good = false;
         Layout l;
         if (structure) {
@@ -486,9 +592,27 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
             }
         }
         TimeStamp::Info info;
-        const bool tokenOk = TimeStamp::verify(s.token, certificates, &info) == TimeStamp::Check::Ok && info.sha256;
-        const bool matches = tokenOk && info.imprint == imprint(s, l, previous);
-        const bool keptLeaves = s.version >= 2 && !s.parts.isEmpty();
+        bool tokenOk = false, matches = false;
+        const auto same = [&](const Cache::Entry &e) {
+            return e.end == s.end && e.mediaEnd == s.mediaEnd && e.recordCursor == recordCursor
+                   && e.packetCursor == packetCursor && e.parts == s.parts.size() && e.clip == (clip != nullptr)
+                   && e.token == s.token && e.previous == previous;
+        };
+        if (cache && k < cache->entries.size() && same(cache->entries[k])) {
+            const Cache::Entry &e = cache->entries[k];
+            tokenOk = e.tokenOk;
+            matches = e.matches;
+            info = e.info;
+        } else {
+            tokenOk = TimeStamp::verify(s.token, certificates, &info) == TimeStamp::Check::Ok && info.sha256;
+            matches = tokenOk && info.imprint == imprint(s, l, previous);
+            if (cache) {
+                cache->entries.resize(k);
+                cache->entries.append({s.token, previous, s.end, s.mediaEnd, recordCursor, packetCursor,
+                                       s.parts.size(), clip != nullptr, tokenOk, matches, info});
+            }
+        }
+        const bool keptLeaves = s.version >= 2 && !s.parts.isEmpty();  // v3
         if (s.voided) {
             ++rep.voided;
             // A voided stamp v2 with its records as leaves still stamps its packets.
@@ -561,7 +685,7 @@ void follow(QList<Stamp> &stamps, const KeyRecords &before, const KeyRecords &ed
 {
     if (stamps.isEmpty())
         return;
-    // The layouts over the records before the edit (v2 voided stamps keep them as leaves).
+    // The layouts over the records before the edit (v3 voided stamps keep them as leaves).
     const Records old(before, stamps, std::nullopt);
     QList<Layout> layouts;
     {
@@ -587,6 +711,14 @@ void follow(QList<Stamp> &stamps, const KeyRecords &before, const KeyRecords &ed
     for (int k = 0; k < stamps.size(); ++k) {
         Stamp &s = stamps[k];
         const int oldEnd = s.end;
+        if (!isVersionChecked(s.version)) { // not followed: it stays where it was, if it can
+            s.end = int(std::upper_bound(tags.begin(), tags.end(), quint32(s.end)) - tags.begin());
+            s.end = std::max(s.end, prevEnd);
+            prevEnd = s.end;
+            prevOldEnd = oldEnd;
+            previous = imprintOf(s.token);
+            continue;
+        }
         s.end = int(std::upper_bound(tags.begin(), tags.end(), quint32(s.end)) - tags.begin());
         const QByteArrayView now = QByteArrayView(encoded).sliced(prevEnd * 12, std::max(0, s.end - prevEnd) * 12);
         bool changed;
@@ -609,7 +741,7 @@ void follow(QList<Stamp> &stamps, const KeyRecords &before, const KeyRecords &ed
             if (s.version >= 2 && layouts[k].ok) {
                 // Its records as leaves (none of them is shown), the records left of them unstamped, its packets.
                 QList<StampPart> parts = partsOf(s, layouts[k], [](const RecItem &) { return false; },
-                                                 [](const PacketItem &) { return true; }, nullptr);
+                                                 [](const PacketItem &) { return true; }, false, nullptr);
                 const int left = std::max(0, s.end - prevEnd);
                 if (left)
                     parts.insert(std::find_if(parts.begin(), parts.end(),
@@ -673,7 +805,14 @@ QList<Stamp> extract(const QList<Stamp> &stamps, const KeyRecords &normalized, c
     for (int k = first; k <= last; ++k) {
         const Stamp &s = stamps[k];
         Stamp b = s;
-        b.parts = partsOf(s, layouts[k], keepRecord, keepPacket, revealed);
+        // v3: the key stays with a stamp all of whose records are in the block; otherwise the records shown carry
+        // their salts, and the others' cannot be had.
+        bool all = true;
+        for (const RecItem &r : layouts[k].records)
+            all &= r.kind == RecItem::Unstamped || keepRecord(r);
+        const bool keepKey = s.version >= 2 && all && !s.key.isEmpty();
+        b.key = keepKey ? s.key : QByteArray();
+        b.parts = partsOf(s, layouts[k], keepRecord, keepPacket, s.version >= 2 && !keepKey, revealed);
         for (const StampPart &p : b.parts) {
             if (p.kind == StampPart::Records)
                 end += p.count;

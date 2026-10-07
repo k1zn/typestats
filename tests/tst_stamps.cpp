@@ -310,9 +310,10 @@ private slots:
 
     void videoChain()
     {
-        // The chain v2 with a webcam clip (make_stamped.py --v2 --video): records and packets confirmed.
+        // The chain v3 with a webcam clip (make_stamped.py --v3 --video): records and packets confirmed.
         const TsfDocument doc = load("video.tsf");
-        QCOMPARE(doc.stamps.first().version, 2);
+        QCOMPARE(doc.stamps.first().version, 3);
+        QCOMPARE(doc.stamps.first().key.size(), Stamps::kKeySize);
         MediaClip clip;
         QVERIFY(MediaClip::parse(doc.webcam, clip));
         QCOMPARE(clip.packets.size(), 206);
@@ -350,9 +351,48 @@ private slots:
         QVERIFY(r.packetsLate > 0);
     }
 
-    void liveChainV2()
+    void cache()
     {
-        // The chain v2 record by record, with the packets of each stamp: the imprints that were stamped.
+        // The checks kept between reports: the same report; a stamp added later is checked on its own.
+        const TsfDocument doc = load("video.tsf");
+        MediaClip clip;
+        QVERIFY(MediaClip::parse(doc.webcam, clip));
+        const KeyRecords normalized = Recalc::normalized(doc.records);
+        Stamps::Cache cache;
+        QList<Stamp> first = doc.stamps.mid(0, 2);
+        Stamps::Report r = Stamps::verify(normalized, first, doc.stampCertificates, &clip, DocTime::modelOffset(doc.records),
+                                          {}, &cache);
+        QCOMPARE(cache.entries.size(), 2);
+        r = Stamps::verify(normalized, doc.stamps, doc.stampCertificates, &clip, DocTime::modelOffset(doc.records), {},
+                           &cache);
+        QCOMPARE(cache.entries.size(), 3);
+        const Stamps::Report plain = reportWith(doc, clip);
+        QCOMPARE(r.status, plain.status);
+        QCOMPARE(r.confirmed, plain.confirmed);
+        QCOMPARE(r.packetsStamped, plain.packetsStamped);
+        QCOMPARE(r.status, Stamps::Report::Status::Confirmed);
+    }
+
+    void unknownVersion()
+    {
+        // A stamp of a version this program does not check (the unreleased v2, a newer one): its records are not
+        // stamped, but nothing is broken, and the stamps after it are checked.
+        TsfDocument doc = load("video.tsf");
+        MediaClip clip;
+        QVERIFY(MediaClip::parse(doc.webcam, clip));
+        doc.stamps[0].version = 4;
+        TsfDocument back = Tsf::parse(Tsf::serialize(doc, true));
+        QCOMPARE(back.stamps[0].version, 4);
+        const Stamps::Report r = reportWith(back, clip);
+        QCOMPARE(r.unknown, 1);
+        QCOMPARE(r.bad, 0);
+        QCOMPARE(r.status, Stamps::Report::Status::Partial);
+        QVERIFY(r.stamped >= 175);
+    }
+
+    void liveChainV3()
+    {
+        // The chain v3 record by record, with the packets of each stamp: the imprints that were stamped.
         const TsfDocument doc = load("video.tsf");
         MediaClip clip;
         QVERIFY(MediaClip::parse(doc.webcam, clip));
@@ -366,7 +406,7 @@ private slots:
             for (int i = media; i < s.mediaEnd; ++i)
                 hashes += Stamps::packetHash(clip.packets[i]);
             const QByteArray imprint = TimeStamp::info(s.token)->imprint;
-            QCOMPARE(chain.hashV2(previous, from, s.end, s.delayMs, hashes, s.mediaEnd - media), imprint);
+            QCOMPARE(chain.hashV3(previous, from, s.end, s.delayMs, s.key, hashes, s.mediaEnd - media), imprint);
             previous = imprint;
             from = s.end;
             media = s.mediaEnd;
@@ -414,17 +454,31 @@ private slots:
         if (video)
             block.webcam = cut.serialize();
         QVERIFY(!block.stamps.isEmpty());
-        // Records outside go as they are only for v1 or a group cut by an edge (at most 7 on each side).
-        if (file.startsWith(u"stamped"))
+        // Records outside go as they are only for v1; v3 - as hashes of salted records, and the salts only of the
+        // block's records (the key only with a stamp all of whose records are in it).
+        if (file.startsWith(u"stamped")) {
             QVERIFY(revealed > 0);
-        else
-            QVERIFY2(revealed <= 14, qPrintable(QString::number(revealed)));
+        } else {
+            QCOMPARE(revealed, 0);
+            for (const Stamp &s : block.stamps) {
+                bool hides = false;
+                for (const StampPart &p : s.parts) {
+                    QVERIFY(p.kind != StampPart::Hidden);
+                    hides |= p.kind == StampPart::Leaf || p.kind == StampPart::Commitments;
+                    if (p.kind == StampPart::Records)
+                        QCOMPARE(p.data.size(), s.key.isEmpty() ? qsizetype(p.count) * Stamps::kSaltSize : 0);
+                }
+                if (hides)
+                    QVERIFY(s.key.isEmpty());
+            }
+        }
         const TsfDocument back = Tsf::parse(Tsf::serialize(block, true));
         QCOMPARE(back.stamps.size(), block.stamps.size());
         for (int i = 0; i < block.stamps.size(); ++i) {
             QCOMPARE(back.stamps[i].parts, block.stamps[i].parts);
             QCOMPARE(back.stamps[i].previous, block.stamps[i].previous);
             QCOMPARE(back.stamps[i].mediaEnd, block.stamps[i].mediaEnd);
+            QCOMPARE(back.stamps[i].key, block.stamps[i].key);
         }
         MediaClip backClip;
         if (video)
@@ -446,7 +500,21 @@ private slots:
                 if (!touched && p.kind == StampPart::Leaf) {
                     p.durationUs += 1000;
                     touched = true;
-                } else if (!touched && p.kind == StampPart::Hidden) {
+                } else if (!touched && (p.kind == StampPart::Hidden || p.kind == StampPart::Commitments)) {
+                    p.data[0] = char(p.data[0] ^ 1);
+                    touched = true;
+                }
+        if (touched)
+            QCOMPARE(reportWith(forged, backClip).status, Stamps::Report::Status::Broken);
+        // The hidden time of a cut group or a salt changed: broken.
+        forged = back;
+        touched = false;
+        for (Stamp &s : forged.stamps)
+            for (StampPart &p : s.parts)
+                if (!touched && p.kind == StampPart::Commitments) {
+                    p.durationUs += 1000;
+                    touched = true;
+                } else if (!touched && p.kind == StampPart::Records && !p.data.isEmpty()) {
                     p.data[0] = char(p.data[0] ^ 1);
                     touched = true;
                 }
@@ -458,7 +526,7 @@ private slots:
         QCOMPARE(reportWith(edited, backClip).status, Stamps::Report::Status::Broken);
     }
 
-    void followV2()
+    void followV3()
     {
         // An edit voids the stamp of its records, which keeps them as leaves: its packets stay stamped.
         TsfDocument doc = load("video.tsf");

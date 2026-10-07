@@ -127,6 +127,7 @@ int main(int argc, char *argv[])
             {"stamps", QString::number(r.stamps)},
             {"bad", QString::number(r.bad)},
             {"voided", QString::number(r.voided)},
+            {"unknown", QString::number(r.unknown)},
             {"records", QString::number(r.records)},
             {"stamped", QString::number(r.stamped)},
             {"confirmed", QString::number(r.confirmed)},

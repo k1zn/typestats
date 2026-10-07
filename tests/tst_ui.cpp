@@ -1155,13 +1155,15 @@ private slots:
         Stamps::Chain chain;
         for (const KeyRecord &r : doc.records)
             chain.push(r);
-        // The chain v2: the records as leaves, no video here.
-        QVERIFY(sent[0].imprint == chain.hashV2({}, 0, 2, 0, {}, 0) || sent[0].imprint == chain.hashV2({}, 0, 2, 1, {}, 0));
         key(u'b', 1000, true); // while it is on its way: no second request
         QCOMPARE(sent.size(), 1);
         sent[0].done(fakeToken(sent[0].imprint), {});
         QCOMPARE(doc.stamps.size(), 1);
         QCOMPARE(doc.stamps[0].end, 2);
+        // The chain v3: the records salted with the stamp's key, in leaves; no video here.
+        QCOMPARE(doc.stamps[0].version, Stamps::kVersion);
+        QCOMPARE(doc.stamps[0].key.size(), Stamps::kKeySize);
+        QCOMPARE(chain.hashV3({}, 0, 2, doc.stamps[0].delayMs, doc.stamps[0].key, {}, 0), sent[0].imprint);
         QCOMPARE(changed.size(), 1);
         // Within the interval nothing; the first key after it - a stamp of everything since.
         key(u'c', 4000000);

@@ -10,17 +10,20 @@
 struct StampPart
 {
     enum Kind : quint8 {
-        Records,      // "R<k>": the next k records of the document
+        Records,      // "R<k>[:<z85>]": the next k records of the document; v3 without a key - their salts
         Unstamped,    // "U<k>": the next k records of the document are not under this stamp (it was voided)
-        Hidden,       // "H<z85>": records not in the document, 12 bytes each
+        Hidden,       // "H<z85>": v1 - records not in the document, 12 bytes each
         Leaf,         // "L<count>:<duration>:<hash>": a whole group of records not in the document
+        Commitments,  // "C<count>:<duration>:<z85>": v3 - records of a group cut by a block's edge, as hashes
         Packets,      // "V<k>": the next k packets of the document's video
         HiddenPacket, // "W<hash>": a packet not in the document
     };
     Kind kind = Records;
-    int count = 0;           // Records, Unstamped, Packets; Leaf: records of the group
-    quint64 durationUs = 0;  // Leaf: the sum of their dt
-    QByteArray data;         // Hidden: the records; Leaf: SHA-256 of them; HiddenPacket: SHA-256 of the packet
+    int count = 0;           // Records, Unstamped, Packets; Leaf, Commitments: records
+    quint64 durationUs = 0;  // Leaf, Commitments: the sum of their dt
+    // Records: their salts (16 bytes each) or none; Hidden: the records; Leaf: the hash of the group; Commitments:
+    // the hashes of the records (32 bytes each); HiddenPacket: SHA-256 of the packet.
+    QByteArray data;
     bool operator==(const StampPart &) const = default;
 };
 
@@ -32,9 +35,12 @@ struct Stamp
     quint32 delayMs = 0;
     bool voided = false; // its records were edited here afterwards: it only links the chain
     QByteArray token;
-    int version = 1;     // the chain: 1 - records hashed in a row, 2 - leaves of records and video packets
-    int mediaEnd = 0;    // v2: the packets of the document's clip up to this one
-    QList<StampPart> parts;  // v2 (and v1 in a block): empty - the chunk is all in the document
+    // The chain: 1 - records hashed in a row (1.1.0); 3 - salted records in leaves, and video packets. Others (2: of
+    // the days before 1.2, never released; newer ones) are not checked.
+    int version = 1;
+    int mediaEnd = 0;    // v3: the packets of the document's clip up to this one
+    QByteArray key;      // v3: the key of the records' salts (16 bytes); none in a block that hides some of them
+    QList<StampPart> parts;  // v3 (and v1 in a block): empty - the chunk is all in the document
     QByteArray previous;     // the imprint of the stamp before when it is not in the file (the first stamp of a block)
 };
 

@@ -259,6 +259,7 @@ private:
     QElapsedTimer m_playClock;
     qint64 m_playFromUs = 0;
     StampRecorder *m_stamps = nullptr;
+    mutable Stamps::Cache m_stampCache; // cleared with every m_stamps->attach (the records replaced)
     bool m_proofPending = false;
     JournalWriter m_journal;
     bool m_journalFailed = false; // the journal could not be written: said once

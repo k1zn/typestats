@@ -141,6 +141,7 @@ MainWindow::MainWindow(QWidget *parent)
     m_doc.platform = currentKeyPlatform(); // a recording made here
     m_stamps = new StampRecorder(this);
     m_stamps->setClip(&m_clip);
+    m_stampCache.clear(); // the records replaced: the checks of the stamps are done anew
     m_stamps->attach(&m_doc);
     // A stamp (or a failed request) and the video alone are not unsaved records: a save takes a stamp of all there
     // is (stampForSave), and video that goes on after it is not worth a question when closing.
@@ -770,7 +771,7 @@ Stamps::Report MainWindow::stampReport() const
             break;
         }
     return Stamps::verify(Recalc::normalized(m_doc.records), m_doc.stamps, m_doc.stampCertificates, &m_clip,
-                          DocTime::modelOffset(m_doc.records), firstDt);
+                          DocTime::modelOffset(m_doc.records), firstDt, &m_stampCache);
 }
 
 void MainWindow::showProof()
@@ -804,6 +805,8 @@ void MainWindow::showProof()
                          .arg(loc.toString(r.hiddenBeforeUs / 1e6, 'f', 1), loc.toString(r.hiddenAfterUs / 1e6, 'f', 1));
         if (r.voided)
             lines << tr("Изменено после записи: участков — %1").arg(r.voided);
+        if (r.unknown)
+            lines << tr("Меток версии, которую эта программа не проверяет: %1").arg(r.unknown);
         if (r.bad)
             lines << tr("Не сходятся с записью или подписью: меток — %1").arg(r.bad);
     }
@@ -1050,6 +1053,7 @@ void MainWindow::normalizeRecords()
     m_docEndUs = DocTime::end(m_doc.records);
     syncWebcamClock();
     keepRoomForRecording();
+    m_stampCache.clear(); // the records replaced: the checks of the stamps are done anew
     m_stamps->attach(&m_doc); // the same normalized records, the chain built anew
 }
 
@@ -1075,6 +1079,7 @@ void MainWindow::endEdit()
     }
     m_docEndUs = DocTime::end(m_doc.records);
     syncWebcamClock();
+    m_stampCache.clear(); // the records replaced: the checks of the stamps are done anew
     m_stamps->attach(&m_doc);
     m_unsaved = true;
     recalculate();
@@ -1142,6 +1147,7 @@ void MainWindow::undo()
     syncWebcamClock();
     m_unsaved = true;
     keepRoomForRecording();
+    m_stampCache.clear(); // the records replaced: the checks of the stamps are done anew
     m_stamps->attach(&m_doc);
     recalculate();
     updateProof();
@@ -1794,6 +1800,7 @@ void MainWindow::setDocument(const TsfDocument &doc, const QString &title, bool 
     }
 #endif
     keepRoomForRecording();
+    m_stampCache.clear(); // the records replaced: the checks of the stamps are done anew
     m_stamps->attach(&m_doc, true);
     setTitle(title);
     m_damaged->setVisible(damaged);

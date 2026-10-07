@@ -8,6 +8,7 @@
 // TS_PERF_SIZES=10000,100000 limits the sizes. Every scenario runs several times; the median, the
 // minimum and the maximum go to $TS_PERF_DIR/perf.txt (appended) and to the test log.
 
+#include "core/Stamps.h"
 #include "core/Editing.h"
 #include "core/ExtraStats.h"
 #include "core/FingerZones.h"
@@ -955,6 +956,37 @@ private slots:
                 ExtraStats::collect(m, fingers, 0, m.size(), ExtraStats::Words, QString()), false, 0);
             measure(QStringLiteral("extra toText words (%1 rows)").arg(rows.size()), n,
                     [&] { ExtraStats::toText(rows, false, QLocale(), {}); });
+        }
+    }
+
+    // The hashes of the time stamps (re/stamps.md): v1 hashes a chunk in a row, v3 salts each record (two more
+    // SHA-256 of a record) - what opening a stamped file and taking a stamp cost.
+    void stamps()
+    {
+        for (int n : m_sizes) {
+            TsfDocument doc;
+            QCOMPARE(Tsf::read(tsf(n), doc), Tsf::ReadError::None);
+            const KeyRecords recs = Recalc::normalized(doc.records);
+            QByteArray encoded;
+            for (const KeyRecord &r : recs)
+                encoded += Stamps::encode(r);
+            const int chunk = 100; // a stamp in 10 s of fast typing
+            const QByteArray key(Stamps::kKeySize, 'k');
+            measure(QStringLiteral("stamps v1 hash all"), n, [&] {
+                for (qsizetype i = 0; i < encoded.size(); i += 12 * chunk)
+                    Stamps::chunkHash({}, chunk, 0, QByteArrayView(encoded).sliced(i, std::min<qsizetype>(12 * chunk, encoded.size() - i)));
+            });
+            measure(QStringLiteral("stamps v3 hash all"), n, [&] {
+                for (qsizetype i = 0; i < encoded.size(); i += 12 * chunk)
+                    Stamps::recordsHash(QByteArrayView(encoded).sliced(i, std::min<qsizetype>(12 * chunk, encoded.size() - i)), key);
+            });
+            Stamps::Chain chain;
+            for (int i = 0; i < std::min<qsizetype>(recs.size(), chunk); ++i)
+                chain.push(doc.records[i]);
+            measure(QStringLiteral("stamps v3 one stamp of 100"), chunk, [&] {
+                for (int i = 0; i < 1000; ++i)
+                    chain.hashV3({}, 0, chain.size(), 0, key, {}, 0);
+            });
         }
     }
 

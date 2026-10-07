@@ -944,6 +944,10 @@ Copy the command, paste it into a terminal and enter your password. This is need
         <source>Видео под метками: %1 %</source>
         <translation>Video under the stamps: %1 %</translation>
     </message>
+    <message>
+        <source>Меток версии, которую эта программа не проверяет: %1</source>
+        <translation>Stamps of a version this program does not check: %1</translation>
+    </message>
 </context>
 <context>
     <name>QObject</name>

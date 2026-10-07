@@ -6,11 +6,11 @@ written independently of the program's code.
     python re/scripts/make_stamped.py tests/golden/stamps/compressed.tsf --compress 0.85
     python re/scripts/make_stamped.py tests/golden/stamps/more.tsf --services Certum,SwissSign,Microsoft
 
-    python re/scripts/make_stamped.py tests/golden/stamps/video.tsf --v2 --video
-    python re/scripts/make_stamped.py tests/golden/stamps/video_late.tsf --v2 --video --video-shift 5
+    python re/scripts/make_stamped.py tests/golden/stamps/video.tsf --v3 --video
+    python re/scripts/make_stamped.py tests/golden/stamps/video_late.tsf --v3 --video --video-shift 5
 
 --compress: the records claim a faster typing than the real one (as a modified program would): the stamps then do
-not confirm the time. --v2: the chain v2 (records as leaves of 8, re/stamps.md); --video: with a webcam clip
+not confirm the time. --v3: the chain v3 (salted records in leaves of 8, re/stamps.md); --video: with a webcam clip
 (re/webcam.md) of made-up packets, 10 a second, a key one every 4 s, timed in the document's time; --video-shift S:
 the packets claim to be S seconds later than they are (a modified program dating video after the stamps). Needs
 openssl in PATH (Git Bash has it) and the network; ~30 s.
@@ -63,24 +63,31 @@ def leaf(count, duration, group_hash):
     return hashlib.sha256(bytes([count]) + struct.pack("<Q", duration) + group_hash).digest()
 
 
-def records_hash(encoded):
-    """Stamps::recordsHash: leaves of groups of 8 records from the first, hashed together."""
+def salt(key, j):
+    """Stamps::salt: the salt of record j of a chunk, from the stamp's key."""
+    return hashlib.sha256(key + struct.pack("<I", j)).digest()[:16]
+
+
+def records_hash(encoded, key):
+    """Stamps::recordsHash: leaves of groups of 8 salted records from the first, hashed together."""
     leaves = b""
     for i in range(0, len(encoded), 12 * 8):
         group = encoded[i:i + 12 * 8]
         duration = sum(struct.unpack_from("<I", group, k)[0] for k in range(0, len(group), 12))
-        leaves += leaf(len(group) // 12, duration, hashlib.sha256(group).digest())
+        commitments = b"".join(hashlib.sha256(salt(key, (i + k) // 12) + group[k:k + 12]).digest()
+                               for k in range(0, len(group), 12))
+        leaves += leaf(len(group) // 12, duration, hashlib.sha256(commitments).digest())
     return hashlib.sha256(leaves).digest()
 
 
-def stamp_hash_v2(previous, length, delay_ms, encoded, packet_hashes):
-    """Stamps::chunkHashV2."""
+def stamp_hash_v3(previous, length, delay_ms, encoded, key, packet_hashes):
+    """Stamps::chunkHashV3."""
     h = hashlib.sha256()
-    h.update(b"TypingStatistics stamps 2")
+    h.update(b"TypingStatistics stamps 3")
     h.update(bytes([len(previous)]))
     h.update(previous)
     h.update(struct.pack("<II", length, delay_ms))
-    h.update(records_hash(encoded))
+    h.update(records_hash(encoded, key))
     h.update(struct.pack("<I", len(packet_hashes)))
     h.update(hashlib.sha256(b"".join(packet_hashes)).digest())
     return h.digest()
@@ -186,8 +193,8 @@ def main():
     ap.add_argument("--compress", type=float, default=1.0)
     ap.add_argument("--services", default="DigiCert,Sectigo,GlobalSign", help="the authorities, in turn")
     ap.add_argument("--replay", help="a .tsf to play again on the clock (its normalized records, its own timing)")
-    ap.add_argument("--v2", action="store_true", help="the chain v2")
-    ap.add_argument("--video", action="store_true", help="a webcam clip of made-up packets (needs --v2)")
+    ap.add_argument("--v3", action="store_true", help="the chain v3")
+    ap.add_argument("--video", action="store_true", help="a webcam clip of made-up packets (needs --v3)")
     ap.add_argument("--video-shift", type=float, default=0.0, help="the packets claim to be this much later, s")
     args = ap.parse_args()
     services = [s for s in SERVICES if s[0] in args.services.split(",")]
@@ -245,14 +252,16 @@ def main():
         frames_until(now)
         delay = int((now - times[-1]) * 1000)
         media_end = len(packets)
-        if args.v2:
+        key = os.urandom(16)
+        if args.v3:
             hashes = [hashlib.sha256(packet_bytes(*p)).digest() for p in packets[stamped_packets:media_end]]
-            digest = stamp_hash_v2(previous, end - stamped_end, delay, encoded[stamped_end * 12:end * 12], hashes)
+            digest = stamp_hash_v3(previous, end - stamped_end, delay, encoded[stamped_end * 12:end * 12], key,
+                                   hashes)
         else:
             digest = stamp_hash(previous, end - stamped_end, delay, encoded[stamped_end * 12:end * 12])
         token = request_stamp(digest, workdir, services[service % len(services)])
         service += 1
-        stamps.append((end, delay, token, media_end))
+        stamps.append((end, delay, token, media_end, key))
         stamped_packets = media_end
         previous, stamped_end, last_stamp_record_time = digest, end, times[-1]
         print(f"stamp {len(stamps)}: {end} records, delay {delay} ms, {services[(service - 1) % len(services)][0]}")
@@ -285,12 +294,12 @@ def main():
              for (dt, flags, ch), comment in zip(records, comments)]
     lines += ["tsfVersion=1", "autor=make_stamped.py", "date=" + time.strftime("%d.%m.%Y %H:%M:%S")]
     b64 = __import__("base64").b64encode
-    if args.v2:
-        lines += ["Stamp%d=%d %d 2 %s %d" % (i + 1, end, delay, b64(token).decode(), media_end)
-                  for i, (end, delay, token, media_end) in enumerate(stamps)]
+    if args.v3:  # flags: the version - 1, shifted past the "voided" bit
+        lines += ["Stamp%d=%d %d 4 %s %d %s" % (i + 1, end, delay, b64(token).decode(), media_end, z85(key))
+                  for i, (end, delay, token, media_end, key) in enumerate(stamps)]
     else:
         lines += ["Stamp%d=%d %d 0 %s" % (i + 1, end, delay, b64(token).decode())
-                  for i, (end, delay, token, _) in enumerate(stamps)]
+                  for i, (end, delay, token, _, _) in enumerate(stamps)]
     if packets:
         clip = clip_bytes(packets)
         text = z85(clip)
