@@ -747,6 +747,17 @@ private slots:
         QCOMPARE(again.m_playFromUs, DocTime::of(again.m_doc.records, bPress));
         again.m_video->m_play->setChecked(false);
         QVERIFY(!again.m_playTimer->isActive());
+        // Played to the end: it stops there; ▶ again starts from the beginning.
+        again.m_video->m_play->setChecked(true);
+        again.m_playFromUs = spanTo + 1;
+        again.playTick();
+        QVERIFY(!again.m_playTimer->isActive());
+        QVERIFY(!again.m_video->m_play->isChecked());
+        QCOMPARE(again.m_videoShownUs, spanTo);
+        QCOMPARE(again.m_video->m_slider->value(), again.m_video->m_slider->maximum());
+        again.m_video->m_play->setChecked(true);
+        QCOMPARE(again.m_playFromUs, spanFrom);
+        again.m_video->m_play->setChecked(false);
         // Video going on after a save is not unsaved records (no question when closing).
         w.m_unsaved = false;
         cam.addVideo(picture, 3100000);

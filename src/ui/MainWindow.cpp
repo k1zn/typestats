@@ -2430,7 +2430,8 @@ void MainWindow::playVideo(bool play)
     // From where the video stands (after seeking into a squeezed pause it is not the klavogram's edge); from the start
     // when it stands at the end.
     m_playFromUs = m_videoShownUs;
-    if (const auto [from, to] = videoSpan(); m_playFromUs >= to || m_playFromUs < from)
+    constexpr qint64 kAtEndUs = 250000; // the slider at its end, the last frame of a playback
+    if (const auto [from, to] = videoSpan(); m_playFromUs >= to - kAtEndUs || m_playFromUs < from)
         m_playFromUs = from;
     m_video->startSound(m_playFromUs);
     m_video->feedSound(m_playFromUs);
@@ -2461,12 +2462,17 @@ void MainWindow::saveVideo()
 void MainWindow::playTick()
 {
     const qint64 now = m_playFromUs + m_playClock.nsecsElapsed() / 1000;
-    const qint64 lastKey = m_model.klav.isEmpty() ? 0 : m_model.klav.last().t + DocTime::modelOffset(m_doc.records);
-    if (now > std::max(m_clip.lastUs(), lastKey)) {
+    const qint64 end = videoSpan().second;
+    if (now > end) {
         m_playTimer->stop();
 #ifdef TS_HAVE_WEBCAM
         m_video->setPlaying(false);
         m_video->stopSound();
+        // Stopped at the very end (the slider too): ▶ starts it again from the beginning.
+        m_videoAtUs = end;
+        scrollKlavogramToDocTime(end);
+        updateVideo();
+        m_videoAtUs.reset();
 #endif
         return;
     }
