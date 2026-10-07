@@ -5,7 +5,9 @@
 #include <QDialogButtonBox>
 #include <QFormLayout>
 #include <QGroupBox>
+#include <QHBoxLayout>
 #include <QLabel>
+#include <QLocale>
 #include <QSpinBox>
 #include <QVBoxLayout>
 
@@ -44,7 +46,57 @@ VideoPropertiesDialog::VideoPropertiesDialog(QWidget *parent) : QDialog(parent)
     m_quality->addItem(tr("Экономно: 320×240, 10 к/с (~0,4 МБ/мин)"));
     m_quality->addItem(tr("Обычно: 640×360, 15 к/с (~0,9 МБ/мин)"));
     m_quality->addItem(tr("Хорошо: 640×480, 24 к/с (~1,9 МБ/мин)"));
+    m_quality->addItem(tr("Своё…"));
     form->addRow(tr("Качество"), m_quality);
+
+    auto *customRow = new QWidget;
+    auto *custom = new QHBoxLayout(customRow);
+    custom->setContentsMargins(0, 0, 0, 0);
+    auto spin = [](int from, int to, int step, const QString &suffix) {
+        auto *box = new QSpinBox;
+        box->setRange(from, to);
+        box->setSingleStep(step);
+        box->setSuffix(suffix);
+        return box;
+    };
+    m_width = spin(160, 1920, 2, {});
+    m_height = spin(120, 1080, 2, {});
+    m_fps = spin(1, 30, 1, tr(" к/с"));
+    m_kbps = spin(10, 4000, 10, tr(" кбит/с"));
+    m_width->setToolTip(tr("Ширина кадра; камера с другим размером масштабируется"));
+    m_height->setToolTip(tr("Высота кадра"));
+    m_fps->setToolTip(tr("Кадров в секунду"));
+    m_kbps->setToolTip(tr("Поток видео: больше — чётче, но файл крупнее"));
+    custom->addWidget(m_width);
+    custom->addWidget(new QLabel(QStringLiteral("×")));
+    custom->addWidget(m_height);
+    custom->addWidget(m_fps);
+    custom->addWidget(m_kbps);
+    custom->addStretch(1);
+    m_estimate = new QLabel;
+    m_custom = new QWidget;
+    auto *customRows = new QVBoxLayout(m_custom);
+    customRows->setContentsMargins(0, 0, 0, 0);
+    customRows->addWidget(customRow);
+    customRows->addWidget(m_estimate);
+    form->addRow(QString(), m_custom);
+    for (QSpinBox *box : {m_width, m_height, m_fps, m_kbps}) {
+        connect(box, &QSpinBox::valueChanged, this, &VideoPropertiesDialog::updateEstimate);
+        connect(box, &QSpinBox::editingFinished, this, [this] { m_customTouched = true; });
+    }
+    connect(m_quality, &QComboBox::currentIndexChanged, this, [this](int i) {
+        // "Своё" starts from the quality chosen before.
+        if (i == WebcamRecorder::Custom && !m_customTouched) {
+            const WebcamRecorder::Preset p = WebcamRecorder::preset(m_lastQuality);
+            m_width->setValue(p.width);
+            m_height->setValue(p.height);
+            m_fps->setValue(p.fps);
+            m_kbps->setValue(p.kbps);
+        }
+        if (i != WebcamRecorder::Custom)
+            m_lastQuality = i;
+        updateEnabled();
+    });
     m_audio = new QCheckBox(tr("Записывать звук с микрофона (~0,15 МБ/мин)"));
     form->addRow(m_audio);
     m_mic = new QComboBox;
@@ -79,6 +131,12 @@ void VideoPropertiesDialog::setSettings(const WebcamRecorder::Settings &s)
 {
     m_video->setChecked(s.video);
     fillDevices(m_camera, Camera::devices(), s.camera);
+    m_customTouched = s.custom != WebcamRecorder::preset(WebcamRecorder::Normal);
+    m_lastQuality = s.quality == WebcamRecorder::Custom ? WebcamRecorder::Normal : s.quality;
+    m_width->setValue(s.custom.width);
+    m_height->setValue(s.custom.height);
+    m_fps->setValue(s.custom.fps);
+    m_kbps->setValue(s.custom.kbps);
     m_quality->setCurrentIndex(s.quality);
     m_audio->setChecked(s.audio);
     fillDevices(m_mic, Microphone::devices(), s.microphone);
@@ -91,6 +149,7 @@ WebcamRecorder::Settings VideoPropertiesDialog::settings() const
     s.video = m_video->isChecked();
     s.camera = m_camera->currentData().toString();
     s.quality = m_quality->currentIndex();
+    s.custom = WebcamRecorder::Preset{m_width->value(), m_height->value(), m_fps->value(), m_kbps->value()}.bounded();
     s.audio = m_audio->isChecked();
     s.microphone = m_mic->currentData().toString();
     return s;
@@ -111,5 +170,21 @@ void VideoPropertiesDialog::updateEnabled()
 {
     m_camera->setEnabled(m_video->isChecked());
     m_quality->setEnabled(m_video->isChecked());
+    m_custom->setVisible(m_quality->currentIndex() == WebcamRecorder::Custom);
+    m_custom->setEnabled(m_video->isChecked());
     m_mic->setEnabled(m_audio->isChecked());
+    updateEstimate();
+    adjustSize();
+}
+
+void VideoPropertiesDialog::updateEstimate()
+{
+    // As the presets: ~1 MB a minute per 100 kbit/s (a person at a keyboard, key frames included); the frame needs
+    // the bits - too few for its size and the picture is blurred.
+    const double mbPerMin = m_kbps->value() / 100.0;
+    const double bitsPerPixel = m_kbps->value() * 1000.0 / (double(m_width->value()) * m_height->value() * m_fps->value());
+    QString text = tr("~%1 МБ/мин").arg(QLocale().toString(mbPerMin, 'f', mbPerMin < 10 ? 1 : 0));
+    if (bitsPerPixel < 0.01)
+        text += QStringLiteral(" · ") + tr("мало для такого кадра: картинка будет размытой");
+    m_estimate->setText(text);
 }

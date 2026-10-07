@@ -1246,6 +1246,42 @@ Copy the command, paste it into a terminal and enter your password. This is need
         <source>Сдвиг видео</source>
         <translation>Video shift</translation>
     </message>
+    <message>
+        <source>Своё…</source>
+        <translation>Custom…</translation>
+    </message>
+    <message>
+        <source> к/с</source>
+        <translation> fps</translation>
+    </message>
+    <message>
+        <source> кбит/с</source>
+        <translation> kbit/s</translation>
+    </message>
+    <message>
+        <source>Ширина кадра; камера с другим размером масштабируется</source>
+        <translation>Frame width; a camera of another size is scaled</translation>
+    </message>
+    <message>
+        <source>Высота кадра</source>
+        <translation>Frame height</translation>
+    </message>
+    <message>
+        <source>Кадров в секунду</source>
+        <translation>Frames per second</translation>
+    </message>
+    <message>
+        <source>Поток видео: больше — чётче, но файл крупнее</source>
+        <translation>Video bitrate: higher is sharper, but the file is larger</translation>
+    </message>
+    <message>
+        <source>~%1 МБ/мин</source>
+        <translation>~%1 MB/min</translation>
+    </message>
+    <message>
+        <source>мало для такого кадра: картинка будет размытой</source>
+        <translation>too little for such a frame: the picture will be blurred</translation>
+    </message>
 </context>
 <context>
     <name>VideoWindow</name>
@@ -1268,6 +1304,10 @@ Copy the command, paste it into a terminal and enter your password. This is need
     <message>
         <source>В этой записи нет видео</source>
         <translation>This recording has no video</translation>
+    </message>
+    <message>
+        <source>Перемотка (стрелки — на секунду)</source>
+        <translation>Seek (arrow keys: a second)</translation>
     </message>
 </context>
 </TS>

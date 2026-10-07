@@ -2,6 +2,7 @@
 
 #include "core/MediaClip.h"
 
+#include <QIcon>
 #include <QImage>
 #include <QWidget>
 #include <memory>
@@ -10,6 +11,7 @@ class AudioOut;
 class Av1Decoder;
 class OpusAudioDecoder;
 class QLabel;
+class QSlider;
 class QToolButton;
 
 // The picture of the webcam (Form5 "Видео", re/webcam.md): while recording - what the camera sees; while looking at a
@@ -31,6 +33,8 @@ public:
     // The frame at the document's time.
     void showTime(qint64 docUs);
     void setPlaying(bool playing);
+    // The span of the slider (the document's time of the first and the last key or frame).
+    void setSpan(qint64 fromUs, qint64 toUs);
     // The sound of the clip while playing: from a time, then kept a little ahead of the time played.
     void startSound(qint64 docUs);
     void feedSound(qint64 docUs);
@@ -42,16 +46,20 @@ public:
 signals:
     void playToggled(bool play);
     void saveRequested(); // "Сохранить видео…": the clip as a WebM file
+    void seekRequested(qint64 docUs); // the slider moved by hand
     void visibilityChanged(bool visible);
 
 protected:
     void paintEvent(QPaintEvent *e) override;
     void showEvent(QShowEvent *e) override;
     void hideEvent(QHideEvent *e) override;
+    void changeEvent(QEvent *e) override;
 
 private:
+    friend class TstUi;
     QRect pictureRect() const;
     void updateTimeLabel(qint64 docUs);
+    void updateIcons(); // drawn in the colour of the text (the themes)
 
     bool m_live = false;
     bool m_recording = false;
@@ -69,4 +77,8 @@ private:
     QToolButton *m_save = nullptr;
     QLabel *m_time = nullptr;
     QLabel *m_rec = nullptr;
+    QSlider *m_slider = nullptr;   // milliseconds from the span's start
+    qint64 m_spanFromUs = 0, m_spanToUs = 0;
+    bool m_resume = false;         // playing when the slider was grabbed: on again when let go
+    QIcon m_playIcon, m_pauseIcon;
 };

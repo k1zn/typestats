@@ -18,21 +18,27 @@ class WebcamRecorder : public QObject
 {
     Q_OBJECT
 public:
+    struct Preset
+    {
+        int width, height, fps, kbps;
+        bool operator==(const Preset &) const = default;
+        // Within what the encoder and the cameras take: even sizes 160×120..1920×1080, 1..30 fps, 10..4000 kbit/s.
+        Preset bounded() const;
+    };
+    enum Quality { Economy, Normal, Good, Custom };
+    static Preset preset(int quality); // Economy..Good
     struct Settings
     {
         bool video = false;   // "WebcamOn"
         QString camera;       // "WebcamDevice": an id of Camera::devices(), empty - the first camera
-        int quality = 1;      // "WebcamQuality": 0 economy, 1 normal, 2 good
+        int quality = Normal; // "WebcamQuality": Quality
+        Preset custom{640, 360, 15, 90}; // "WebcamWidth", "WebcamHeight", "WebcamFps", "WebcamKbps": for Custom
         bool audio = false;   // "WebcamAudio"
         QString microphone;   // "WebcamMic"
+        Preset preset() const { return quality == Custom ? custom.bounded() : WebcamRecorder::preset(quality); }
         static Settings load();
         void save() const;
     };
-    struct Preset
-    {
-        int width, height, fps, kbps;
-    };
-    static Preset preset(int quality);
 
     explicit WebcamRecorder(QObject *parent = nullptr);
     ~WebcamRecorder() override;

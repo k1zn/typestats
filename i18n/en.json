@@ -274,5 +274,15 @@
   "Воспроизвести: клавограмма прокручивается вместе с видео": "Play: the klavogram scrolls along with the video",
   "Запись": "Recording",
   "Сохранить видео в файл WebM (открывается в браузере и проигрывателях)": "Save the video as a WebM file (browsers and players open it)",
-  "В этой записи нет видео": "This recording has no video"
+  "В этой записи нет видео": "This recording has no video",
+  "Своё…": "Custom…",
+  " к/с": " fps",
+  " кбит/с": " kbit/s",
+  "Ширина кадра; камера с другим размером масштабируется": "Frame width; a camera of another size is scaled",
+  "Высота кадра": "Frame height",
+  "Кадров в секунду": "Frames per second",
+  "Поток видео: больше — чётче, но файл крупнее": "Video bitrate: higher is sharper, but the file is larger",
+  "~%1 МБ/мин": "~%1 MB/min",
+  "мало для такого кадра: картинка будет размытой": "too little for such a frame: the picture will be blurred",
+  "Перемотка (стрелки — на секунду)": "Seek (arrow keys: a second)"
 }

@@ -26,6 +26,8 @@ public:
         s.height = p.height;
         s.fps = p.fps;
         s.kbps = p.kbps;
+        if (p.width * p.height > 640 * 480) // larger frames of "Своё": in time for the next one
+            s.threads = 4;
         video.open(s);
         audio = withAudio ? std::make_unique<OpusAudioEncoder>() : nullptr;
         lastGeneration = -1;
@@ -43,7 +45,12 @@ WebcamRecorder::Settings WebcamRecorder::Settings::load()
     Settings s;
     s.video = q.value(QStringLiteral("WebcamOn"), false).toBool();
     s.camera = q.value(QStringLiteral("WebcamDevice")).toString();
-    s.quality = std::clamp(q.value(QStringLiteral("WebcamQuality"), 1).toInt(), 0, 2);
+    s.quality = std::clamp(q.value(QStringLiteral("WebcamQuality"), int(Normal)).toInt(), int(Economy), int(Custom));
+    s.custom = Preset{q.value(QStringLiteral("WebcamWidth"), s.custom.width).toInt(),
+                      q.value(QStringLiteral("WebcamHeight"), s.custom.height).toInt(),
+                      q.value(QStringLiteral("WebcamFps"), s.custom.fps).toInt(),
+                      q.value(QStringLiteral("WebcamKbps"), s.custom.kbps).toInt()}
+                   .bounded();
     s.audio = q.value(QStringLiteral("WebcamAudio"), false).toBool();
     s.microphone = q.value(QStringLiteral("WebcamMic")).toString();
     return s;
@@ -55,6 +62,10 @@ void WebcamRecorder::Settings::save() const
     q.setValue(QStringLiteral("WebcamOn"), video);
     q.setValue(QStringLiteral("WebcamDevice"), camera);
     q.setValue(QStringLiteral("WebcamQuality"), quality);
+    q.setValue(QStringLiteral("WebcamWidth"), custom.width);
+    q.setValue(QStringLiteral("WebcamHeight"), custom.height);
+    q.setValue(QStringLiteral("WebcamFps"), custom.fps);
+    q.setValue(QStringLiteral("WebcamKbps"), custom.kbps);
     q.setValue(QStringLiteral("WebcamAudio"), audio);
     q.setValue(QStringLiteral("WebcamMic"), microphone);
 }
@@ -62,13 +73,19 @@ void WebcamRecorder::Settings::save() const
 WebcamRecorder::Preset WebcamRecorder::preset(int quality)
 {
     switch (quality) {
-    case 0:
+    case Economy:
         return {320, 240, 10, 40};
-    case 2:
+    case Good:
         return {640, 480, 24, 200};
     default:
         return {640, 360, 15, 90};
     }
+}
+
+WebcamRecorder::Preset WebcamRecorder::Preset::bounded() const
+{
+    return {std::clamp(width, 160, 1920) & ~1, std::clamp(height, 120, 1080) & ~1, std::clamp(fps, 1, 30),
+            std::clamp(kbps, 10, 4000)};
 }
 
 WebcamRecorder::WebcamRecorder(QObject *parent) : QObject(parent)
@@ -100,7 +117,7 @@ WebcamRecorder::~WebcamRecorder()
 
 void WebcamRecorder::setSettings(const Settings &s)
 {
-    const bool restart = m_recording && (s.quality != m_settings.quality || s.audio != m_settings.audio
+    const bool restart = m_recording && (s.preset() != m_settings.preset() || s.audio != m_settings.audio
                                           || s.camera != m_settings.camera || s.microphone != m_settings.microphone
                                           || s.video != m_settings.video);
     if (restart)
@@ -161,7 +178,7 @@ void WebcamRecorder::update()
     }
     const bool camera = m_devices && m_settings.video && (m_recording || m_preview);
     const bool mic = m_devices && m_settings.audio && m_recording;
-    const Preset p = preset(m_settings.quality);
+    const Preset p = m_settings.preset();
     if (camera && !m_camera->isActive())
         m_camera->start(m_settings.camera, QSize(p.width, p.height), p.fps);
     else if (!camera && m_camera->isActive())
@@ -175,7 +192,7 @@ void WebcamRecorder::update()
 void WebcamRecorder::startSession()
 {
     m_recording = true;
-    m_preset = preset(m_settings.quality);
+    m_preset = m_settings.preset();
     m_fps = m_preset.fps;
     ++m_generation;
     m_pending.clear();

@@ -6,9 +6,45 @@
 
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QMouseEvent>
 #include <QPainter>
+#include <QPainterPath>
+#include <QSlider>
+#include <QStyle>
+#include <QStyleOptionSlider>
 #include <QToolButton>
 #include <QVBoxLayout>
+
+#include <algorithm>
+#include <limits>
+
+namespace {
+
+// A click on the groove goes to that place at once (not a page step), and the handle can be dragged on from there.
+class SeekSlider : public QSlider
+{
+public:
+    SeekSlider() : QSlider(Qt::Horizontal) {}
+
+protected:
+    void mousePressEvent(QMouseEvent *e) override
+    {
+        if (e->button() == Qt::LeftButton) {
+            QStyleOptionSlider opt;
+            initStyleOption(&opt);
+            const QRect handle = style()->subControlRect(QStyle::CC_Slider, &opt, QStyle::SC_SliderHandle, this);
+            if (!handle.contains(e->position().toPoint())) {
+                const QRect groove = style()->subControlRect(QStyle::CC_Slider, &opt, QStyle::SC_SliderGroove, this);
+                const int x = e->position().toPoint().x() - groove.x() - handle.width() / 2;
+                setValue(QStyle::sliderValueFromPosition(minimum(), maximum(), x, groove.width() - handle.width(),
+                                                         opt.upsideDown));
+            }
+        }
+        QSlider::mousePressEvent(e);
+    }
+};
+
+} // namespace
 
 VideoWindow::VideoWindow(QWidget *parent)
     : QWidget(parent, Qt::Tool | Qt::WindowStaysOnTopHint), m_decoder(std::make_unique<Av1Decoder>()),
@@ -25,26 +61,96 @@ VideoWindow::VideoWindow(QWidget *parent)
     auto *row = new QHBoxLayout(bar);
     row->setContentsMargins(4, 2, 4, 2);
     m_play = new QToolButton;
-    m_play->setText(QStringLiteral("▶"));
     m_play->setCheckable(true);
+    m_play->setAutoRaise(true);
     m_play->setToolTip(tr("Воспроизвести: клавограмма прокручивается вместе с видео"));
     connect(m_play, &QToolButton::toggled, this, [this](bool on) {
-        m_play->setText(on ? QStringLiteral("❚❚") : QStringLiteral("▶"));
+        m_play->setIcon(on ? m_pauseIcon : m_playIcon);
         emit playToggled(on);
+    });
+    m_slider = new SeekSlider;
+    m_slider->setSingleStep(1000);
+    m_slider->setPageStep(5000);
+    m_slider->setToolTip(tr("Перемотка (стрелки — на секунду)"));
+    connect(m_slider, &QSlider::valueChanged, this, [this](int ms) {
+        updateTimeLabel(m_spanFromUs + qint64(ms) * 1000);
+        emit seekRequested(m_spanFromUs + qint64(ms) * 1000);
+    });
+    // Dragged while playing: the playback waits and goes on from where the handle is let go.
+    connect(m_slider, &QSlider::sliderPressed, this, [this] {
+        m_resume = m_play->isChecked();
+        if (m_resume)
+            m_play->setChecked(false);
+    });
+    connect(m_slider, &QSlider::sliderReleased, this, [this] {
+        if (m_resume)
+            m_play->setChecked(true);
+        m_resume = false;
     });
     m_time = new QLabel;
     m_rec = new QLabel(QStringLiteral("● ") + tr("Запись"));
     m_rec->setStyleSheet(QStringLiteral("color: #d00000; font-weight: bold"));
     m_rec->hide();
     m_save = new QToolButton;
-    m_save->setText(QStringLiteral("💾"));
+    m_save->setAutoRaise(true);
     m_save->setToolTip(tr("Сохранить видео в файл WebM (открывается в браузере и проигрывателях)"));
     connect(m_save, &QToolButton::clicked, this, &VideoWindow::saveRequested);
     row->addWidget(m_play);
-    row->addWidget(m_time, 1);
+    row->addWidget(m_slider, 1);
+    row->addWidget(m_time);
+    row->addStretch(0);
     row->addWidget(m_rec);
     row->addWidget(m_save);
     layout->addWidget(bar);
+    updateIcons();
+    updateTimeLabel(0);
+}
+
+void VideoWindow::updateIcons()
+{
+    const qreal dpr = devicePixelRatioF();
+    const QColor ink = palette().color(QPalette::ButtonText);
+    auto draw = [&](auto paint) {
+        constexpr int side = 16;
+        QPixmap pm(QSize(side, side) * dpr);
+        pm.setDevicePixelRatio(dpr);
+        pm.fill(Qt::transparent);
+        QPainter p(&pm);
+        p.setRenderHint(QPainter::Antialiasing);
+        p.setPen(Qt::NoPen);
+        p.setBrush(ink);
+        paint(p);
+        return QIcon(pm);
+    };
+    m_playIcon = draw([](QPainter &p) {
+        QPainterPath path;
+        path.moveTo(4, 2.5);
+        path.lineTo(13.5, 8);
+        path.lineTo(4, 13.5);
+        path.closeSubpath();
+        p.drawPath(path);
+    });
+    m_pauseIcon = draw([](QPainter &p) {
+        p.drawRoundedRect(QRectF(3.5, 2.5, 3.5, 11), 0.8, 0.8);
+        p.drawRoundedRect(QRectF(9, 2.5, 3.5, 11), 0.8, 0.8);
+    });
+    m_play->setIcon(m_play->isChecked() ? m_pauseIcon : m_playIcon);
+    m_save->setIcon(style()->standardIcon(QStyle::SP_DialogSaveButton, nullptr, this));
+}
+
+void VideoWindow::changeEvent(QEvent *e)
+{
+    QWidget::changeEvent(e);
+    if (e->type() == QEvent::PaletteChange || e->type() == QEvent::StyleChange)
+        updateIcons();
+}
+
+void VideoWindow::setSpan(qint64 fromUs, qint64 toUs)
+{
+    m_spanFromUs = fromUs;
+    m_spanToUs = std::max(fromUs, toUs);
+    const QSignalBlocker b(m_slider);
+    m_slider->setRange(0, int(std::min<qint64>((m_spanToUs - m_spanFromUs) / 1000, std::numeric_limits<int>::max())));
 }
 
 VideoWindow::~VideoWindow() = default;
@@ -55,6 +161,7 @@ void VideoWindow::setLive(bool live)
         return;
     m_live = live;
     m_play->setVisible(!live);
+    m_slider->setVisible(!live);
     m_time->setVisible(!live);
     m_save->setVisible(!live);
     if (live)
@@ -100,14 +207,18 @@ void VideoWindow::setPlaying(bool playing)
 {
     const QSignalBlocker b(m_play);
     m_play->setChecked(playing);
-    m_play->setText(playing ? QStringLiteral("❚❚") : QStringLiteral("▶"));
+    m_play->setIcon(playing ? m_pauseIcon : m_playIcon);
 }
 
 void VideoWindow::showTime(qint64 docUs)
 {
     if (m_live)
         return;
-    updateTimeLabel(docUs);
+    if (!m_slider->isSliderDown()) { // not under the hand
+        const QSignalBlocker b(m_slider);
+        m_slider->setValue(int(std::clamp<qint64>((docUs - m_spanFromUs) / 1000, 0, m_slider->maximum())));
+        updateTimeLabel(docUs);
+    }
     const auto [key, frame] = m_clip ? m_clip->videoFramesAt(docUs) : std::pair{-1, -1};
     if (frame < 0) {
         m_image = QImage();
@@ -142,8 +253,12 @@ void VideoWindow::showTime(qint64 docUs)
 
 void VideoWindow::updateTimeLabel(qint64 docUs)
 {
-    const qint64 s = std::max<qint64>(0, docUs / 1000000);
-    m_time->setText(QStringLiteral("%1:%2").arg(s / 60).arg(s % 60, 2, 10, QLatin1Char('0')));
+    // From the span's start: the time of the recording, as players show it.
+    auto text = [](qint64 us) {
+        const qint64 s = std::max<qint64>(0, us / 1000000);
+        return QStringLiteral("%1:%2").arg(s / 60).arg(s % 60, 2, 10, QLatin1Char('0'));
+    };
+    m_time->setText(text(docUs - m_spanFromUs) + QStringLiteral(" / ") + text(m_spanToUs - m_spanFromUs));
 }
 
 QRect VideoWindow::pictureRect() const

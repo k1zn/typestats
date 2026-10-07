@@ -134,6 +134,10 @@ private:
     qint64 klavogramDocTimeUs() const;
     void scrollKlavogramToDocTime(qint64 docUs);
     void playVideo(bool play);
+    // The slider of the video window: the klavogram (and the playback, when on) goes to a document's time.
+    void seekVideo(qint64 docUs);
+    // The span of the recording in the document's time: the first and the last key or frame.
+    std::pair<qint64, qint64> videoSpan() const;
     void saveVideo();
     void playTick();
     // The recorder learns where the document's time is (after a record, an edit, another document).
@@ -270,6 +274,10 @@ private:
     QTimer *m_playTimer = nullptr;
     QElapsedTimer m_playClock;
     qint64 m_playFromUs = 0;
+    // The time the video shows when it is not the klavogram's left edge (playback, seeking: in a squeezed pause the
+    // klavogram waits at the next fragment, the video goes on); the time last shown.
+    std::optional<qint64> m_videoAtUs;
+    qint64 m_videoShownUs = 0;
     StampRecorder *m_stamps = nullptr;
     mutable Stamps::Cache m_stampCache; // cleared with every m_stamps->attach (the records replaced)
     bool m_proofPending = false;

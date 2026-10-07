@@ -172,6 +172,7 @@ MainWindow::MainWindow(QWidget *parent)
     });
     connect(m_video, &VideoWindow::visibilityChanged, this, &MainWindow::updateVideoMode);
     connect(m_video, &VideoWindow::playToggled, this, &MainWindow::playVideo);
+    connect(m_video, &VideoWindow::seekRequested, this, &MainWindow::seekVideo);
     connect(m_video, &VideoWindow::saveRequested, this, &MainWindow::saveVideo);
     m_playTimer = new QTimer(this);
     m_playTimer->setInterval(33);
@@ -2197,8 +2198,47 @@ void MainWindow::updateVideoMode()
 void MainWindow::updateVideo()
 {
 #ifdef TS_HAVE_WEBCAM
-    if (m_video && m_video->isVisible() && !m_video->isLive())
-        m_video->showTime(klavogramDocTimeUs());
+    if (m_video && m_video->isVisible() && !m_video->isLive()) {
+        m_videoShownUs = m_videoAtUs.value_or(klavogramDocTimeUs());
+        const auto [from, to] = videoSpan();
+        m_video->setSpan(from, to);
+        m_video->showTime(m_videoShownUs);
+    }
+#endif
+}
+
+std::pair<qint64, qint64> MainWindow::videoSpan() const
+{
+    qint64 from = 0, to = 0;
+    bool any = false;
+    if (!m_model.klav.isEmpty()) {
+        const qint64 offset = DocTime::modelOffset(m_doc.records);
+        from = m_model.klav.first().t + offset;
+        to = m_model.klav.last().t + offset;
+        any = true;
+    }
+    if (!m_clip.isEmpty()) {
+        from = any ? std::min(from, m_clip.firstUs()) : m_clip.firstUs();
+        to = any ? std::max(to, m_clip.lastUs()) : m_clip.lastUs();
+    }
+    return {from, std::max(from, to)};
+}
+
+void MainWindow::seekVideo(qint64 docUs)
+{
+#ifdef TS_HAVE_WEBCAM
+    m_videoAtUs = docUs;
+    scrollKlavogramToDocTime(docUs);
+    updateVideo(); // when the klavogram did not move
+    m_videoAtUs.reset();
+    if (m_playTimer->isActive()) {
+        m_playFromUs = docUs;
+        m_video->startSound(docUs);
+        m_video->feedSound(docUs);
+        m_playClock.start();
+    }
+#else
+    Q_UNUSED(docUs);
 #endif
 }
 
@@ -2246,7 +2286,11 @@ void MainWindow::playVideo(bool play)
         m_video->stopSound();
         return;
     }
-    m_playFromUs = klavogramDocTimeUs();
+    // From where the video stands (after seeking into a squeezed pause it is not the klavogram's edge); from the start
+    // when it stands at the end.
+    m_playFromUs = m_videoShownUs;
+    if (const auto [from, to] = videoSpan(); m_playFromUs >= to || m_playFromUs < from)
+        m_playFromUs = from;
     m_video->startSound(m_playFromUs);
     m_video->feedSound(m_playFromUs);
     m_playClock.start();
@@ -2285,7 +2329,10 @@ void MainWindow::playTick()
 #endif
         return;
     }
+    m_videoAtUs = now;
     scrollKlavogramToDocTime(now);
+    updateVideo(); // in a squeezed pause the klavogram stands still
+    m_videoAtUs.reset();
 #ifdef TS_HAVE_WEBCAM
     m_video->feedSound(now);
 #endif

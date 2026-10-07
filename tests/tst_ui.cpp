@@ -25,6 +25,7 @@
 #include "ui/TextView.h"
 #ifdef TS_HAVE_WEBCAM
 #include "media/Yuv.h"
+#include "ui/VideoPropertiesDialog.h"
 #include "ui/VideoWindow.h"
 #include "ui/WebcamRecorder.h"
 #endif
@@ -723,11 +724,80 @@ private slots:
         QVERIFY(!again.m_video->isLive());
         again.scrollKlavogramToDocTime(DocTime::of(again.m_doc.records, bPress));
         QVERIFY(!again.m_video->image().isNull());
+        // The slider: from the first frame to the last; moved by hand, the klavogram and the frame follow.
+        const auto [spanFrom, spanTo] = again.videoSpan();
+        QCOMPARE(spanFrom, again.m_clip.firstUs());
+        QCOMPARE(again.m_video->m_slider->maximum(), int((spanTo - spanFrom) / 1000));
+        const qint64 cPress = DocTime::of(again.m_doc.records, 4);
+        again.m_video->m_slider->setValue(int((cPress - spanFrom) / 1000));
+        QVERIFY(std::abs(again.klavogramDocTimeUs() - cPress) <= 1000);
+        QCOMPARE(again.m_videoShownUs, cPress);
+        QCOMPARE(again.m_clip.docTime(again.m_clip.packets[again.m_video->m_decoded].ptsUs), cPress);
+        // Playing goes on from there; let go after a drag while playing, it plays from the new place.
+        again.playVideo(true);
+        QCOMPARE(again.m_playFromUs, cPress);
+        again.m_video->m_play->setChecked(true);
+        emit again.m_video->m_slider->sliderPressed();
+        QVERIFY(!again.m_playTimer->isActive());
+        again.m_video->m_slider->setValue(int((DocTime::of(again.m_doc.records, bPress) - spanFrom) / 1000));
+        emit again.m_video->m_slider->sliderReleased();
+        QVERIFY(again.m_playTimer->isActive());
+        QCOMPARE(again.m_playFromUs, DocTime::of(again.m_doc.records, bPress));
+        again.m_video->m_play->setChecked(false);
+        QVERIFY(!again.m_playTimer->isActive());
         // Video going on after a save is not unsaved records (no question when closing).
         w.m_unsaved = false;
         cam.addVideo(picture, 3100000);
         cam.drain();
         QVERIFY(!w.m_unsaved);
+#else
+        QSKIP("built without the webcam");
+#endif
+    }
+
+    void webcamCustomQuality()
+    {
+#ifdef TS_HAVE_WEBCAM
+        // "Своё": the values kept, held within what the encoder takes; it starts from the quality chosen before.
+        WebcamRecorder::Settings s;
+        s.quality = WebcamRecorder::Custom;
+        s.custom = {1281, 50, 60, 1};
+        s.save();
+        const WebcamRecorder::Settings back = WebcamRecorder::Settings::load();
+        QCOMPARE(back.quality, int(WebcamRecorder::Custom));
+        QVERIFY((back.preset() == WebcamRecorder::Preset{1280, 120, 30, 10}));
+        WebcamRecorder::Settings good;
+        good.quality = WebcamRecorder::Good;
+        QVERIFY((good.preset() == WebcamRecorder::preset(WebcamRecorder::Good)));
+
+        VideoPropertiesDialog d;
+        d.setSettings(good);
+        QVERIFY(!d.m_custom->isVisibleTo(&d));
+        d.m_quality->setCurrentIndex(WebcamRecorder::Custom);
+        QVERIFY(d.m_custom->isVisibleTo(&d));
+        QVERIFY((d.settings().preset() == WebcamRecorder::preset(WebcamRecorder::Good)));
+        d.m_width->setValue(1920);
+        d.m_height->setValue(1080);
+        d.m_fps->setValue(30);
+        d.m_kbps->setValue(300);
+        QVERIFY(d.m_estimate->text().contains(QStringLiteral("3")));
+        QVERIFY(d.m_estimate->text().contains(QStringLiteral("·"))); // too few bits for such a frame
+        QVERIFY((d.settings().preset() == WebcamRecorder::Preset{1920, 1080, 30, 300}));
+        // A recording with it: the stream of the clip has the size chosen.
+        MainWindow w;
+        w.m_webcam->setDevicesEnabled(false);
+        w.m_webcam->setSettings([&] {
+            WebcamRecorder::Settings v = d.settings();
+            v.video = true;
+            return v;
+        }());
+        w.m_webcam->setCapture(true);
+        QVERIFY(w.m_webcam->isRecording());
+        const int stream = w.m_clip.streamOf(MediaStream::Video);
+        QVERIFY(stream >= 0);
+        QCOMPARE(w.m_clip.streams[stream].a, 1920);
+        QCOMPARE(w.m_clip.streams[stream].b, 1080);
+        w.m_webcam->setCapture(false);
 #else
         QSKIP("built without the webcam");
 #endif
