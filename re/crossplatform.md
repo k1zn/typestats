@@ -24,7 +24,7 @@ WSL нет; Docker Desktop есть (`docker desktop start`). Образ Debian 
 Сборка и тесты (репозиторий подключается только на чтение, сборка — в `/work` на томе):
 ```bash
 docker build -t tsport-linux ci/linux
-MSYS_NO_PATHCONV=1 docker run --rm -v "C:\Users\kizn\Desktop\typestats:/src:ro" -v "<scratch>\work:/work" tsport-linux bash -c '
+MSYS_NO_PATHCONV=1 docker run --rm -v "D:\typestats:/src:ro" -v "<scratch>\work:/work" tsport-linux bash -c '
   cmake -S /src -B /work/build-gcc -G Ninja -DCMAKE_BUILD_TYPE=Debug "-DCMAKE_CXX_FLAGS=-Wall -Wextra" &&
   cmake --build /work/build-gcc -- -k 0 && cd /work/build-gcc && QT_QPA_PLATFORM=offscreen ctest --output-on-failure'
 ```

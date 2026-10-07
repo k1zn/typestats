@@ -14,8 +14,8 @@ from pywinauto import Desktop  # noqa: E402
 from wincapture import capture  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
-QT_BIN = Path(os.environ.get("QTDIR", r"C:\Users\kizn\Qt\6.8.3\mingw_64")) / "bin"
-MINGW_BIN = Path(r"C:\Users\kizn\Qt\Tools\mingw1310_64\bin")
+QT_BIN = Path(os.environ.get("QTDIR", r"D:\Qt\6.8.3\mingw_64")) / "bin"
+MINGW_BIN = Path(r"D:\Qt\Tools\mingw1310_64\bin")
 
 title = None
 if "--window" in sys.argv:

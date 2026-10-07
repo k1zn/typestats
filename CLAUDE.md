@@ -17,11 +17,8 @@ n-граммы и слова, зоны пальцев, оперативная с
   кнопки 20/21 на месте и всегда выключены; поля `AttachedVideo`/`VideoTimeShift` `.tsf` читаются и пишутся как есть;
 - сознательно выкидываем: «Запускать Ts на одном ядре». Регистрацию `.tsf` (оригинал писал её в реестр сам) порт
   делает по согласию: при первом запуске спрашивает один раз (`platform/FileAssociation`, все три ОС).
-- **метки времени записи** (2026-10-06, своё, `re/stamps.md`): подпись оригинала — MD5 с открытой «солью», её
-  пересчитает любой; по желанию (настройка `StampRecording`, выкл.) во время набора хэши нормализованных записей
-  уходят службам RFC 3161 (DigiCert, Sectigo, GlobalSign, Certum, SwissSign, Microsoft), метки — в строки `Stamp<i>`/`StampCert<i>` `.tsf`.
-  Доказывают «набрано в реальном времени и не правилось», но не «набирал человек» (изменённая программа, аппаратный
-  бот). Кнопка состояния — слева от кнопки темы; `tsstat --verify`.
+- **метки времени записи** (2026-10-06, своё): по желанию (настройка `StampRecording`, выкл.); устройство — в
+  `re/stamps.md` (только локально, в git его нет). Кнопка состояния — слева от кнопки темы; `tsstat --verify`.
 
 `TypeStats.exe` в корне — оригинал. Не трогать. В git его нет (2026-10-05 убран из всей истории `filter-branch`, локально —
 `.git/info/exclude`; старая история — локальная ветка `backup/with-original`, не пушить): нужен только стенду и Ghidra.
@@ -29,8 +26,9 @@ n-граммы и слова, зоны пальцев, оперативная с
 
 ## Сборка
 
-Тулчейн установлен через aqtinstall в `C:\Users\kizn\Qt`: Qt 6.8.3 mingw_64 + QtMultimedia (с FFmpeg), MinGW 13.1,
-CMake, Ninja. `download.qt.io` отсюда недоступен (сброс соединения); работает зеркало
+Тулчейн установлен через aqtinstall в `D:\Qt` (перенесён с C: 2026-10-07, как и проект — `D:\typestats`): Qt 6.8.3
+mingw_64 + QtMultimedia (с FFmpeg), MinGW 13.1, CMake, Ninja, NASM 3.02 (`D:\Qt\Tools\nasm-3.02`, нужен libaom).
+Исходники зависимостей (libaom, opus) скачаны в `D:\Qt\src\deps`. `download.qt.io` отсюда недоступен (сброс соединения); работает зеркало
 `https://mirrors.ocf.berkeley.edu/qt/` (`aqt ... --base <зеркало>`), но на нём нет `.sha256`, которые aqt требует, —
 QtMultimedia поставлен вручную: архив из `Updates.xml` зеркала + сверка его `.sha1`, распаковка в `6.8.3/mingw_64`.
 
@@ -80,7 +78,7 @@ windeployqt --release --no-translations --no-opengl-sw --no-system-d3d-compiler 
 Проверено запуском с `PATH` без Qt/MinGW.
 
 **Один exe** (`dist/TypingStatistics-single.exe`, ~17 МБ): статический qtbase 6.8.3 собран из исходников
-(`C:\Users\kizn\Qt\src`; установка `6.8.3\mingw_64_static_net` — `ci/windows/static-qt.sh`, с network для меток
+(`D:\Qt\src`; установка `6.8.3\mingw_64_static_net` — `ci/windows/static-qt.sh`, с network для меток
 времени; прежняя `mingw_64_static_min` — без network). Конфигурация qtbase:
 `-DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Release -DFEATURE_optimize_size=ON -DFEATURE_static_runtime=ON`, выключены
 `opengl dynamicgl dbus sql printsupport concurrent xml jpeg gif freetype textodfwriter textmarkdownreader
@@ -90,7 +88,7 @@ udpsocket sctp` (`-DFEATURE_x=OFF`; network остаётся, без TLS — с�
 `graphicsview` нужен стилю windows11; LTO невозможно (slim-LTO не дружит с `-Wa,-mbig-obj`, а без него GCC 13.1 падает
 с ICE). Программа (PATH — только MinGW/CMake/Ninja, без динамического Qt):
 ```bash
-cmake -S . -B build-static-o2 -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=C:/Users/kizn/Qt/6.8.3/mingw_64_static_net -DTS_LRELEASE=C:/Users/kizn/Qt/6.8.3/mingw_64/bin/lrelease.exe "-DCMAKE_CXX_FLAGS=-ffunction-sections -fdata-sections" "-DCMAKE_C_FLAGS=-ffunction-sections -fdata-sections" "-DCMAKE_EXE_LINKER_FLAGS=-s -Wl,--gc-sections"
+cmake -S . -B build-static-o2 -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=D:/Qt/6.8.3/mingw_64_static_net -DTS_LRELEASE=D:/Qt/6.8.3/mingw_64/bin/lrelease.exe "-DCMAKE_CXX_FLAGS=-ffunction-sections -fdata-sections" "-DCMAKE_C_FLAGS=-ffunction-sections -fdata-sections" "-DCMAKE_EXE_LINKER_FLAGS=-s -Wl,--gc-sections"
 cmake --build build-static-o2 --target TypingStatistics
 ```
 CI собирает так же (`ci/windows/static-qt.sh` — та же конфигурация qtbase плюс явные `FEATURE_system_*=OFF`).
@@ -147,10 +145,8 @@ src/core/      только QtCore, тестируемо
   NumberFormat.*      formatFixed(v, decimals, loc): округление половинок от нуля, как FloatToStrF оригинала
                       (QLocale округляет к чётному), NaN/Inf как FloatToStrF — используется всеми списками
   Der.*, Rsa.*        разбор/запись DER; проверка подписи RSA PKCS#1 v1.5 (Монтгомери) — для меток времени
-  TimeStamp.*         RFC 3161: запрос, ответ, проверка токена (CMS SignedData, цепочка до корней `StampRoots.inc`)
-  Stamps.*            метки записи (`re/stamps.md`): `Chain` (хэши нормализованного потока), `verify` → Report
-                      (годные/плохие/аннулированные, время подтверждено полосами offset), `follow` после правки
-                      (`KeyRecord::tag`); `Recalc::Normalizer` — потоковая нормализация
+  TimeStamp.*         RFC 3161 (`re/stamps.md`)
+  Stamps.*            метки записи (`re/stamps.md`)
   Ext80.h             80-битная x87-арифметика: `Ext` = `long double` там, где он x87 (GCC/Clang на x86), иначе
                       программный `Ext80` (arm64, MSVC); `kExtMilli` = 0.001L, `extFloor`/`extFabs`. Всё ядро и окна
                       считают «как оригинал» через `Ext`
@@ -274,8 +270,8 @@ tests/tst_orig.cpp  ядро против записанного вывода о
                     выделения, ListView1 — 4 файла × 5 наборов опций; серии графиков — 824; Form3 (ключ `extra`) и
                     Form4 (ключ `hist`) — 824 и обыка (обыка — при «Только текст» = 1 и = 0).
                     Сверка float — побитная на всех платформах (через `Ext`)
-tests/tst_stamps.cpp ядро меток времени на `tests/golden/stamps/*.tsf` (настоящие метки служб, сняты
-                    `re/scripts/make_stamped.py` — своя реализация хэша на Python); `tst_ui::stampLive` — настоящие
+tests/tst_stamps.cpp ядро меток времени (`re/stamps.md`) на `tests/golden/stamps/*.tsf` (настоящие метки служб,
+                    `re/scripts/make_stamped.py`); `tst_ui::stampLive` — настоящие
                     службы через сетевой код программы, только с `TS_STAMP_LIVE=1`
 tests/tst_platform.cpp  все ОС: таблицы кодов (scan↔VK, evdev, Mac), разбор ответов sway/Hyprland/GNOME/KDE, i3-IPC
 tests/tst_evdev.cpp только Linux: XkbKeyboard (символы, флаги, группы, мёртвые клавиши, golden-записи через перевод),
@@ -322,7 +318,7 @@ python re/scripts/diffstand.py файл --journal                               
     (запятую cmd.exe режет на аргументы). Если по адресу нет функции (вызывается только через vtable) — создаётся.
 - **Запуск:**
   ```
-  cmd //c "tools\\ghidra_12.1.4_PUBLIC\\support\\analyzeHeadless.bat re\\ghidra_proj TypeStats -process TypeStats.exe -noanalysis -scriptPath re\\scripts -postScript TsImportAndDecompile.java C:\\Users\\kizn\\Desktop\\typestats <mode>"
+  cmd //c "tools\\ghidra_12.1.4_PUBLIC\\support\\analyzeHeadless.bat re\\ghidra_proj TypeStats -process TypeStats.exe -noanalysis -scriptPath re\\scripts -postScript TsImportAndDecompile.java D:\\typestats <mode>"
   ```
   Для `one:` добавлять `-readOnly`. Прогон занимает минуты, запускать в фоне.
   Завершение проверять по логу (`grep "Decompiled\|one "`), а не через `ps`: он не видит `java.exe`,

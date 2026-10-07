@@ -41,8 +41,8 @@ from pywinauto import Desktop  # noqa: E402
 ROOT = Path(__file__).resolve().parents[2]
 ORIGINAL = ROOT / "TypeStats.exe"
 TSSTAT = ROOT / "build" / "tsstat.exe"
-QT_BIN = Path(os.environ.get("QTDIR", r"C:\Users\kizn\Qt\6.8.3\mingw_64")) / "bin"
-MINGW_BIN = Path(r"C:\Users\kizn\Qt\Tools\mingw1310_64\bin")
+QT_BIN = Path(os.environ.get("QTDIR", r"D:\Qt\6.8.3\mingw_64")) / "bin"
+MINGW_BIN = Path(r"D:\Qt\Tools\mingw1310_64\bin")
 
 # RichEdit colours (COLORREF, 0x00BBGGRR) the original uses for TextStyle bits, see re/text_reconstruction.md.
 BLUE, RED, GREEN = 0xFF0000, 0x0000FF, 0x008000
