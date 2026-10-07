@@ -1,10 +1,13 @@
 // The webcam's codecs (re/webcam.md): YUV conversions, AV1 (libaom realtime), Opus.
 
+#include "core/MediaClip.h"
+#include "core/WebmWriter.h"
 #include "media/Av1Codec.h"
 #include "media/OpusCodec.h"
 #include "media/Yuv.h"
 
 #include <QElapsedTimer>
+#include <QFile>
 #include <QPainter>
 #include <QTest>
 
@@ -156,6 +159,42 @@ private slots:
         const double msPerFrame = t.elapsed() / 45.0;
         qInfo("AV1 640x360: %.1f ms per frame", msPerFrame);
         QVERIFY(msPerFrame < 66);
+    }
+
+    void webm()
+    {
+        // 3 s of video and audio through the encoders into a clip, out as WebM.
+        MediaClip clip;
+        Av1Settings s;
+        s.width = 320;
+        s.height = 240;
+        Av1Encoder enc;
+        QVERIFY(enc.open(s));
+        OpusAudioEncoder audio;
+        const int v = clip.addStream(MediaStream::video(s.width, s.height));
+        const int a = clip.addStream(MediaStream::audio(48000, 1));
+        QVector<float> tone(4800);
+        for (int i = 0; i < 45; ++i) {
+            const qint64 t = qint64(i) * 66667;
+            for (const EncodedFrame &f : enc.encode(Yuv::fromImage(scene(s.width, s.height, i)), t))
+                clip.packets.append({quint8(v), f.key, f.ptsUs, f.data});
+            for (int k = 0; k < tone.size(); ++k)
+                tone[k] = float(0.3 * std::sin(2 * M_PI * 330 * (i * 3200 + k) / 48000.0));
+            for (const EncodedFrame &f : audio.push(tone.constData(), 3200, 1, 48000, t))
+                clip.packets.append({quint8(a), true, f.ptsUs, f.data});
+        }
+        const QByteArray config = Webm::av1Config(clip.packets[0].data);
+        QVERIFY(config.size() > 4);
+        QCOMPARE(quint8(config[0]), quint8(0x81));
+        QCOMPARE(quint8(config[1]) >> 5, 0); // profile 0 (main): 8 bits, 4:2:0
+        const QByteArray w = Webm::write(clip);
+        QVERIFY(w.contains("V_AV1"));
+        // For a look by hand: ffprobe / a browser.
+        if (const QByteArray out = qgetenv("TS_MEDIA_WEBM"); !out.isEmpty()) {
+            QFile f(QString::fromLocal8Bit(out));
+            QVERIFY(f.open(QIODevice::WriteOnly));
+            f.write(w);
+        }
     }
 
     void opusRoundTrip()

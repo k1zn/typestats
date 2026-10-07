@@ -3,7 +3,9 @@
 #include "Cp1251.h"
 #include "Keyboard.h"
 #include "TsfSignature.h"
+#include "Z85.h"
 
+#include <QCryptographicHash>
 #include <QFile>
 #include <QMap>
 
@@ -206,6 +208,49 @@ void readStamps(const QList<QStringView> &lines, TsfDocument &doc)
     doc.stampCertificates = certs.values();
 }
 
+// The webcam recording (re/webcam.md): "Webcam=1 <bytes> <SHA-256>" and "WebcamData<i>=<Z85>", in the order of i.
+void readWebcam(const QList<QStringView> &lines, TsfDocument &doc)
+{
+    static const QString key = QStringLiteral("Webcam"), dataKey = QStringLiteral("WebcamData");
+    QMap<int, QStringView> chunks;
+    QStringView head;
+    for (QStringView l : lines) {
+        if (!l.startsWith(key))
+            continue;
+        const qsizetype eq = l.indexOf(u'=');
+        if (eq < 0)
+            continue;
+        if (eq == key.size()) {
+            head = l.mid(eq + 1);
+        } else if (l.startsWith(dataKey)) {
+            bool ok = false;
+            const int index = l.mid(dataKey.size(), eq - dataKey.size()).toInt(&ok);
+            if (ok)
+                chunks.insert(index, l.mid(eq + 1));
+        }
+    }
+    if (head.isEmpty())
+        return;
+    doc.webcamDamaged = true;
+    const QList<QStringView> parts = head.split(u' ', Qt::SkipEmptyParts);
+    bool okSize = false;
+    const qsizetype size = parts.size() == 3 && parts[0] == u"1" ? parts[1].toLongLong(&okSize) : -1;
+    if (!okSize || size < 0)
+        return;
+    QString text;
+    for (QStringView c : chunks)
+        text += c;
+    bool ok = false;
+    QByteArray bytes = Z85::decode(text, &ok);
+    if (!ok || bytes.size() < size)
+        return;
+    bytes.truncate(size);
+    if (QCryptographicHash::hash(bytes, QCryptographicHash::Sha256).toHex() != parts[2].toLatin1())
+        return;
+    doc.webcam = bytes;
+    doc.webcamDamaged = false;
+}
+
 TsfDocument parseLines(const QList<QStringView> &lines, Tsf::ReadError *err)
 {
     const std::array<QString, KeyCount> header = values(lines);
@@ -254,6 +299,7 @@ TsfDocument parseLines(const QList<QStringView> &lines, Tsf::ReadError *err)
         doc.videoTimeShiftMs = header[VideoTimeShift].toInt();
 
     readStamps(lines, doc);
+    readWebcam(lines, doc);
 
     const QString &sig = header[Signature];
     doc.signed_ = !sig.isEmpty();
@@ -264,6 +310,8 @@ TsfDocument parseLines(const QList<QStringView> &lines, Tsf::ReadError *err)
 } // namespace
 
 namespace Tsf {
+
+constexpr qsizetype kWebcamLine = 65535; // characters of Z85 per line (a multiple of 5)
 
 QString dataLine(const KeyRecord &r)
 {
@@ -327,6 +375,15 @@ QStringList serialize(const TsfDocument &doc, bool sign)
     }
     for (int i = 0; i < doc.stampCertificates.size(); ++i)
         lines.append(QStringLiteral("StampCert%1=").arg(i + 1) + QString::fromLatin1(doc.stampCertificates[i].toBase64()));
+    // The webcam (the port's own, re/webcam.md). The key must not start with a hexadecimal digit: the original
+    // reads every line with sscanf("%x %s") into a buffer on its stack.
+    if (!doc.webcam.isEmpty()) {
+        lines.append(QStringLiteral("Webcam=1 %1 ").arg(doc.webcam.size())
+                     + QString::fromLatin1(QCryptographicHash::hash(doc.webcam, QCryptographicHash::Sha256).toHex()));
+        const QString text = Z85::encode(doc.webcam);
+        for (qsizetype i = 0, n = 1; i < text.size(); i += kWebcamLine, ++n)
+            lines.append(QStringLiteral("WebcamData%1=").arg(n) + text.mid(i, kWebcamLine));
+    }
     return lines;
 }
 

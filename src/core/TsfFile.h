@@ -30,6 +30,8 @@ struct TsfDocument
     KeyPlatform platform = KeyPlatform::Windows; // "Platform": where it was recorded; none - Windows
     QList<Stamp> stamps;                    // "Stamp1", "Stamp2"...: the port's own, not signed
     QList<QByteArray> stampCertificates;    // "StampCert1"...: the certificates of the authorities, DER
+    QByteArray webcam;                      // "Webcam", "WebcamData1"...: the webcam recording (MediaClip, re/webcam.md)
+    bool webcamDamaged = false;             // its lines were there but did not add up (it is dropped)
     bool signed_ = false;     // file had a signature line
     bool signatureValid = true;
 };
