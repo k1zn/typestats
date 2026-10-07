@@ -393,3 +393,17 @@ QSettings — 58 ключей-литералов без пар, различаю
   RU/EN, символы с Option, Delete и Fn+Delete, CapsLock; нет ли лагов клавиатуры в других программах при
   пересчёте большого файла (`re/scripts/gen_big.py`); Cmd+Q во время набора; размеры шрифтов и чёткость; числа
   golden-файлов против Windows (ListView2, Form3, Form4); запуск из «Загрузок» (ini и журнал пишутся).
+
+
+## Веб-камера (2026-10-07, `re/webcam.md`)
+
+- Linux: V4L2 (`src/media/linux/CaptureLinux.cpp`: YUYV → NV12 → MJPEG через `QImage`, время кадра — от драйвера по
+  `CLOCK_MONOTONIC`), микрофон и звук воспроизведения — простой API PulseAudio (`libpulse-simple.so.0` через `dlopen`:
+  без него звука нет, программа работает). Список микрофонов не показывается — источник по умолчанию системы.
+- macOS: AVFoundation (`src/media/mac/CaptureMac.mm`, ARC; разрешения камеры и микрофона — `NSCameraUsageDescription`,
+  `NSMicrophoneUsageDescription` в `Info.plist.in`), звук — AudioQueue.
+- **Не собрано ни разу**: Docker Desktop 2026-10-07 не поднял движок (`docker desktop start` висел), macOS здесь не
+  собрать. Первый прогон CI и ручные проверки:
+  - Linux: камера в списке «Свойств видео», картинка в окне «Видео», запись и воспроизведение; без доступа к
+    `/dev/video0` (группа `video`) — сообщение об ошибке, а не падение;
+  - macOS: запрос доступа к камере при первом включении, отказ — сообщение; звук воспроизведения.

@@ -109,6 +109,15 @@ if(TS_WEBCAM)
     list(APPEND MEDIA_SOURCES src/media/AudioOut.h)
     if(WIN32)
         list(APPEND MEDIA_SOURCES src/media/CaptureWin.cpp src/media/AudioOutWin.cpp) # Media Foundation, waveOut
+    elseif(APPLE)
+        # AVFoundation, AudioQueue.
+        enable_language(OBJCXX)
+        list(APPEND MEDIA_SOURCES src/media/mac/CaptureMac.mm src/media/mac/AudioOutMac.cpp)
+        set_source_files_properties(src/media/mac/CaptureMac.mm PROPERTIES COMPILE_OPTIONS -fobjc-arc)
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        # V4L2; PulseAudio's simple API, loaded at run time.
+        list(APPEND MEDIA_SOURCES src/media/linux/CaptureLinux.cpp src/media/linux/AudioOutLinux.cpp
+             src/media/linux/PulseSimple.h src/media/linux/PulseSimple.cpp)
     else()
         list(APPEND MEDIA_SOURCES src/media/CaptureStub.cpp src/media/AudioOutStub.cpp)
     endif()
@@ -117,6 +126,11 @@ if(TS_WEBCAM)
     target_link_libraries(tsmedia PUBLIC Qt6::Gui PRIVATE ts_aom ts_opus)
     if(WIN32)
         target_link_libraries(tsmedia PRIVATE mfuuid ole32 winmm)
+    elseif(APPLE)
+        target_link_libraries(tsmedia PRIVATE "-framework AVFoundation" "-framework CoreMedia" "-framework CoreVideo"
+                              "-framework AudioToolbox" "-framework Foundation")
+    else()
+        target_link_libraries(tsmedia PRIVATE ${CMAKE_DL_LIBS})
     endif()
     target_compile_definitions(tsmedia PUBLIC TS_HAVE_WEBCAM)
 endif()

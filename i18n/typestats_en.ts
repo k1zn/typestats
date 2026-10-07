@@ -70,6 +70,53 @@ Special thanks to Urikor (for the great site and the hosting), Avtandilina, Dron
     </message>
 </context>
 <context>
+    <name>Capture</name>
+    <message>
+        <source>Запись камеры на этой системе пока не поддерживается</source>
+        <translation>Webcam recording is not supported on this system yet</translation>
+    </message>
+    <message>
+        <source>Запись звука на этой системе пока не поддерживается</source>
+        <translation>Sound recording is not supported on this system yet</translation>
+    </message>
+    <message>
+        <source>Устройство не найдено</source>
+        <translation>Device not found</translation>
+    </message>
+    <message>
+        <source>Устройство занято или недоступно</source>
+        <translation>The device is busy or unavailable</translation>
+    </message>
+    <message>
+        <source>Нет Media Foundation (Windows N: нужен Media Feature Pack)</source>
+        <translation>No Media Foundation (Windows N needs the Media Feature Pack)</translation>
+    </message>
+    <message>
+        <source>Камера не отдаёт кадры в нужном формате</source>
+        <translation>The camera gives no frames in a usable format</translation>
+    </message>
+    <message>
+        <source>Камера отключилась</source>
+        <translation>The camera was disconnected</translation>
+    </message>
+    <message>
+        <source>Нет Media Foundation</source>
+        <translation>No Media Foundation</translation>
+    </message>
+    <message>
+        <source>Микрофон не отдаёт звук в нужном формате</source>
+        <translation>The microphone gives no sound in a usable format</translation>
+    </message>
+    <message>
+        <source>Микрофон отключился</source>
+        <translation>The microphone was disconnected</translation>
+    </message>
+    <message>
+        <source>Нет PulseAudio (libpulse-simple)</source>
+        <translation>No PulseAudio (libpulse-simple)</translation>
+    </message>
+</context>
+<context>
     <name>ExtraStatsWindow</name>
     <message>
         <source>Дополнительная статистика</source>
@@ -869,6 +916,37 @@ Copy the command, paste it into a terminal and enter your password. This is need
         <source>Метки ставят службы времени DigiCert, Sectigo, GlobalSign, Certum, SwissSign и Microsoft: они подтверждают, что записи были набраны в это время и не менялись позже. Наружу уходят только хэши, без вашего набранного текста. Включается в настройках.</source>
         <translation>The stamps come from the time stamping services of DigiCert, Sectigo, GlobalSign, Certum, SwissSign and Microsoft: they confirm that the records were typed at that time and not changed later. Only hashes leave the computer, without the text you typed. Turned on in the settings.</translation>
     </message>
+    <message>
+        <source>Видео: пакетов %1, под метками: %2 (%3 %)</source>
+        <translation>Video: %1 packets, %2 under stamps (%3 %)</translation>
+    </message>
+    <message>
+        <source>Кадры позже своей метки: %1</source>
+        <translation>Frames dated after their stamp: %1</translation>
+    </message>
+    <message>
+        <source>Блок из записи, заверенной метками: до него скрыто %1 с, после — %2 с</source>
+        <translation>A block of a stamped recording: %1 s hidden before it, %2 s after</translation>
+    </message>
+    <message>
+        <source>Чтобы блок сохранил метки времени, в файл попадут скрыто (без показа и статистики) соседние нажатия записи: %1. Сохранить метки?</source>
+        <translation>To keep the time stamps, the block will carry neighbouring keystrokes of the recording, hidden (not shown, not counted): %1. Keep the stamps?</translation>
+    </message>
+    <message>
+        <source>Видео: камера записывает</source>
+        <translation>Video: the camera is recording</translation>
+    </message>
+</context>
+<context>
+    <name>QObject</name>
+    <message>
+        <source>По умолчанию</source>
+        <translation>Default</translation>
+    </message>
+    <message>
+        <source>(не подключено)</source>
+        <translation>(not connected)</translation>
+    </message>
 </context>
 <context>
     <name>SettingsDialog</name>
@@ -1080,6 +1158,92 @@ Copy the command, paste it into a terminal and enter your password. This is need
     <message>
         <source>max без исправлений</source>
         <translation>max without corrections</translation>
+    </message>
+</context>
+<context>
+    <name>VideoPropertiesDialog</name>
+    <message>
+        <source>Свойства видео</source>
+        <translation>Video properties</translation>
+    </message>
+    <message>
+        <source>Во время набора</source>
+        <translation>While typing</translation>
+    </message>
+    <message>
+        <source>Записывать веб-камеру</source>
+        <translation>Record the webcam</translation>
+    </message>
+    <message>
+        <source>Камера</source>
+        <translation>Camera</translation>
+    </message>
+    <message>
+        <source>Экономно: 320×240, 10 к/с (~0,4 МБ/мин)</source>
+        <translation>Economy: 320×240, 10 fps (~0.4 MB/min)</translation>
+    </message>
+    <message>
+        <source>Обычно: 640×360, 15 к/с (~0,9 МБ/мин)</source>
+        <translation>Normal: 640×360, 15 fps (~0.9 MB/min)</translation>
+    </message>
+    <message>
+        <source>Хорошо: 640×480, 24 к/с (~1,9 МБ/мин)</source>
+        <translation>Good: 640×480, 24 fps (~1.9 MB/min)</translation>
+    </message>
+    <message>
+        <source>Качество</source>
+        <translation>Quality</translation>
+    </message>
+    <message>
+        <source>Записывать звук с микрофона (~0,15 МБ/мин)</source>
+        <translation>Record sound from the microphone (~0.15 MB/min)</translation>
+    </message>
+    <message>
+        <source>Микрофон</source>
+        <translation>Microphone</translation>
+    </message>
+    <message>
+        <source>Видео сохраняется внутри файла .tsf. «Сохранить блок» обрезает его по времени выделенного текста. С метками времени видео заверяется вместе с набором.</source>
+        <translation>The video is kept inside the .tsf file. "Save block" cuts it to the time of the selected text. With time stamps the video is stamped together with the typing.</translation>
+    </message>
+    <message>
+        <source>Эта запись</source>
+        <translation>This recording</translation>
+    </message>
+    <message>
+        <source> мс</source>
+        <translation> ms</translation>
+    </message>
+    <message>
+        <source>Положительный сдвиг показывает кадры позже: если на видео клавиша нажимается раньше, чем на клавограмме</source>
+        <translation>A positive shift shows the frames later: when a key goes down in the video before the klavogram shows it</translation>
+    </message>
+    <message>
+        <source>Сдвиг видео</source>
+        <translation>Video shift</translation>
+    </message>
+</context>
+<context>
+    <name>VideoWindow</name>
+    <message>
+        <source>Видео</source>
+        <translation>Video</translation>
+    </message>
+    <message>
+        <source>Воспроизвести: клавограмма прокручивается вместе с видео</source>
+        <translation>Play: the klavogram scrolls along with the video</translation>
+    </message>
+    <message>
+        <source>Запись</source>
+        <translation>Recording</translation>
+    </message>
+    <message>
+        <source>Сохранить видео в файл WebM (открывается в браузере и проигрывателях)</source>
+        <translation>Save the video as a WebM file (browsers and players open it)</translation>
+    </message>
+    <message>
+        <source>В этой записи нет видео</source>
+        <translation>This recording has no video</translation>
     </message>
 </context>
 </TS>

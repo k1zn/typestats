@@ -13,7 +13,9 @@ sys.stdout.reconfigure(encoding="utf-8")
 HERE = Path(__file__).resolve().parent
 TS = HERE / "typestats_en.ts"
 
-subprocess.run(["lupdate", str(HERE.parent / "src"), "-ts", str(TS), "-source-language", "ru_RU",
+# .mm: the macOS backends (Objective-C++), not among lupdate's own extensions.
+subprocess.run(["lupdate", str(HERE.parent / "src"), "-extensions", "c,cpp,h,hpp,mm,ui", "-ts", str(TS),
+                "-source-language", "ru_RU",
                 "-target-language", "en_US", "-no-obsolete", "-locations", "none"], check=True,
                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 words = json.loads((HERE / "en.json").read_text(encoding="utf-8"))

@@ -26,6 +26,10 @@
 	<string>${MACOSX_BUNDLE_COPYRIGHT}</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>${CMAKE_OSX_DEPLOYMENT_TARGET}</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Запись веб-камеры во время набора, если она включена в «Свойствах видео». Webcam recording while typing, when enabled in Video properties.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Запись звука вместе с видео, если она включена в «Свойствах видео». Sound with the video, when enabled in Video properties.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSPrincipalClass</key>
