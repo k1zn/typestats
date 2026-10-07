@@ -24,6 +24,9 @@ public:
         bool operator==(const Preset &) const = default;
         // Within what the encoder and the cameras take: even sizes 160×120..1920×1080, 1..30 fps, 10..4000 kbit/s.
         Preset bounded() const;
+        // A bitrate that suits the size and the rate of frames (a person at a keyboard): near the presets' ones,
+        // growing slower for large frames.
+        static int suggestedKbps(int width, int height, int fps);
     };
     enum Quality { Economy, Normal, Good, Custom };
     static Preset preset(int quality); // Economy..Good

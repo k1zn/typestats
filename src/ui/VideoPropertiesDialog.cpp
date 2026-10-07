@@ -10,6 +10,7 @@
 #include <QLocale>
 #include <QPixmap>
 #include <QSpinBox>
+#include <QToolButton>
 #include <QVBoxLayout>
 
 namespace {
@@ -75,12 +76,20 @@ VideoPropertiesDialog::VideoPropertiesDialog(QWidget *parent) : QDialog(parent)
     m_width->setToolTip(tr("Ширина кадра; камера с другим размером масштабируется"));
     m_height->setToolTip(tr("Высота кадра"));
     m_fps->setToolTip(tr("Кадров в секунду"));
-    m_kbps->setToolTip(tr("Поток видео: больше — чётче, но файл крупнее"));
+    m_kbps->setToolTip(tr("Поток видео: больше — чётче, но файл крупнее. Подбирается по размеру и частоте кадров, "
+                          "пока не поставлен свой"));
+    // "Авто": the bitrate follows the size and the rate of frames until one of the user's own is typed.
+    m_autoKbps = new QToolButton;
+    m_autoKbps->setText(tr("авто"));
+    m_autoKbps->setCheckable(true);
+    m_autoKbps->setChecked(true);
+    m_autoKbps->setToolTip(tr("Подбирать поток по размеру и частоте кадров"));
     custom->addWidget(m_width);
     custom->addWidget(new QLabel(QStringLiteral("×")));
     custom->addWidget(m_height);
     custom->addWidget(m_fps);
     custom->addWidget(m_kbps);
+    custom->addWidget(m_autoKbps);
     custom->addStretch(1);
     m_estimate = new QLabel;
     m_custom = new QWidget;
@@ -93,14 +102,22 @@ VideoPropertiesDialog::VideoPropertiesDialog(QWidget *parent) : QDialog(parent)
         connect(box, &QSpinBox::valueChanged, this, &VideoPropertiesDialog::updateEstimate);
         connect(box, &QSpinBox::editingFinished, this, [this] { m_customTouched = true; });
     }
+    for (QSpinBox *box : {m_width, m_height, m_fps})
+        connect(box, &QSpinBox::valueChanged, this, &VideoPropertiesDialog::suggestKbps);
+    connect(m_kbps, &QSpinBox::valueChanged, this, [this] {
+        if (!m_settingKbps) // typed by the user: theirs from now on
+            m_autoKbps->setChecked(false);
+    });
+    connect(m_autoKbps, &QToolButton::toggled, this, &VideoPropertiesDialog::suggestKbps);
     connect(m_quality, &QComboBox::currentIndexChanged, this, [this](int i) {
-        // "Своё" starts from the quality chosen before.
+        // "Своё" starts from the quality chosen before (its bitrate, then following the size).
         if (i == WebcamRecorder::Custom && !m_customTouched) {
             const WebcamRecorder::Preset p = WebcamRecorder::preset(m_lastQuality);
             m_width->setValue(p.width);
             m_height->setValue(p.height);
             m_fps->setValue(p.fps);
-            m_kbps->setValue(p.kbps);
+            setKbps(p.kbps);
+            m_autoKbps->setChecked(true);
         }
         if (i != WebcamRecorder::Custom)
             m_lastQuality = i;
@@ -143,10 +160,19 @@ void VideoPropertiesDialog::setSettings(const WebcamRecorder::Settings &s)
     fillDevices(m_camera, Camera::devices(), s.camera);
     m_customTouched = s.custom != WebcamRecorder::preset(WebcamRecorder::Normal);
     m_lastQuality = s.quality == WebcamRecorder::Custom ? WebcamRecorder::Normal : s.quality;
+    {
+        const QSignalBlocker b(m_autoKbps);
+        m_autoKbps->setChecked(false); // the values as saved
+    }
     m_width->setValue(s.custom.width);
     m_height->setValue(s.custom.height);
     m_fps->setValue(s.custom.fps);
-    m_kbps->setValue(s.custom.kbps);
+    setKbps(s.custom.kbps);
+    // Auto when never set, or when it is what auto would give.
+    const QSignalBlocker b(m_autoKbps);
+    m_autoKbps->setChecked(!m_customTouched
+                           || s.custom.kbps == WebcamRecorder::Preset::suggestedKbps(s.custom.width, s.custom.height,
+                                                                                    s.custom.fps));
     m_quality->setCurrentIndex(s.quality);
     m_audio->setChecked(s.audio);
     fillDevices(m_mic, Microphone::devices(), s.microphone);
@@ -185,6 +211,19 @@ void VideoPropertiesDialog::updateEnabled()
     m_mic->setEnabled(m_audio->isChecked());
     updateEstimate();
     adjustSize();
+}
+
+void VideoPropertiesDialog::setKbps(int kbps)
+{
+    m_settingKbps = true;
+    m_kbps->setValue(kbps);
+    m_settingKbps = false;
+}
+
+void VideoPropertiesDialog::suggestKbps()
+{
+    if (m_autoKbps->isChecked())
+        setKbps(WebcamRecorder::Preset::suggestedKbps(m_width->value(), m_height->value(), m_fps->value()));
 }
 
 void VideoPropertiesDialog::setPicture(const QImage &image)

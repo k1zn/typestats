@@ -1327,10 +1327,6 @@ Camera recording is turned on in its button's menu (▾).</translation>
         <translation>Frames per second</translation>
     </message>
     <message>
-        <source>Поток видео: больше — чётче, но файл крупнее</source>
-        <translation>Video bitrate: higher is sharper, but the file is larger</translation>
-    </message>
-    <message>
         <source>~%1 МБ/мин</source>
         <translation>~%1 MB/min</translation>
     </message>
@@ -1341,6 +1337,18 @@ Camera recording is turned on in its button's menu (▾).</translation>
     <message>
         <source>Свойства камеры</source>
         <translation>Camera properties</translation>
+    </message>
+    <message>
+        <source>Поток видео: больше — чётче, но файл крупнее. Подбирается по размеру и частоте кадров, пока не поставлен свой</source>
+        <translation>Video bitrate: higher is sharper, but the file is larger. Chosen by the frame size and rate until you set your own</translation>
+    </message>
+    <message>
+        <source>авто</source>
+        <translation>auto</translation>
+    </message>
+    <message>
+        <source>Подбирать поток по размеру и частоте кадров</source>
+        <translation>Choose the bitrate by the frame size and rate</translation>
     </message>
 </context>
 <context>

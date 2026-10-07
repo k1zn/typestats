@@ -7,6 +7,7 @@
 #include <QSettings>
 
 #include <algorithm>
+#include <cmath>
 #include <memory>
 
 // The encoders, in their thread. A frame of another generation (a new session or a new clip) starts with a key frame.
@@ -80,6 +81,16 @@ WebcamRecorder::Preset WebcamRecorder::preset(int quality)
     default:
         return {640, 360, 15, 90};
     }
+}
+
+int WebcamRecorder::Preset::suggestedKbps(int width, int height, int fps)
+{
+    // ~0.024 bit a pixel over 20 kbit/s (economy 38, normal 103, good 197 - the presets: 40, 90, 200); above the good
+    // preset's pixels a second, as their power 0.75 (a still scene shares more between frames): 1080p30 - ~900.
+    constexpr double kGood = 640.0 * 480 * 24, kBits = 0.024;
+    const double rate = double(width) * height * fps;
+    const double bits = rate <= kGood ? kBits * rate : kBits * kGood * std::pow(rate / kGood, 0.75);
+    return std::clamp(int(std::lround((20 + bits / 1000) / 10)) * 10, 10, 4000);
 }
 
 WebcamRecorder::Preset WebcamRecorder::Preset::bounded() const

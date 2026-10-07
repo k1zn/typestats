@@ -835,8 +835,23 @@ private slots:
         d.m_quality->setCurrentIndex(WebcamRecorder::Custom);
         QVERIFY(d.m_custom->isVisibleTo(&d));
         QVERIFY((d.settings().preset() == WebcamRecorder::preset(WebcamRecorder::Good)));
+        // The bitrate follows the size and the rate of frames, until one of the user's own is typed.
+        using P = WebcamRecorder::Preset;
+        QCOMPARE(P::suggestedKbps(320, 240, 10), 40);
+        QCOMPARE(P::suggestedKbps(640, 360, 15), 100);
+        QCOMPARE(P::suggestedKbps(640, 480, 24), 200);
+        QCOMPARE(P::suggestedKbps(1920, 1080, 30), 900);
+        QVERIFY(d.m_autoKbps->isChecked());
         d.m_width->setValue(1920);
         d.m_height->setValue(1080);
+        d.m_fps->setValue(30);
+        QCOMPARE(d.m_kbps->value(), 900);
+        d.m_kbps->setValue(300);
+        QVERIFY(!d.m_autoKbps->isChecked());
+        d.m_fps->setValue(25);
+        QCOMPARE(d.m_kbps->value(), 300);
+        d.m_autoKbps->setChecked(true);
+        QCOMPARE(d.m_kbps->value(), P::suggestedKbps(1920, 1080, 25));
         d.m_fps->setValue(30);
         d.m_kbps->setValue(300);
         QVERIFY(d.m_estimate->text().contains(QStringLiteral("3")));

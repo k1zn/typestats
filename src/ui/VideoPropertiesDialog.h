@@ -8,6 +8,7 @@ class QCheckBox;
 class QComboBox;
 class QLabel;
 class QSpinBox;
+class QToolButton;
 
 // "Свойства камеры" (the menu of the webcam's button; re/webcam.md): what is recorded while typing, the picture of the
 // camera chosen (to place it), and the synchronization of the recording looked at.
@@ -33,6 +34,8 @@ private:
     friend class TstUi;
     void updateEnabled();
     void updateEstimate();
+    void setKbps(int kbps); // not as typed by the user
+    void suggestKbps();     // when "авто" is on
 
     QCheckBox *m_video = nullptr;
     QComboBox *m_camera = nullptr;
@@ -40,6 +43,8 @@ private:
     QComboBox *m_quality = nullptr;
     QWidget *m_custom = nullptr; // "Своё": size, fps, bitrate
     QSpinBox *m_width = nullptr, *m_height = nullptr, *m_fps = nullptr, *m_kbps = nullptr;
+    QToolButton *m_autoKbps = nullptr;
+    bool m_settingKbps = false;
     QLabel *m_estimate = nullptr;
     bool m_customTouched = false; // "Своё" has its own values (else it starts from the quality chosen before)
     int m_lastQuality = WebcamRecorder::Normal;
