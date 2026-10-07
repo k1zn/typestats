@@ -192,7 +192,7 @@ void Camera::start(const QString &deviceId, QSize size, int fps)
     case AVAuthorizationStatusAuthorized:
         begin();
         break;
-    case AVAuthorizationStatusNotDetermined:
+    case AVAuthorizationStatusNotDetermined: { // braced: the block below lives in this scope only
         [AVCaptureDevice requestAccessForMediaType:AVMediaTypeVideo
                                  completionHandler:^(BOOL granted) {
                                      QMetaObject::invokeMethod(this, [this, granted, begin] {
@@ -206,6 +206,7 @@ void Camera::start(const QString &deviceId, QSize size, int fps)
                                      });
                                  }];
         break;
+    }
     default:
         d->active = false;
         emit failed(QCoreApplication::translate("Capture", "Нет доступа к камере (Системные настройки → Конфиденциальность)"));
@@ -289,7 +290,7 @@ void Microphone::start(const QString &deviceId)
     case AVAuthorizationStatusAuthorized:
         begin();
         break;
-    case AVAuthorizationStatusNotDetermined:
+    case AVAuthorizationStatusNotDetermined: { // braced: the block below lives in this scope only
         [AVCaptureDevice requestAccessForMediaType:AVMediaTypeAudio
                                  completionHandler:^(BOOL granted) {
                                      QMetaObject::invokeMethod(this, [this, granted, begin] {
@@ -303,6 +304,7 @@ void Microphone::start(const QString &deviceId)
                                      });
                                  }];
         break;
+    }
     default:
         d->active = false;
         emit failed(QCoreApplication::translate("Capture", "Нет доступа к микрофону (Системные настройки → Конфиденциальность)"));
