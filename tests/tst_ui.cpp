@@ -1432,6 +1432,77 @@ private slots:
         QCOMPARE(extra.rows.first().at(2).toInt(), w.m_extra->rows().first().value);
     }
 
+    void graphShownAtStart_data()
+    {
+        QTest::addColumn<QSize>("window");
+        QTest::addColumn<int>("text");
+        QTest::addColumn<int>("klav");
+        QTest::newRow("defaults") << QSize() << -1 << -1;
+        QTest::newRow("saved") << QSize(876, 579) << 120 << 200;
+        QTest::newRow("large") << QSize(1600, 1000) << 120 << 200;
+        QTest::newRow("tall panes") << QSize(1600, 1000) << 300 << 400;
+    }
+
+    void graphShownAtStart()
+    {
+        // The graph is there from the start, whatever the window was (the panes are laid out once the window is).
+        QFETCH(QSize, window);
+        QFETCH(int, text);
+        QFETCH(int, klav);
+        {
+            QSettings s;
+            s.clear();
+            if (window.isValid()) {
+                QWidget probe;
+                probe.resize(window);
+                s.setValue(QStringLiteral("WindowGeometry"), probe.saveGeometry());
+                s.setValue(QStringLiteral("TextWinHeight"), text);
+                s.setValue(QStringLiteral("KlavWinHeight"), klav);
+            }
+        }
+        MainWindow w;
+        w.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QCoreApplication::processEvents();
+        const QList<int> sizes = w.m_leftSplit->sizes();
+        QVERIFY2(!w.m_graphFolded, qPrintable(QStringLiteral("%1 %2 %3").arg(sizes[0]).arg(sizes[1]).arg(sizes[2])));
+        QVERIFY(w.m_graph->isVisible());
+        QVERIFY(sizes[1] >= 100);
+        // The panes as saved when they fit; else the text and the klavogram give way in proportion.
+        if (text > 0) {
+            if (text + klav + 100 <= sizes[0] + sizes[1] + sizes[2]) {
+                QCOMPARE(sizes[0], text);
+                QCOMPARE(sizes[2], klav);
+            } else {
+                QVERIFY(sizes[0] < text && sizes[2] < klav);
+                QVERIFY(qAbs(sizes[0] * klav - sizes[2] * text) <= text + klav);
+            }
+        }
+        QSettings().clear();
+    }
+
+    void graphFoldedByHandStays()
+    {
+        // Folded by hand and closed: folded again (the port's key GraphFolded).
+        QSettings().clear();
+        {
+            MainWindow w;
+            w.show();
+            QVERIFY(QTest::qWaitForWindowExposed(&w));
+            const QList<int> sizes = w.m_leftSplit->sizes();
+            w.m_leftSplit->setSizes({sizes[0], 80, sizes[2] + sizes[1] - 80});
+            w.graphPaneResized();
+            QVERIFY(w.m_graphFolded);
+            w.saveSettings();
+        }
+        MainWindow w;
+        w.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&w));
+        QVERIFY(w.m_graphFolded);
+        QVERIFY(!w.m_graph->isVisible());
+        QSettings().clear();
+    }
+
     void foldedGraph()
     {
         MainWindow w;

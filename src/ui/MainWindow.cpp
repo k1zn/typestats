@@ -531,17 +531,18 @@ void MainWindow::loadSettings()
         if (s.contains(QStringLiteral("MainWinLeft")))
             move(s.value(QStringLiteral("MainWinLeft")).toInt(), s.value(QStringLiteral("MainWinTop")).toInt());
     }
-    // Heights of the text and the klavogram, width of the right panel; the graph takes the rest.
-    const int total = m_leftSplit->sizes().value(0) + m_leftSplit->sizes().value(1) + m_leftSplit->sizes().value(2);
-    const int textHeight = s.value(QStringLiteral("TextWinHeight"), 120).toInt();
-    const int klavHeight = s.value(QStringLiteral("KlavWinHeight"), 200).toInt();
-    m_leftSplit->setSizes({textHeight, std::max(20, total - textHeight - klavHeight), klavHeight});
+    // Heights of the text and the klavogram (the graph takes the rest) - once the window is laid out: before it is
+    // shown the panes have no size of their own, and the graph would fold for want of room. Width of the right panel.
+    m_panes = {s.value(QStringLiteral("TextWinHeight"), 120).toInt(), s.value(QStringLiteral("KlavWinHeight"), 200).toInt(),
+               s.value(QStringLiteral("GraphFolded"), false).toBool()};
+    m_panesPending = true;
+    if (isVisible())
+        layOutPanes();
     const int rightWidth = s.value(QStringLiteral("RightPanelWidth"), 218).toInt();
     m_mainSplit->setSizes({std::max(100, width() - rightWidth - m_mainSplit->handleWidth()), rightWidth});
     m_keys->horizontalHeader()->resizeSection(0, s.value(QStringLiteral("DlitCol1Width"), 80).toInt());
     m_keys->horizontalHeader()->resizeSection(1, s.value(QStringLiteral("DlitCol2Width"), 80).toInt());
     m_fingers->setCurrentIndex(std::max(0, m_fingers->findText(s.value(QStringLiteral("FingerZonesName")).toString())));
-    graphPaneResized();
 
     m_live->loadSettings();
     m_extra->loadSettings();
@@ -586,6 +587,7 @@ void MainWindow::saveSettings() const
     m_input->saveSettings();
     s.setValue(QStringLiteral("TextWinHeight"), m_leftSplit->sizes().value(0));
     s.setValue(QStringLiteral("KlavWinHeight"), m_leftSplit->sizes().value(2));
+    s.setValue(QStringLiteral("GraphFolded"), m_graphFolded); // the port's own: folded by hand
     s.setValue(QStringLiteral("RightPanelWidth"), m_mainSplit->sizes().value(1));
     s.setValue(QStringLiteral("DlitCol1Width"), m_keys->horizontalHeader()->sectionSize(0));
     s.setValue(QStringLiteral("DlitCol2Width"), m_keys->horizontalHeader()->sectionSize(1));
@@ -1370,9 +1372,34 @@ void MainWindow::resizeEvent(QResizeEvent *e)
     m_axisPanel->keepInside();
 }
 
+void MainWindow::layOutPanes()
+{
+    m_panesPending = false;
+    const QList<int> sizes = m_leftSplit->sizes();
+    const int total = sizes.value(0) + sizes.value(1) + sizes.value(2);
+    int text = std::max(20, m_panes.text), klav = std::max(20, m_panes.klav);
+    if (m_panes.graphFolded) {
+        const int bar = m_graphScroll->sizeHint().height();
+        m_leftSplit->setSizes({text, bar, std::max(20, total - text - bar)});
+    } else {
+        // The panes as they were; on a smaller window the text and the klavogram give way, so that the graph keeps the
+        // least it is shown at (graphPaneResized folds it below).
+        const int room = total - kGraphMinHeight;
+        if (text + klav > room) {
+            const int both = std::max(40, room);
+            text = std::max(20, int(qint64(both) * text / (text + klav)));
+            klav = std::max(20, both - text);
+        }
+        m_leftSplit->setSizes({text, std::max(kGraphMinHeight, total - text - klav), klav});
+    }
+    graphPaneResized();
+}
+
 void MainWindow::showEvent(QShowEvent *e)
 {
     QWidget::showEvent(e);
+    if (m_panesPending)
+        layOutPanes();
     if (!m_legendPlaced) {
         // Over the top left corner of the graph, next to the axis.
         m_legendPlaced = true;
@@ -1612,7 +1639,7 @@ void MainWindow::graphPaneResized()
     // Panel1CanResize.
     const QList<int> sizes = m_leftSplit->sizes();
     const int pane = sizes.value(1), bar = m_graphScroll->sizeHint().height();
-    if (pane < 100) {
+    if (pane < kGraphMinHeight) {
         if (!m_graphFolded) {
             m_graphFolded = true;
             m_graph->hide();

@@ -114,6 +114,7 @@ private:
     void syncGraphScrollBar();
     // Panel1 lower than 100 px: the graph folds away and its scroll bar moves the klavogram.
     void graphPaneResized();
+    void layOutPanes(); // the heights of the panes from the settings, once the window has its size
     qint64 drawTimeOfElement(int element) const;
     void createGraphPanels();
     // N7Click / N8Click: the panels are only opened here (their red buttons close them); while one
@@ -214,6 +215,13 @@ private:
     LegendPanel *m_legend = nullptr;
     AxisPanel *m_axisPanel = nullptr;
     bool m_legendPlaced = false;
+    static constexpr int kGraphMinHeight = 100; // below it the graph folds to its scroll bar (Panel1CanResize)
+    struct Panes
+    {
+        int text = 120, klav = 200;
+        bool graphFolded = false;
+    } m_panes;
+    bool m_panesPending = false;
     bool m_legendOpen = true; // the legend is not closed; the folded graph hides it all the same
     QToolButton *m_axisButton = nullptr;
     QToolButton *m_legendButton = nullptr;
