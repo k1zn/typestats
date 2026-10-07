@@ -81,6 +81,34 @@ QString proofStyle(const QColor &color)
 }
 
 
+#ifdef TS_HAVE_WEBCAM
+// A video camera in a colour; `dot` - the red dot of recording on it.
+QIcon cameraIcon(const QColor &color, bool dot)
+{
+    QIcon icon;
+    for (int size : {16, 32, 48}) {
+        QPixmap pixmap(size, size);
+        pixmap.fill(Qt::transparent);
+        QPainter p(&pixmap);
+        p.setRenderHint(QPainter::Antialiasing);
+        p.scale(size / 16.0, size / 16.0);
+        p.setPen(Qt::NoPen);
+        p.setBrush(color);
+        p.drawRoundedRect(QRectF(0.5, 4, 10.5, 8.5), 1.8, 1.8);
+        const QPointF lens[] = {{11.5, 7.2}, {15.5, 4.8}, {15.5, 11.7}, {11.5, 9.3}};
+        p.drawPolygon(lens, 4);
+        if (dot) {
+            p.setBrush(QColor(230, 30, 30));
+            p.setPen(QPen(Qt::white, 0.8));
+            p.drawEllipse(QPointF(5.75, 8.25), 2.6, 2.6);
+        }
+        p.end();
+        icon.addPixmap(pixmap);
+    }
+    return icon;
+}
+#endif
+
 QString appTitle()
 {
     return QStringLiteral("Typing statistics v") + QCoreApplication::applicationVersion();
@@ -165,10 +193,11 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_webcam, &WebcamRecorder::picture, m_video, &VideoWindow::setPicture);
     connect(m_webcam, &WebcamRecorder::recordingChanged, this, &MainWindow::updateVideoMode);
     connect(m_webcam, &WebcamRecorder::packetsAdded, m_stamps, &StampRecorder::packetsAdded);
+    connect(m_webcam, &WebcamRecorder::packetsAdded, this, &MainWindow::updateCameraButton);
     connect(m_webcam, &WebcamRecorder::failed, this, [this](const QString &reason) {
+        m_cameraError = reason;
         m_video->setMessage(reason);
-        if (m_videoButton)
-            m_videoButton->setToolTip(tr("Видео") + QStringLiteral(": ") + reason);
+        updateCameraButton();
     });
     connect(m_video, &VideoWindow::visibilityChanged, this, &MainWindow::updateVideoMode);
     connect(m_video, &VideoWindow::playToggled, this, &MainWindow::playVideo);
@@ -347,12 +376,9 @@ QWidget *MainWindow::createToolBar()
             [this] { exportTable(keyTable(), true); });
     action(12, 150, 4, 23, tr("Дополнительная статистика"), &MainWindow::showExtraStats);
     action(19, 174, 4, 23, tr("Статистические гистограммы"), &MainWindow::showHistograms);
-#ifdef TS_HAVE_WEBCAM
-    m_videoButton = action(20, 198, 4, 23, tr("Видео"), &MainWindow::showVideo);
-    m_videoIcon = m_videoButton->icon();
-#else
-    action(20, 198, 4, 23, tr("Видео"), nullptr); // built without the webcam: disabled
-#endif
+    // The original's attached AVI (Form5, Form6) is not ported: its buttons stay, disabled. The webcam has its own
+    // button in the corner.
+    action(20, 198, 4, 23, tr("Видео"), nullptr);
     action(22, 222, 4, 23, tr("Настройки..."), &MainWindow::showSettings);
     action(4, 246, 4, 23, tr("Оперативная статистика"), &MainWindow::showLiveStats);
     m_helpButton = action(3, 270, 4, 23, tr("О программе"), &MainWindow::showHelpMenu);
@@ -365,11 +391,7 @@ QWidget *MainWindow::createToolBar()
     action(14, 78, 32, 22, tr("Отменить (%1)").arg(Hotkeys::undo()), &MainWindow::undo);
     action(18, 102, 32, 22, tr("Удалить нетекстовые клавиши"), &MainWindow::removeNonText);
     action(15, 126, 32, 22, tr("Пометить (%1)").arg(Hotkeys::mark()), &MainWindow::mark);
-#ifdef TS_HAVE_WEBCAM
-    action(21, 150, 32, 22, tr("Свойства видео"), &MainWindow::videoProperties);
-#else
     action(21, 150, 32, 22, tr("Свойства видео"), nullptr);
-#endif
     m_axisButton = action(16, 174, 32, 22, tr("Настройка оси Y графиков"), &MainWindow::showAxisPanel);
     m_legendButton = action(17, 198, 32, 22, tr("Легенда"), &MainWindow::showLegend);
     action(23, 222, 32, 22, tr("Ввод текста (%1)").arg(Hotkeys::textInput()), &MainWindow::showTextInput);
@@ -457,8 +479,49 @@ QWidget *MainWindow::createToolBar()
     m_proofButton->setText(QStringLiteral("✓ 100 % !"));
     m_proofButton->setStyleSheet(proofStyle(Qt::black));
     const int proofWidth = m_proofButton->sizeHint().width();
-    bar->setMinimumWidth(editZones->geometry().right() + 1 + kCornerGap + proofWidth + kCornerGap
-                         + m_themeButton->width() + kCornerMargin);
+    int minWidth = editZones->geometry().right() + 1 + kCornerGap + proofWidth + kCornerGap + m_themeButton->width()
+                   + kCornerMargin;
+#ifdef TS_HAVE_WEBCAM
+    // Under them: the webcam - its video, and the menu of what is recorded.
+    m_cameraButton = new QToolButton(bar);
+    m_cameraButton->setFocusPolicy(Qt::NoFocus);
+    m_cameraButton->setAutoRaise(true);
+    m_cameraButton->setFixedHeight(23);
+    m_cameraButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    m_cameraButton->setPopupMode(QToolButton::MenuButtonPopup);
+    auto *menu = new QMenu(m_cameraButton);
+    m_cameraVideo = menu->addAction(tr("Записывать камеру при наборе"));
+    m_cameraVideo->setCheckable(true);
+    m_cameraAudio = menu->addAction(tr("Записывать звук с микрофона"));
+    m_cameraAudio->setCheckable(true);
+    menu->addSeparator();
+    menu->addAction(tr("Свойства камеры…"), this, &MainWindow::videoProperties);
+    m_cameraSave = menu->addAction(tr("Сохранить видео в WebM…"), this, &MainWindow::saveVideo);
+    connect(menu, &QMenu::aboutToShow, this, [this] {
+        const WebcamRecorder::Settings &s = m_webcam->settings();
+        m_cameraVideo->setChecked(s.video);
+        m_cameraAudio->setChecked(s.audio);
+        m_cameraSave->setEnabled(!m_clip.isEmpty());
+    });
+    auto toggle = [this](bool WebcamRecorder::Settings::*what, bool on) {
+        WebcamRecorder::Settings s = m_webcam->settings();
+        s.*what = on;
+        s.save();
+        m_cameraError.clear();
+        m_webcam->setSettings(s);
+        updateVideoMode();
+    };
+    connect(m_cameraVideo, &QAction::triggered, this, [toggle](bool on) { toggle(&WebcamRecorder::Settings::video, on); });
+    connect(m_cameraAudio, &QAction::triggered, this, [toggle](bool on) { toggle(&WebcamRecorder::Settings::audio, on); });
+    m_cameraButton->setMenu(menu);
+    connect(m_cameraButton, &QToolButton::clicked, this, &MainWindow::showVideo);
+    m_cameraButton->setText(QStringLiteral("00:00"));
+    m_cameraButton->setIcon(cameraIcon(Qt::black, false));
+    m_cameraButton->setStyleSheet(proofStyle(Qt::black));
+    minWidth = std::max(minWidth, editZones->geometry().right() + 1 + kCornerGap + m_cameraButton->sizeHint().width()
+                                      + kCornerMargin);
+#endif
+    bar->setMinimumWidth(minWidth);
     return bar;
 }
 
@@ -516,6 +579,8 @@ void MainWindow::updateThemeColors()
     m_damaged->setPalette(warnPalette);
     m_legend->updateColors();
     m_live->updateColors();
+    m_cameraKey.clear(); // the colours of its states
+    updateCameraButton();
     if (m_model.text.isEmpty())
         return;
     // The colours of the text styles are in its document: it is built again, with the selection and the scroll.
@@ -971,8 +1036,9 @@ void MainWindow::captureToggled(bool on)
     if (!m_opening)
         m_stamps->captureChanged(on);
 #ifdef TS_HAVE_WEBCAM
-    if (m_webcam)
-        m_webcam->setCapture(on);
+    // Off: the camera stops. On: it waits for a key typed into this document (keyEvent).
+    if (m_webcam && !on)
+        m_webcam->setCapture(false);
 #endif
     m_text->setFocus();
 }
@@ -1041,11 +1107,7 @@ void MainWindow::deletePreset()
 
 void MainWindow::startCapture()
 {
-    m_hook.start();
-#ifdef TS_HAVE_WEBCAM
-    if (m_webcam)
-        m_webcam->setCapture(m_capture->isChecked());
-#endif
+    m_hook.start(); // the webcam starts with the first key (keyEvent)
 }
 
 void MainWindow::offerFileAssociation()
@@ -1371,6 +1433,12 @@ void MainWindow::keyEvent(const HookEvent &e)
         }
         m_needRecalc = true;
         m_lastKey.start();
+#ifdef TS_HAVE_WEBCAM
+        // The camera records what is typed into this document: from its first key (a document only opened to be looked
+        // at does not open the camera). It takes a moment to start: the first keys may come before the first frame.
+        if (m_webcam && m_capture->isChecked() && !m_webcam->isRecording())
+            m_webcam->setCapture(true);
+#endif
     }
 }
 
@@ -1468,6 +1536,8 @@ void MainWindow::placeCornerButtons()
 {
     m_themeButton->move(m_themeButton->parentWidget()->width() - m_themeButton->width() - kCornerMargin, 4);
     m_proofButton->move(m_themeButton->x() - m_proofButton->width() - kCornerGap, 4);
+    if (m_cameraButton) // the lower row, right-aligned with the theme
+        m_cameraButton->move(m_themeButton->geometry().right() + 1 - m_cameraButton->width(), 28);
 }
 
 bool MainWindow::eventFilter(QObject *o, QEvent *e)
@@ -1880,6 +1950,8 @@ void MainWindow::setDocument(const TsfDocument &doc, const QString &title, bool 
     m_docEndUs = DocTime::end(m_doc.records);
 #ifdef TS_HAVE_WEBCAM
     if (m_webcam) {
+        // Another document (opened, cleared): the camera waits until it is typed into.
+        m_webcam->setCapture(false);
         m_webcam->setClip(&m_clip);
         m_video->setClip(&m_clip);
         syncWebcamClock();
@@ -2150,13 +2222,46 @@ void MainWindow::videoProperties()
 {
 #ifdef TS_HAVE_WEBCAM
     VideoPropertiesDialog dialog(this);
-    dialog.setSettings(m_webcam->settings());
+    const WebcamRecorder::Settings old = m_webcam->settings();
+    dialog.setSettings(old);
     dialog.setShiftMs(m_clip.shiftMs, !m_clip.isEmpty());
-    if (dialog.exec() != QDialog::Accepted)
+    // The picture of the camera chosen while the dialog is open (while recording - of the recording itself). The
+    // camera opened for it records nothing: the recorder waits.
+    const bool recording = m_webcam->isRecording();
+    const bool capturing = m_webcam->isCapturing();
+    if (!recording)
+        m_webcam->setCapture(false);
+    auto preview = [this, &dialog, recording] {
+        if (recording)
+            return;
+        WebcamRecorder::Settings s = dialog.settings();
+        s.video = true;
+        s.audio = false;
+        dialog.setPreviewMessage(tr("Камера включается…"));
+        m_webcam->setSettings(s);
+    };
+    connect(&dialog, &VideoPropertiesDialog::cameraChanged, &dialog, preview);
+    connect(m_webcam, &WebcamRecorder::picture, &dialog, &VideoPropertiesDialog::setPicture);
+    connect(m_webcam, &WebcamRecorder::failed, &dialog, &VideoPropertiesDialog::setPreviewMessage);
+    if (recording && !old.video)
+        dialog.setPreviewMessage(tr("Идёт запись без камеры"));
+    preview();
+    m_webcam->setPreview(true);
+    const bool accepted = dialog.exec() == QDialog::Accepted;
+    m_webcam->setPreview(false);
+    const WebcamRecorder::Settings s = accepted ? dialog.settings() : old;
+    if (accepted) {
+        s.save();
+        m_cameraError.clear();
+    }
+    if (accepted || !recording)
+        m_webcam->setSettings(s);
+    if (!recording)
+        m_webcam->setCapture(capturing); // typed into already: recording goes on with what was chosen
+    if (!accepted) {
+        updateVideoMode();
         return;
-    const WebcamRecorder::Settings s = dialog.settings();
-    s.save();
-    m_webcam->setSettings(s);
+    }
     if (!m_clip.isEmpty() && dialog.shiftMs() != m_clip.shiftMs) {
         m_clip.shiftMs = dialog.shiftMs();
         m_unsaved = true;
@@ -2169,29 +2274,65 @@ void MainWindow::videoProperties()
 void MainWindow::updateVideoMode()
 {
 #ifdef TS_HAVE_WEBCAM
-    // The camera's own picture while recording, and before it when the document has no video yet (to place the
-    // camera); the recording's frames otherwise.
-    const bool recording = m_webcam->isRecording();
-    const bool live = recording || (m_clip.isEmpty() && m_webcam->settings().video);
+    // What the camera records while it records into this document; the document's frames otherwise. The camera is
+    // not opened just to be looked at here (its picture to place it is in "Свойства камеры").
+    const bool live = m_webcam->isRecording() && m_webcam->settings().video;
     m_video->setLive(live);
-    m_video->setRecording(recording);
+    m_video->setRecording(m_webcam->isRecording());
     m_webcam->setPreview(live && m_video->isVisible());
-    if (m_videoButton) {
-        QIcon icon = m_videoIcon;
-        if (recording && m_webcam->settings().video) {
-            QPixmap pm = m_videoIcon.pixmap(16, 16);
-            QPainter painter(&pm);
-            painter.setRenderHint(QPainter::Antialiasing);
-            painter.setPen(Qt::NoPen);
-            painter.setBrush(QColor(220, 0, 0));
-            painter.drawEllipse(QRectF(pm.width() / pm.devicePixelRatio() - 7, 0, 7, 7));
-            icon = QIcon(pm);
-        }
-        m_videoButton->setIcon(icon);
-        m_videoButton->setToolTip(recording && m_webcam->settings().video ? tr("Видео: камера записывает") : tr("Видео"));
-    }
-    if (!live)
+    if (!live) {
+        const WebcamRecorder::Settings &s = m_webcam->settings();
+        m_video->setMessage(!m_clip.isEmpty() ? QString()
+                            : s.video     ? tr("В этой записи нет видео.\nКамера включится, когда начнётся набор.")
+                                          : tr("В этой записи нет видео.\nЗапись камеры включается в меню её кнопки (▾)."));
         updateVideo();
+    }
+    updateCameraButton();
+#endif
+}
+
+void MainWindow::updateCameraButton()
+{
+#ifdef TS_HAVE_WEBCAM
+    if (!m_cameraButton)
+        return;
+    // Recording: red, the length so far; a document with video: green, its length; else the camera alone, dim when
+    // it is not to record.
+    const WebcamRecorder::Settings &s = m_webcam->settings();
+    const bool recording = m_webcam->isRecording();
+    const Look::Colors &c = Look::colors();
+    QColor color = s.video || s.audio ? c.ink : c.dimInk;
+    QString text, hint;
+    if (recording || !m_clip.isEmpty()) {
+        const qint64 secs = m_clip.isEmpty() ? 0 : std::max<qint64>(0, (m_clip.lastUs() - m_clip.firstUs()) / 1000000);
+        text = QStringLiteral("%1:%2").arg(secs / 60).arg(secs % 60, 2, 10, QLatin1Char('0'));
+    }
+    if (recording) {
+        color = c.proofBad;
+        hint = s.video ? tr("Камера записывает набор") : tr("Микрофон записывает набор");
+    } else if (!m_clip.isEmpty()) {
+        color = c.proofOk;
+        hint = tr("В записи есть видео (%1)").arg(text);
+    } else if (s.video || s.audio) {
+        hint = s.video ? tr("Камера включится, когда начнётся набор") : tr("Микрофон включится, когда начнётся набор");
+    } else {
+        hint = tr("Запись камеры выключена");
+    }
+    if (!m_cameraError.isEmpty() && (s.video || s.audio))
+        hint += u'\n' + m_cameraError;
+    hint += u'\n' + tr("Щелчок — видео, ▾ — что записывать");
+    // Only what changed: a style sheet is costly, and this comes with every packet.
+    const QString key = text + color.name() + (recording ? u'r' : u'-');
+    if (key != m_cameraKey) {
+        m_cameraKey = key;
+        m_cameraButton->setText(text);
+        m_cameraButton->setToolButtonStyle(text.isEmpty() ? Qt::ToolButtonIconOnly : Qt::ToolButtonTextBesideIcon);
+        m_cameraButton->setIcon(cameraIcon(color, recording && s.video));
+        m_cameraButton->setStyleSheet(proofStyle(color));
+        m_cameraButton->adjustSize();
+        placeCornerButtons();
+    }
+    m_cameraButton->setToolTip(hint);
 #endif
 }
 

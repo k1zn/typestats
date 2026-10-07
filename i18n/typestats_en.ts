@@ -937,10 +937,6 @@ Copy the command, paste it into a terminal and enter your password. This is need
         <translation>To keep the time stamps, the block will carry neighbouring keystrokes of the recording, hidden (not shown, not counted): %1. Keep the stamps?</translation>
     </message>
     <message>
-        <source>Видео: камера записывает</source>
-        <translation>Video: the camera is recording</translation>
-    </message>
-    <message>
         <source>Видео под метками: %1 %</source>
         <translation>Video under the stamps: %1 %</translation>
     </message>
@@ -959,6 +955,70 @@ Copy the command, paste it into a terminal and enter your password. This is need
     <message>
         <source>Отмена</source>
         <translation>Cancel</translation>
+    </message>
+    <message>
+        <source>Записывать камеру при наборе</source>
+        <translation>Record the camera while typing</translation>
+    </message>
+    <message>
+        <source>Записывать звук с микрофона</source>
+        <translation>Record sound from the microphone</translation>
+    </message>
+    <message>
+        <source>Свойства камеры…</source>
+        <translation>Camera properties…</translation>
+    </message>
+    <message>
+        <source>Сохранить видео в WebM…</source>
+        <translation>Save the video as WebM…</translation>
+    </message>
+    <message>
+        <source>Камера включается…</source>
+        <translation>Starting the camera…</translation>
+    </message>
+    <message>
+        <source>Идёт запись без камеры</source>
+        <translation>Recording without the camera</translation>
+    </message>
+    <message>
+        <source>В этой записи нет видео.
+Камера включится, когда начнётся набор.</source>
+        <translation>This recording has no video.
+The camera starts when typing does.</translation>
+    </message>
+    <message>
+        <source>В этой записи нет видео.
+Запись камеры включается в меню её кнопки (▾).</source>
+        <translation>This recording has no video.
+Camera recording is turned on in its button's menu (▾).</translation>
+    </message>
+    <message>
+        <source>Камера записывает набор</source>
+        <translation>The camera is recording the typing</translation>
+    </message>
+    <message>
+        <source>Микрофон записывает набор</source>
+        <translation>The microphone is recording the typing</translation>
+    </message>
+    <message>
+        <source>В записи есть видео (%1)</source>
+        <translation>The recording has video (%1)</translation>
+    </message>
+    <message>
+        <source>Камера включится, когда начнётся набор</source>
+        <translation>The camera starts when typing does</translation>
+    </message>
+    <message>
+        <source>Микрофон включится, когда начнётся набор</source>
+        <translation>The microphone starts when typing does</translation>
+    </message>
+    <message>
+        <source>Запись камеры выключена</source>
+        <translation>Camera recording is off</translation>
+    </message>
+    <message>
+        <source>Щелчок — видео, ▾ — что записывать</source>
+        <translation>Click: the video; ▾: what to record</translation>
     </message>
 </context>
 <context>
@@ -1187,10 +1247,6 @@ Copy the command, paste it into a terminal and enter your password. This is need
 <context>
     <name>VideoPropertiesDialog</name>
     <message>
-        <source>Свойства видео</source>
-        <translation>Video properties</translation>
-    </message>
-    <message>
         <source>Во время набора</source>
         <translation>While typing</translation>
     </message>
@@ -1281,6 +1337,10 @@ Copy the command, paste it into a terminal and enter your password. This is need
     <message>
         <source>мало для такого кадра: картинка будет размытой</source>
         <translation>too little for such a frame: the picture will be blurred</translation>
+    </message>
+    <message>
+        <source>Свойства камеры</source>
+        <translation>Camera properties</translation>
     </message>
 </context>
 <context>

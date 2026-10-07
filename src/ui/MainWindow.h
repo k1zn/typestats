@@ -36,6 +36,7 @@ class QSplitter;
 class QSystemTrayIcon;
 class QTableWidget;
 class QTimer;
+class QAction;
 class QToolButton;
 class TextInputWindow;
 class TextView;
@@ -144,6 +145,8 @@ private:
     void syncWebcamClock();
     // Live picture or the recording's frames; the red dot on the button while the camera records.
     void updateVideoMode();
+    // The corner button: red with the length while recording, green with it when the document has video.
+    void updateCameraButton();
     // Room in the records for the keys to come, whenever the records are replaced.
     void keepRoomForRecording();
     // "Ts: ON - Typing statistics v… - file": the capture state goes first, as the original's
@@ -269,8 +272,11 @@ private:
     qint64 m_undoOriginUs = 0;  // the clip's origin of the records kept for "Отменить"
     WebcamRecorder *m_webcam = nullptr;
     VideoWindow *m_video = nullptr;
-    QToolButton *m_videoButton = nullptr;
-    QIcon m_videoIcon;
+    // The webcam's button in the corner (under the time stamps) and its menu.
+    QToolButton *m_cameraButton = nullptr;
+    QAction *m_cameraVideo = nullptr, *m_cameraAudio = nullptr, *m_cameraSave = nullptr;
+    QString m_cameraError; // the last failure of a device
+    QString m_cameraKey;   // what the button shows (redrawn only when it changes)
     QTimer *m_playTimer = nullptr;
     QElapsedTimer m_playClock;
     qint64 m_playFromUs = 0;

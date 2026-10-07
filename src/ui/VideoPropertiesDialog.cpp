@@ -8,6 +8,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLocale>
+#include <QPixmap>
 #include <QSpinBox>
 #include <QVBoxLayout>
 
@@ -32,7 +33,7 @@ void fillDevices(QComboBox *box, const QList<CaptureDevice> &devices, const QStr
 
 VideoPropertiesDialog::VideoPropertiesDialog(QWidget *parent) : QDialog(parent)
 {
-    setWindowTitle(tr("Свойства видео"));
+    setWindowTitle(tr("Свойства камеры"));
     auto *layout = new QVBoxLayout(this);
 
     auto *record = new QGroupBox(tr("Во время набора"));
@@ -41,6 +42,14 @@ VideoPropertiesDialog::VideoPropertiesDialog(QWidget *parent) : QDialog(parent)
     form->addRow(m_video);
     m_camera = new QComboBox;
     form->addRow(tr("Камера"), m_camera);
+    // What the camera sees, while the dialog is open: to place it.
+    m_preview = new QLabel;
+    m_preview->setFixedSize(256, 144);
+    m_preview->setAlignment(Qt::AlignCenter);
+    m_preview->setWordWrap(true);
+    m_preview->setStyleSheet(QStringLiteral("QLabel { background: black; color: #c8c8c8; }"));
+    form->addRow(QString(), m_preview);
+    connect(m_camera, &QComboBox::currentIndexChanged, this, &VideoPropertiesDialog::cameraChanged);
     m_quality = new QComboBox;
     // Sizes in the file are for a person at a keyboard: a still scene takes less.
     m_quality->addItem(tr("Экономно: 320×240, 10 к/с (~0,4 МБ/мин)"));
@@ -96,6 +105,7 @@ VideoPropertiesDialog::VideoPropertiesDialog(QWidget *parent) : QDialog(parent)
         if (i != WebcamRecorder::Custom)
             m_lastQuality = i;
         updateEnabled();
+        emit cameraChanged();
     });
     m_audio = new QCheckBox(tr("Записывать звук с микрофона (~0,15 МБ/мин)"));
     form->addRow(m_audio);
@@ -175,6 +185,19 @@ void VideoPropertiesDialog::updateEnabled()
     m_mic->setEnabled(m_audio->isChecked());
     updateEstimate();
     adjustSize();
+}
+
+void VideoPropertiesDialog::setPicture(const QImage &image)
+{
+    QPixmap pm = QPixmap::fromImage(
+        image.scaled(m_preview->size() * devicePixelRatioF(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    pm.setDevicePixelRatio(devicePixelRatioF());
+    m_preview->setPixmap(pm);
+}
+
+void VideoPropertiesDialog::setPreviewMessage(const QString &text)
+{
+    m_preview->setText(text);
 }
 
 void VideoPropertiesDialog::updateEstimate()

@@ -49,6 +49,7 @@ public:
     void setClip(MediaClip *clip);
     // Recording follows the capture.
     void setCapture(bool on);
+    bool isCapturing() const { return m_capture; }
     // The picture of the camera is shown (the video window is open while recording or not).
     void setPreview(bool on);
     bool isRecording() const { return m_recording; }

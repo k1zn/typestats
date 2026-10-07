@@ -9,8 +9,8 @@ class QComboBox;
 class QLabel;
 class QSpinBox;
 
-// "Свойства видео" (Form6, button 21; re/webcam.md): what is recorded while typing, and the synchronization of the
-// recording looked at.
+// "Свойства камеры" (the menu of the webcam's button; re/webcam.md): what is recorded while typing, the picture of the
+// camera chosen (to place it), and the synchronization of the recording looked at.
 class VideoPropertiesDialog : public QDialog
 {
     Q_OBJECT
@@ -22,6 +22,12 @@ public:
     // The correction of the document's clip; disabled when there is no video.
     void setShiftMs(int ms, bool enabled);
     int shiftMs() const;
+    // The picture of the camera, or why there is none.
+    void setPicture(const QImage &image);
+    void setPreviewMessage(const QString &text);
+
+signals:
+    void cameraChanged(); // another camera or size: the picture follows
 
 private:
     friend class TstUi;
@@ -30,6 +36,7 @@ private:
 
     QCheckBox *m_video = nullptr;
     QComboBox *m_camera = nullptr;
+    QLabel *m_preview = nullptr;
     QComboBox *m_quality = nullptr;
     QWidget *m_custom = nullptr; // "Своё": size, fps, bitrate
     QSpinBox *m_width = nullptr, *m_height = nullptr, *m_fps = nullptr, *m_kbps = nullptr;

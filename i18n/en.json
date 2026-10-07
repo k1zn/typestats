@@ -284,5 +284,21 @@
   "Поток видео: больше — чётче, но файл крупнее": "Video bitrate: higher is sharper, but the file is larger",
   "~%1 МБ/мин": "~%1 MB/min",
   "мало для такого кадра: картинка будет размытой": "too little for such a frame: the picture will be blurred",
-  "Перемотка (стрелки — на секунду)": "Seek (arrow keys: a second)"
+  "Перемотка (стрелки — на секунду)": "Seek (arrow keys: a second)",
+  "Записывать камеру при наборе": "Record the camera while typing",
+  "Записывать звук с микрофона": "Record sound from the microphone",
+  "Свойства камеры…": "Camera properties…",
+  "Сохранить видео в WebM…": "Save the video as WebM…",
+  "Камера включается…": "Starting the camera…",
+  "Идёт запись без камеры": "Recording without the camera",
+  "В этой записи нет видео.\nКамера включится, когда начнётся набор.": "This recording has no video.\nThe camera starts when typing does.",
+  "В этой записи нет видео.\nЗапись камеры включается в меню её кнопки (▾).": "This recording has no video.\nCamera recording is turned on in its button's menu (▾).",
+  "Камера записывает набор": "The camera is recording the typing",
+  "Микрофон записывает набор": "The microphone is recording the typing",
+  "В записи есть видео (%1)": "The recording has video (%1)",
+  "Камера включится, когда начнётся набор": "The camera starts when typing does",
+  "Микрофон включится, когда начнётся набор": "The microphone starts when typing does",
+  "Запись камеры выключена": "Camera recording is off",
+  "Щелчок — видео, ▾ — что записывать": "Click: the video; ▾: what to record",
+  "Свойства камеры": "Camera properties"
 }

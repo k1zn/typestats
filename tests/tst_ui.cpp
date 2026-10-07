@@ -469,18 +469,20 @@ private slots:
         QVERIFY(!w.m_legendButton->isEnabled());
         QVERIFY(!w.m_axisPanel->isVisible());
         QVERIFY(w.m_axisButton->isEnabled());
-        // The video buttons: the webcam (re/webcam.md); a build without it has them disabled.
+        // The original's video buttons stay disabled (its AVI is not ported); the webcam has its button in the corner.
         int video = 0;
         for (const QToolButton *b : w.findChildren<QToolButton *>())
             if (b->toolTip() == QStringLiteral("Видео") || b->toolTip() == QStringLiteral("Свойства видео")) {
-#ifdef TS_HAVE_WEBCAM
-                QVERIFY(b->isEnabled());
-#else
                 QVERIFY(!b->isEnabled());
-#endif
                 ++video;
             }
         QCOMPARE(video, 2);
+#ifdef TS_HAVE_WEBCAM
+        QVERIFY(w.m_cameraButton->isVisible());
+        QVERIFY(w.m_cameraButton->geometry().bottom() < w.m_themeButton->parentWidget()->height());
+        QCOMPARE(w.m_cameraButton->geometry().right(), w.m_themeButton->geometry().right());
+        QVERIFY(!w.m_cameraButton->geometry().intersects(w.m_proofButton->geometry()));
+#endif
 
         emit w.m_legend->closed(); // the red button
         w.m_legend->hide();
@@ -750,6 +752,63 @@ private slots:
         cam.addVideo(picture, 3100000);
         cam.drain();
         QVERIFY(!w.m_unsaved);
+#else
+        QSKIP("built without the webcam");
+#endif
+    }
+
+    void webcamStartsWithTyping()
+    {
+#ifdef TS_HAVE_WEBCAM
+        // The camera records what is typed into the document: not when a file is only opened, from its first key; the
+        // corner button tells it (re/webcam.md).
+        MainWindow w;
+        if (QApplication::activeWindow())
+            QSKIP("the test window got the focus");
+        WebcamRecorder &cam = *w.m_webcam;
+        cam.setDevicesEnabled(false);
+        WebcamRecorder::Settings s;
+        s.video = true;
+        cam.setSettings(s);
+        w.startCapture();
+        QVERIFY(w.m_capture->isChecked());
+        QVERIFY(!cam.isRecording());
+        QVERIFY(w.m_cameraButton->text().isEmpty()); // the camera alone
+        w.showVideo();
+        QVERIFY(!w.m_video->isLive()); // nothing recorded: no camera
+        QVERIFY(!w.m_video->m_message.isEmpty());
+        HookEvent e;
+        e.timeUs = 1000;
+        e.flags = quint32('A') << 16 | 'A' | KeyRecord::HasChar;
+        e.ch = u'a';
+        e.chars = 1;
+        w.keyEvent(e);
+        QVERIFY(cam.isRecording());
+        QVERIFY(w.m_video->isLive());
+        QCOMPARE(w.m_cameraButton->text(), QStringLiteral("0:00"));
+        QVERIFY(w.m_cameraKey.contains(Look::colors().proofBad.name())); // red
+        // Another document: the camera waits again; one with video shows it, green.
+        w.clear();
+        QVERIFY(!cam.isRecording());
+        QVERIFY(!w.m_video->isLive());
+        TsfDocument doc;
+        KeyRecord a;
+        a.flags = quint32('A') << 16 | 'A' | KeyRecord::HasChar;
+        a.ch = u'a';
+        doc.records = {a};
+        MediaClip clip;
+        clip.addStream(MediaStream::video(320, 240));
+        clip.packets = {{0, true, 0, QByteArray("x")}, {0, false, 61000000, QByteArray("y")}};
+        doc.webcam = clip.serialize();
+        w.setDocument(doc, QStringLiteral("v"), false);
+        QVERIFY(!cam.isRecording());
+        QCOMPARE(w.m_cameraButton->text(), QStringLiteral("1:01"));
+        QVERIFY(w.m_cameraKey.contains(Look::colors().proofOk.name())); // green
+        // Ts: OFF stops a recording.
+        w.keyEvent(e);
+        QVERIFY(cam.isRecording());
+        w.m_capture->setChecked(false);
+        QVERIFY(!cam.isRecording());
 #else
         QSKIP("built without the webcam");
 #endif
