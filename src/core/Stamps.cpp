@@ -669,6 +669,8 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
         packetCursor = l.packetsEnd;
     }
     rep.hiddenAfterUs = hiddenTail;
+    rep.pendingRecords = structure ? std::max(0, rep.records - recordCursor) : 0;
+    rep.pendingPackets = structure ? std::max(0, rep.packets - packetCursor) : 0;
     rep.confirmed = int(std::count(confirmed.begin(), confirmed.end(), 1));
     rep.authorities = QStringList(authorities.begin(), authorities.end());
     rep.authorities.sort();

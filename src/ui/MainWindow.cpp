@@ -719,7 +719,15 @@ void MainWindow::updateProof()
             m_proofButton->hide();
             return;
         }
-        const Stamps::Report r = stampReport();
+        Stamps::Report r = stampReport();
+        // While recording, what came after the last stamp waits for the next one (in 10 s at most): not missing.
+        const bool live = m_stamps->enabled() && m_capture->isChecked();
+        const int pendingRecords = live ? r.pendingRecords : 0, pendingPackets = live ? r.pendingPackets : 0;
+        r.records -= pendingRecords;
+        r.packets -= pendingPackets;
+        if (r.status == Stamps::Report::Status::Partial && r.records > 0 && r.confirmed >= r.records
+            && r.packetsStamped >= r.packets && r.voided == 0 && r.unknown == 0)
+            r.status = Stamps::Report::Status::Confirmed;
         // Short: the corner has room for little; the words are in the hint and the details.
         QString text, hint;
         QColor color = Look::colors().dimInk;
@@ -735,6 +743,8 @@ void MainWindow::updateProof()
         case Stamps::Report::Status::Confirmed:
             text = QStringLiteral("✓ 100 %");
             hint = tr("Запись заверена метками времени");
+            if (pendingRecords || pendingPackets)
+                hint += u'\n' + tr("Последнее набранное и снятое ждёт следующей метки");
             color = Look::colors().proofOk;
             break;
         case Stamps::Report::Status::Partial:

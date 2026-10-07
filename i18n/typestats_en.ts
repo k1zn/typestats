@@ -948,6 +948,10 @@ Copy the command, paste it into a terminal and enter your password. This is need
         <source>Меток версии, которую эта программа не проверяет: %1</source>
         <translation>Stamps of a version this program does not check: %1</translation>
     </message>
+    <message>
+        <source>Последнее набранное и снятое ждёт следующей метки</source>
+        <translation>The latest typed and filmed waits for the next stamp</translation>
+    </message>
 </context>
 <context>
     <name>QObject</name>

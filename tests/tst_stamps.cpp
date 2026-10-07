@@ -341,6 +341,8 @@ private slots:
         r = reportWith(doc, more);
         QCOMPARE(r.status, Stamps::Report::Status::Partial);
         QCOMPARE(r.packetsStamped, 206);
+        QCOMPARE(r.pendingPackets, 1); // after the last stamp: while recording it waits for the next one
+        QCOMPARE(r.pendingRecords, 0);
 
         // The video claims to be 5 s later than the stamps that hold it.
         const TsfDocument lateDoc = load("video_late.tsf");

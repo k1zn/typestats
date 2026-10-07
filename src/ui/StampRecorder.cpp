@@ -23,6 +23,7 @@ const char *const kServices[] = {
 constexpr int kServiceCount = int(std::size(kServices));
 constexpr int kTimeoutMs = 5000; // then the next authority
 constexpr int kRetryMs = 5000;
+constexpr int kAfterStopMs = 1000; // the frames still on their way when recording stops
 
 } // namespace
 
@@ -102,7 +103,11 @@ void StampRecorder::recordsAdded()
 
 void StampRecorder::packetsAdded()
 {
-    if (m_enabled && m_doc && !m_videoDue.isActive())
+    if (!m_enabled || !m_doc)
+        return;
+    if (!m_capturing) // the last frames the encoders give after recording stopped: stamped as soon as they are in
+        m_videoDue.start(kAfterStopMs);
+    else if (!m_videoDue.isActive())
         m_videoDue.start(Stamps::kIntervalMs);
 }
 
@@ -140,6 +145,7 @@ void StampRecorder::flushDone(bool ok)
 
 void StampRecorder::captureChanged(bool on)
 {
+    m_capturing = on;
     recordsAdded(); // the releases of the held keys when it goes off
     if (!on)
         stampIfDue(true);

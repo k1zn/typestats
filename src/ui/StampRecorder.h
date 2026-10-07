@@ -100,6 +100,7 @@ private:
     QTimer m_videoDue;              // video the stamps do not hold yet
     Cover m_cover;
     bool m_flushing = false, m_flushSent = false;
+    bool m_capturing = false;
     QString m_error;
     Send m_send;
     QNetworkAccessManager *m_net = nullptr;

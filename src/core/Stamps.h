@@ -84,6 +84,8 @@ struct Report
     int packets = 0;         // of the clip
     int packetsStamped = 0;  // under good stamps
     int packetsLate = 0;     // timed after the stamp that holds them (such stamps are bad)
+    // After the last stamp: while recording they wait for the next one (not missing yet).
+    int pendingRecords = 0, pendingPackets = 0;
     // A block: time of the recording outside it, as its stamps tell.
     qint64 hiddenBeforeUs = 0, hiddenAfterUs = 0;
 };

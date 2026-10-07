@@ -1272,6 +1272,15 @@ private slots:
             sent.last().done({}, QStringLiteral("down"));
         QCOMPARE(flushed.size(), 6);
         QCOMPARE(flushed.last()[0].toBool(), false);
+        // Recording stops; the frames the encoder still gives are stamped a moment later, not in 10 s.
+        s.captureChanged(true);
+        const qsizetype stopped = sent.size();
+        s.captureChanged(false); // what is left is stamped at once
+        QCOMPARE(sent.size(), stopped + 1);
+        sent.last().done(fakeToken(sent.last().imprint), {});
+        const qsizetype before = sent.size();
+        frame(500000);
+        QTRY_VERIFY_WITH_TIMEOUT(sent.size() > before, 2500);
     }
 
     void stampLive()
