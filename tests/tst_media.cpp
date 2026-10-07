@@ -3,6 +3,7 @@
 #include "core/MediaClip.h"
 #include "core/WebmWriter.h"
 #include "media/Av1Codec.h"
+#include "media/Capture.h"
 #include "media/OpusCodec.h"
 #include "media/Yuv.h"
 
@@ -195,6 +196,15 @@ private slots:
             QVERIFY(f.open(QIODevice::WriteOnly));
             f.write(w);
         }
+    }
+
+    void captureDevices()
+    {
+        // Listing does not switch a camera on; on CI machines there are none.
+        for (const CaptureDevice &d : Camera::devices())
+            qInfo("camera: %s", qPrintable(d.name));
+        for (const CaptureDevice &d : Microphone::devices())
+            qInfo("microphone: %s", qPrintable(d.name));
     }
 
     void opusRoundTrip()

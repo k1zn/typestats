@@ -1,5 +1,7 @@
 #pragma once
 
+#include "KeyRecord.h"
+
 #include <QByteArray>
 #include <QList>
 #include <limits>
@@ -74,3 +76,11 @@ public:
     QByteArray serialize() const;
     static bool parse(QByteArrayView bytes, MediaClip &clip);
 };
+
+// The document's time (re/webcam.md, "Синхронизация"): T(i) = Σ dt_j, j = 0..i.
+namespace DocTime {
+qint64 end(const KeyRecords &records);              // Σ of all dt
+qint64 of(const KeyRecords &records, int i);        // T(i)
+// The document's time of a time of the text model (KlavRecord::t: the normalized records, the first at 60 s).
+qint64 modelOffset(const KeyRecords &records);
+}

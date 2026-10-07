@@ -205,3 +205,32 @@ bool MediaClip::parse(QByteArrayView bytes, MediaClip &clip)
     }
     return true;
 }
+
+namespace DocTime {
+
+qint64 end(const KeyRecords &records)
+{
+    qint64 t = 0;
+    for (const KeyRecord &r : records)
+        t += r.dtUs;
+    return t;
+}
+
+qint64 of(const KeyRecords &records, int i)
+{
+    qint64 t = 0;
+    for (int j = 0; j <= i && j < records.size(); ++j)
+        t += records[j].dtUs;
+    return t;
+}
+
+qint64 modelOffset(const KeyRecords &records)
+{
+    // The normalization drops the leading releases and gives the first press 60 s; the times after it stay.
+    for (int i = 0; i < records.size(); ++i)
+        if (records[i].isDown())
+            return of(records, i) - 60000000;
+    return 0;
+}
+
+} // namespace DocTime

@@ -15,6 +15,11 @@
 #include "Look.h"
 #include "SettingsDialog.h"
 #include "TextView.h"
+#ifdef TS_HAVE_WEBCAM
+#include "VideoPropertiesDialog.h"
+#include "VideoWindow.h"
+#include "WebcamRecorder.h"
+#endif
 #include "Texts.h"
 #include "FilePropertiesDialog.h"
 #include "FingerZonesDialog.h"
@@ -140,6 +145,27 @@ MainWindow::MainWindow(QWidget *parent)
     });
     updateTitle();
     setMinimumWidth(220);
+#ifdef TS_HAVE_WEBCAM
+    // The webcam (re/webcam.md): recording follows the capture once it starts (startCapture).
+    m_webcam = new WebcamRecorder(this);
+    m_webcam->setSettings(WebcamRecorder::Settings::load());
+    m_webcam->setClip(&m_clip);
+    m_video = new VideoWindow(this);
+    m_video->setClip(&m_clip);
+    connect(m_webcam, &WebcamRecorder::picture, m_video, &VideoWindow::setPicture);
+    connect(m_webcam, &WebcamRecorder::recordingChanged, this, &MainWindow::updateVideoMode);
+    connect(m_webcam, &WebcamRecorder::packetsAdded, this, [this] { m_unsaved = true; });
+    connect(m_webcam, &WebcamRecorder::failed, this, [this](const QString &reason) {
+        m_video->setMessage(reason);
+        if (m_videoButton)
+            m_videoButton->setToolTip(tr("Видео") + QStringLiteral(": ") + reason);
+    });
+    connect(m_video, &VideoWindow::visibilityChanged, this, &MainWindow::updateVideoMode);
+    connect(m_video, &VideoWindow::playToggled, this, &MainWindow::playVideo);
+    m_playTimer = new QTimer(this);
+    m_playTimer->setInterval(33);
+    connect(m_playTimer, &QTimer::timeout, this, &MainWindow::playTick);
+#endif
 
     auto *root = new QVBoxLayout(this);
     root->setContentsMargins(0, 0, 0, 0);
@@ -304,7 +330,12 @@ QWidget *MainWindow::createToolBar()
             [this] { exportTable(keyTable(), true); });
     action(12, 150, 4, 23, tr("Дополнительная статистика"), &MainWindow::showExtraStats);
     action(19, 174, 4, 23, tr("Статистические гистограммы"), &MainWindow::showHistograms);
-    action(20, 198, 4, 23, tr("Видео"), nullptr); // the attached video is not in the port: always disabled
+#ifdef TS_HAVE_WEBCAM
+    m_videoButton = action(20, 198, 4, 23, tr("Видео"), &MainWindow::showVideo);
+    m_videoIcon = m_videoButton->icon();
+#else
+    action(20, 198, 4, 23, tr("Видео"), nullptr); // built without the webcam: disabled
+#endif
     action(22, 222, 4, 23, tr("Настройки..."), &MainWindow::showSettings);
     action(4, 246, 4, 23, tr("Оперативная статистика"), &MainWindow::showLiveStats);
     m_helpButton = action(3, 270, 4, 23, tr("О программе"), &MainWindow::showHelpMenu);
@@ -317,7 +348,11 @@ QWidget *MainWindow::createToolBar()
     action(14, 78, 32, 22, tr("Отменить (%1)").arg(Hotkeys::undo()), &MainWindow::undo);
     action(18, 102, 32, 22, tr("Удалить нетекстовые клавиши"), &MainWindow::removeNonText);
     action(15, 126, 32, 22, tr("Пометить (%1)").arg(Hotkeys::mark()), &MainWindow::mark);
+#ifdef TS_HAVE_WEBCAM
+    action(21, 150, 32, 22, tr("Свойства видео"), &MainWindow::videoProperties);
+#else
     action(21, 150, 32, 22, tr("Свойства видео"), nullptr);
+#endif
     m_axisButton = action(16, 174, 32, 22, tr("Настройка оси Y графиков"), &MainWindow::showAxisPanel);
     m_legendButton = action(17, 198, 32, 22, tr("Легенда"), &MainWindow::showLegend);
     action(23, 222, 32, 22, tr("Ввод текста (%1)").arg(Hotkeys::textInput()), &MainWindow::showTextInput);
@@ -862,6 +897,8 @@ void MainWindow::captureToggled(bool on)
     }
     if (!m_opening)
         m_stamps->captureChanged(on);
+    if (m_webcam)
+        m_webcam->setCapture(on);
     m_text->setFocus();
 }
 
@@ -930,6 +967,8 @@ void MainWindow::deletePreset()
 void MainWindow::startCapture()
 {
     m_hook.start();
+    if (m_webcam)
+        m_webcam->setCapture(m_capture->isChecked());
 }
 
 void MainWindow::offerFileAssociation()
@@ -965,8 +1004,12 @@ void MainWindow::offerFileAssociation()
 
 void MainWindow::normalizeRecords()
 {
-    // Editing works on the records the text was built from (the original normalizes them in place).
+    // Editing works on the records the text was built from (the original normalizes them in place). The first
+    // press gets 60 s: the clip's time follows (re/webcam.md).
+    m_clip.moveOrigin(DocTime::modelOffset(m_doc.records));
     m_doc.records = m_model.records;
+    m_docEndUs = DocTime::end(m_doc.records);
+    syncWebcamClock();
     keepRoomForRecording();
     m_stamps->attach(&m_doc); // the same normalized records, the chain built anew
 }
@@ -978,12 +1021,21 @@ void MainWindow::beginEdit()
         m_doc.records[i].tag = quint32(i + 1);
     m_undo = m_doc.records;
     m_undoStamps = m_doc.stamps;
+    m_undoOriginUs = m_clip.originUs;
 }
 
 void MainWindow::endEdit()
 {
     // The stamps follow their records; those whose records changed are voided (re/stamps.md).
     Stamps::follow(m_doc.stamps, m_doc.records);
+    // The clip follows the time of the first record: an edit changes it, the times after it stay.
+    if (!m_doc.records.isEmpty()) {
+        const int old = int(m_doc.records[0].tag) - 1;
+        if (old >= 0 && old < m_undo.size())
+            m_clip.moveOrigin(DocTime::of(m_undo, old) - DocTime::of(m_doc.records, 0));
+    }
+    m_docEndUs = DocTime::end(m_doc.records);
+    syncWebcamClock();
     m_stamps->attach(&m_doc);
     m_unsaved = true;
     recalculate();
@@ -1046,6 +1098,9 @@ void MainWindow::undo()
     normalizeRecords();
     m_doc.records.swap(m_undo);
     m_doc.stamps.swap(m_undoStamps);
+    std::swap(m_clip.originUs, m_undoOriginUs);
+    m_docEndUs = DocTime::end(m_doc.records);
+    syncWebcamClock();
     m_unsaved = true;
     keepRoomForRecording();
     m_stamps->attach(&m_doc);
@@ -1211,6 +1266,9 @@ void MainWindow::keyEvent(const HookEvent &e)
     };
 
     const Recorder::Outcome out = m_recorder.handle(e, s, c, m_doc.records);
+    if (out.recorded)
+        m_docEndUs += m_doc.records.last().dtUs;
+    syncWebcamClock(); // the timer moves with every event
     if (out.setCapture)
         m_capture->setChecked(*out.setCapture);
     if (out.clear)
@@ -1568,6 +1626,7 @@ void MainWindow::klavogramMoved()
     m_graph->setKlavogramRange(from, to);
     syncGraphScrollBar();
     updateKeyList();
+    updateVideo();
 }
 
 RecalcOptions MainWindow::options() const
@@ -1681,6 +1740,18 @@ void MainWindow::setDocument(const TsfDocument &doc, const QString &title, bool 
     m_doc = doc;
     m_unsaved = false;
     m_undoStamps.clear();
+    // The webcam's clip lives apart from the document (its bytes are written when saving).
+    m_clip = MediaClip();
+    if (!m_doc.webcam.isEmpty() && !MediaClip::parse(m_doc.webcam, m_clip))
+        m_clip = MediaClip();
+    m_doc.webcam.clear();
+    m_docEndUs = DocTime::end(m_doc.records);
+    if (m_webcam) {
+        m_webcam->setClip(&m_clip);
+        m_video->setClip(&m_clip);
+        syncWebcamClock();
+        updateVideoMode();
+    }
     keepRoomForRecording();
     m_stamps->attach(&m_doc);
     setTitle(title);
@@ -1760,6 +1831,43 @@ void MainWindow::save()
     saveDocument(false);
 }
 
+TsfDocument MainWindow::documentForSave(bool block) const
+{
+    TsfDocument doc = m_doc;
+    if (block) {
+        // The records of the selection; nothing selected - all of them.
+        const auto [from, to] = Editing::recordRange(m_model, m_text->selectionStart(), m_text->selectionLength());
+        doc.records = to == 0 ? m_model.records : m_model.records.mid(from, to - from);
+        doc.attachedVideo.clear();
+        // The webcam's clip of the same time (re/webcam.md, "Сохранить блок"): the records are the normalized ones.
+        if (!m_clip.isEmpty()) {
+            const qint64 offset = DocTime::modelOffset(m_doc.records);
+            MediaClip clip = m_clip;
+            if (to == 0) {
+                clip.moveOrigin(offset);
+            } else {
+                clip = m_clip.cut(DocTime::of(m_model.records, from) + offset, DocTime::of(m_model.records, to - 1) + offset);
+                clip.moveOrigin(-qint64(m_model.records[from].dtUs));
+            }
+            doc.webcam = clip.serialize();
+        }
+        if (to != 0) { // a part: the stamps cover the whole recording
+            doc.stamps.clear();
+            doc.stampCertificates.clear();
+        }
+    } else if (!m_clip.isEmpty()) {
+        doc.webcam = m_clip.serialize();
+    }
+    // The finger layout goes into the file unless it is the built-in one.
+    doc.fingerZonesName.clear();
+    doc.fingers.clear();
+    if (m_fingers->currentIndex() > 0) {
+        doc.fingerZonesName = m_fingers->currentText();
+        doc.fingers = m_schemes.zones(m_fingers->currentText()).toStrings();
+    }
+    return doc;
+}
+
 bool MainWindow::saveDocument(bool block)
 {
     // SaveTsf: the properties first. A loaded file keeps its author and date; a new recording and a
@@ -1779,29 +1887,12 @@ bool MainWindow::saveDocument(bool block)
     if (QFileInfo(path).suffix().isEmpty())
         path += QStringLiteral(".tsf");
 
-    TsfDocument doc = m_doc;
+    TsfDocument doc = documentForSave(block);
     doc.author = properties.author();
     doc.date = properties.date();
     doc.comment = properties.description();
     if (!m_loaded && doc.author != settings.value(QStringLiteral("UserName")).toString())
         settings.setValue(QStringLiteral("UserName"), doc.author);
-    if (block) {
-        // The records of the selection; nothing selected - all of them.
-        const auto [from, to] = Editing::recordRange(m_model, m_text->selectionStart(), m_text->selectionLength());
-        doc.records = to == 0 ? m_model.records : m_model.records.mid(from, to - from);
-        doc.attachedVideo.clear();
-        if (to != 0) { // a part: the stamps cover the whole recording
-            doc.stamps.clear();
-            doc.stampCertificates.clear();
-        }
-    }
-    // The finger layout goes into the file unless it is the built-in one.
-    doc.fingerZonesName.clear();
-    doc.fingers.clear();
-    if (m_fingers->currentIndex() > 0) {
-        doc.fingerZonesName = m_fingers->currentText();
-        doc.fingers = m_schemes.zones(m_fingers->currentText()).toStrings();
-    }
     // A recording made here or loaded with a valid signature is signed (g_fileClean).
     if (!Tsf::write(path, doc, m_clean)) {
         QMessageBox::warning(this, appTitle(), tr("Не удалось сохранить файл %1").arg(path));
@@ -1812,6 +1903,7 @@ bool MainWindow::saveDocument(bool block)
     const KeyRecords records = m_doc.records;
     m_doc = doc;
     m_doc.records = records;
+    m_doc.webcam.clear();
     m_path = path;
     m_loaded = true;
     m_unsaved = false;
@@ -1831,4 +1923,139 @@ void MainWindow::clear()
     TsfDocument fresh;
     fresh.platform = currentKeyPlatform(); // recorded here
     setDocument(fresh, {}, false);
+}
+
+// --- the webcam (re/webcam.md) ---
+
+void MainWindow::syncWebcamClock()
+{
+    if (m_webcam)
+        m_webcam->setClock(m_docEndUs, m_recorder.timerUs());
+}
+
+void MainWindow::showVideo()
+{
+    if (!m_video)
+        return;
+    m_video->show();
+    m_video->raise();
+    updateVideoMode();
+}
+
+void MainWindow::videoProperties()
+{
+#ifdef TS_HAVE_WEBCAM
+    VideoPropertiesDialog dialog(this);
+    dialog.setSettings(m_webcam->settings());
+    dialog.setShiftMs(m_clip.shiftMs, !m_clip.isEmpty());
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+    const WebcamRecorder::Settings s = dialog.settings();
+    s.save();
+    m_webcam->setSettings(s);
+    if (!m_clip.isEmpty() && dialog.shiftMs() != m_clip.shiftMs) {
+        m_clip.shiftMs = dialog.shiftMs();
+        m_unsaved = true;
+        m_video->setClip(&m_clip);
+    }
+    updateVideoMode();
+#endif
+}
+
+void MainWindow::updateVideoMode()
+{
+#ifdef TS_HAVE_WEBCAM
+    // The camera's own picture while recording, and before it when the document has no video yet (to place the
+    // camera); the recording's frames otherwise.
+    const bool recording = m_webcam->isRecording();
+    const bool live = recording || (m_clip.isEmpty() && m_webcam->settings().video);
+    m_video->setLive(live);
+    m_video->setRecording(recording);
+    m_webcam->setPreview(live && m_video->isVisible());
+    if (m_videoButton) {
+        QIcon icon = m_videoIcon;
+        if (recording && m_webcam->settings().video) {
+            QPixmap pm = m_videoIcon.pixmap(16, 16);
+            QPainter painter(&pm);
+            painter.setRenderHint(QPainter::Antialiasing);
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(QColor(220, 0, 0));
+            painter.drawEllipse(QRectF(pm.width() / pm.devicePixelRatio() - 7, 0, 7, 7));
+            icon = QIcon(pm);
+        }
+        m_videoButton->setIcon(icon);
+        m_videoButton->setToolTip(recording && m_webcam->settings().video ? tr("Видео: камера записывает") : tr("Видео"));
+    }
+    if (!live)
+        updateVideo();
+#endif
+}
+
+void MainWindow::updateVideo()
+{
+#ifdef TS_HAVE_WEBCAM
+    if (m_video && m_video->isVisible() && !m_video->isLive())
+        m_video->showTime(klavogramDocTimeUs());
+#endif
+}
+
+qint64 MainWindow::klavogramDocTimeUs() const
+{
+    // The drawing time of the left edge as real time (in a squeezed pause: just before the fragment after it).
+    const qint64 drawUs = qint64(std::trunc(m_klav->scrollMs())) * 1000;
+    qint64 us = drawUs;
+    if (!m_model.klav.isEmpty()) {
+        auto it = std::lower_bound(m_model.klav.begin(), m_model.klav.end(), drawUs,
+                                   [](const KlavRecord &r, qint64 t) { return r.tDraw < t; });
+        if (it == m_model.klav.end())
+            --it;
+        us = drawUs - it->tDraw + it->t;
+    }
+    return us + DocTime::modelOffset(m_doc.records);
+}
+
+void MainWindow::scrollKlavogramToDocTime(qint64 docUs)
+{
+    const QVector<KlavRecord> &klav = m_model.klav;
+    if (klav.isEmpty())
+        return;
+    const qint64 t = docUs - DocTime::modelOffset(m_doc.records);
+    auto it = std::upper_bound(klav.begin(), klav.end(), t, [](qint64 v, const KlavRecord &r) { return v < r.t; });
+    qint64 draw;
+    if (it == klav.begin()) {
+        draw = klav.front().tDraw - (klav.front().t - t);
+    } else {
+        draw = (it - 1)->tDraw + (t - (it - 1)->t);
+        if (it != klav.end())
+            draw = std::min(draw, it->tDraw); // a squeezed pause waits at the next fragment
+    }
+    m_klav->setScrollMs(float(draw) / 1000.0f);
+    klavogramMoved();
+}
+
+void MainWindow::playVideo(bool play)
+{
+    if (!m_playTimer)
+        return;
+    if (!play) {
+        m_playTimer->stop();
+        return;
+    }
+    m_playFromUs = klavogramDocTimeUs();
+    m_playClock.start();
+    m_playTimer->start();
+}
+
+void MainWindow::playTick()
+{
+    const qint64 now = m_playFromUs + m_playClock.nsecsElapsed() / 1000;
+    const qint64 lastKey = m_model.klav.isEmpty() ? 0 : m_model.klav.last().t + DocTime::modelOffset(m_doc.records);
+    if (now > std::max(m_clip.lastUs(), lastKey)) {
+        m_playTimer->stop();
+#ifdef TS_HAVE_WEBCAM
+        m_video->setPlaying(false);
+#endif
+        return;
+    }
+    scrollKlavogramToDocTime(now);
 }

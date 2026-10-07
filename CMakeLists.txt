@@ -104,10 +104,19 @@ endif()
 
 # --- the webcam's codecs (re/webcam.md) ---
 if(TS_WEBCAM)
-    file(GLOB MEDIA_SOURCES CONFIGURE_DEPENDS src/media/*.cpp src/media/*.h)
+    set(MEDIA_SOURCES src/media/Yuv.h src/media/Yuv.cpp src/media/Av1Codec.h src/media/Av1Codec.cpp
+        src/media/OpusCodec.h src/media/OpusCodec.cpp src/media/Capture.h)
+    if(WIN32)
+        list(APPEND MEDIA_SOURCES src/media/CaptureWin.cpp) # Media Foundation, loaded at run time
+    else()
+        list(APPEND MEDIA_SOURCES src/media/CaptureStub.cpp)
+    endif()
     add_library(tsmedia STATIC ${MEDIA_SOURCES})
     target_include_directories(tsmedia PUBLIC src)
     target_link_libraries(tsmedia PUBLIC Qt6::Gui PRIVATE ts_aom ts_opus)
+    if(WIN32)
+        target_link_libraries(tsmedia PRIVATE mfuuid ole32)
+    endif()
     target_compile_definitions(tsmedia PUBLIC TS_HAVE_WEBCAM)
 endif()
 
@@ -116,9 +125,15 @@ endif()
 file(GLOB UI_SOURCES CONFIGURE_DEPENDS
     src/ui/*.cpp src/ui/*.h
     src/export/*.cpp src/export/*.h)
+if(NOT TS_WEBCAM)
+    list(FILTER UI_SOURCES EXCLUDE REGEX "/(WebcamRecorder|VideoWindow|VideoPropertiesDialog)\.")
+endif()
 add_library(tsui STATIC ${UI_SOURCES})
 target_include_directories(tsui PUBLIC src)
 target_link_libraries(tsui PUBLIC tscore tsplatform Qt6::Widgets Qt6::Network QXlsx::QXlsx)
+if(TS_WEBCAM)
+    target_link_libraries(tsui PUBLIC tsmedia)
+endif()
 target_compile_definitions(tsui PRIVATE TS_REMAKE_VERSION="${TS_REMAKE_VERSION}")
 
 qt_add_executable(TypingStatistics WIN32 MACOSX_BUNDLE src/main.cpp resources/resources.qrc)

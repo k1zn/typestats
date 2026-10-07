@@ -71,6 +71,9 @@ public:
     static int appendReleases(KeyRecords &records);
 
     const LiveStats &live() const { return m_live; }
+    // The hook timer: the time of the last event that counted. The next record's dt is measured from it, so a moment
+    // `s` of the recording is at the document's time Σdt + (s − timer) (the webcam, re/webcam.md).
+    std::optional<qint64> timerUs() const { return m_last; }
     void resetLive();
 
 private:

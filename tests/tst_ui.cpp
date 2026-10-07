@@ -23,6 +23,11 @@
 #include "ui/TextInputWindow.h"
 #include "ui/SettingsDialog.h"
 #include "ui/TextView.h"
+#ifdef TS_HAVE_WEBCAM
+#include "media/Yuv.h"
+#include "ui/VideoWindow.h"
+#include "ui/WebcamRecorder.h"
+#endif
 
 #include <QApplication>
 #include <QClipboard>
@@ -442,11 +447,15 @@ private slots:
         QVERIFY(!w.m_legendButton->isEnabled());
         QVERIFY(!w.m_axisPanel->isVisible());
         QVERIFY(w.m_axisButton->isEnabled());
-        // The video buttons are there and always disabled (no video in the port).
+        // The video buttons: the webcam (re/webcam.md); a build without it has them disabled.
         int video = 0;
         for (const QToolButton *b : w.findChildren<QToolButton *>())
             if (b->toolTip() == QStringLiteral("Видео") || b->toolTip() == QStringLiteral("Свойства видео")) {
+#ifdef TS_HAVE_WEBCAM
+                QVERIFY(b->isEnabled());
+#else
                 QVERIFY(!b->isEnabled());
+#endif
                 ++video;
             }
         QCOMPARE(video, 2);
@@ -572,6 +581,128 @@ private slots:
         QVERIFY(hook.start()); // the destructor stops it
 #else
         QSKIP("the Windows hook");
+#endif
+    }
+
+    void webcam()
+    {
+#ifdef TS_HAVE_WEBCAM
+        // A recording with the webcam: frames and sound go in as the devices would give them (re/webcam.md).
+        MainWindow w;
+        if (QApplication::activeWindow())
+            QSKIP("the test window got the focus");
+        WebcamRecorder &cam = *w.m_webcam;
+        cam.setDevicesEnabled(false);
+        WebcamRecorder::Settings s;
+        s.video = true;
+        s.quality = 0; // 320×240, 10 fps
+        s.audio = true;
+        cam.setSettings(s);
+        cam.setCapture(true);
+        QVERIFY(cam.isRecording());
+        auto key = [&w](qint64 ms, quint8 vk, bool down, char16_t ch) {
+            HookEvent e;
+            e.timeUs = ms * 1000;
+            e.flags = quint32(vk) << 16 | (vk & 0x7f) | (down ? (ch ? KeyRecord::HasChar : KeyRecord::NoChar)
+                                                               : KeyRecord::KeyUp | KeyRecord::NoChar);
+            e.ch = ch;
+            e.chars = ch ? 1 : 0;
+            w.keyEvent(e);
+        };
+        const I420Frame picture = Yuv::fromImage(QImage(320, 240, QImage::Format_RGB32));
+        const QVector<float> sound(4800, 0.1f); // 100 ms, mono 48 kHz
+        // a at 0.5 s, b at 1.5 s, c at 2.5 s; a frame and 100 ms of sound every 100 ms from 0 to 3 s.
+        for (int ms = 0; ms <= 3000; ms += 100) {
+            for (auto [at, vk, ch] : {std::tuple{500, 'A', u'a'}, {1500, 'B', u'b'}, {2500, 'C', u'c'}}) {
+                if (ms == at)
+                    key(at, quint8(vk), true, ch);
+                if (ms == at + 100)
+                    key(at + 80, quint8(vk), false, 0);
+            }
+            cam.addVideo(picture, qint64(ms) * 1000);
+            cam.addAudio(sound, 1, 48000, qint64(ms) * 1000);
+            cam.drain();
+        }
+        QCOMPARE(w.m_doc.records.size(), 6);
+        // The first record came at 0.5 s with dt 0 (the recorder's first event): the document's time 0 is 0.5 s.
+        QCOMPARE(DocTime::of(w.m_doc.records, 0), 0);
+        const MediaClip &clip = w.m_clip;
+        QList<qint64> video;
+        int audio = 0;
+        for (const MediaPacket &p : clip.packets) {
+            if (clip.streams[p.stream].kind == MediaStream::Video)
+                video.append(clip.docTime(p.ptsUs));
+            else
+                ++audio;
+        }
+        QCOMPARE(video.size(), 31);
+        for (int i = 0; i < video.size(); ++i)
+            QCOMPARE(video[i], qint64(i) * 100000 - 500000); // frames before the first key wait for it
+        QVERIFY(clip.packets[0].key);
+        QVERIFY(audio >= 150);
+        QVERIFY(w.m_unsaved);
+
+        // The frame of the klavogram's left edge: b's press is at 1.0 s of the document.
+        w.recalculate();
+        QCOMPARE(w.m_model.text, QStringLiteral("abc"));
+        w.scrollKlavogramToDocTime(1000000);
+        QVERIFY(std::abs(w.klavogramDocTimeUs() - 1000000) <= 1000);
+        QCOMPARE(clip.docTime(clip.packets[clip.videoFramesAt(w.klavogramDocTimeUs()).second].ptsUs), 1000000);
+
+        // "Сохранить блок" of "b": the records from a's release to b's, the video of their time only.
+        select(w, 1, 1);
+        const TsfDocument block = w.documentForSave(true);
+        QCOMPARE(block.records.size(), 3);
+        MediaClip cut;
+        QVERIFY(MediaClip::parse(block.webcam, cut));
+        qint64 lastVideo = MediaClip::kAll;
+        for (const MediaPacket &p : cut.packets)
+            if (cut.streams[p.stream].kind == MediaStream::Video)
+                lastVideo = std::max(lastVideo, cut.docTime(p.ptsUs));
+        // The block's records: a's release at 80 ms of its time (its dt), b's release at 1080 ms.
+        QCOMPARE(DocTime::of(block.records, 0), 80000);
+        QCOMPARE(DocTime::end(block.records), 1080000);
+        QCOMPARE(lastVideo, 1000000);        // the last frame within the block
+        QCOMPARE(cut.docTime(cut.startUs), 80000); // shown from the block's first record
+        QCOMPARE(cut.videoFramesAt(79000).first, -1);
+        QCOMPARE(cut.docTime(cut.packets[cut.videoFramesAt(1000000).second].ptsUs), 1000000);
+        // The whole recording as a block: the normalized records (the first at 60 s), the same frames at their keys.
+        select(w, 0, 0);
+        MediaClip all;
+        QVERIFY(MediaClip::parse(w.documentForSave(true).webcam, all));
+        QCOMPARE(all.docTime(all.packets[all.videoFramesAt(61000000).second].ptsUs), 61000000); // b's press
+
+        // Deleting "a": the clip follows, b's press keeps its frame; "Отменить" brings the time back.
+        cam.setCapture(false);
+        const int bPress = 2;
+        const qint64 before = clip.packets[clip.videoFramesAt(DocTime::of(w.m_doc.records, bPress)).second].ptsUs;
+        select(w, 0, 1);
+        w.deleteSelection();
+        int b = -1;
+        for (int i = 0; i < w.m_doc.records.size(); ++i)
+            if (w.m_doc.records[i].ch == u'b' && w.m_doc.records[i].isDown())
+                b = i;
+        QVERIFY(b >= 0);
+        QCOMPARE(clip.packets[clip.videoFramesAt(DocTime::of(w.m_doc.records, b)).second].ptsUs, before);
+        w.undo();
+        QCOMPARE(clip.packets[clip.videoFramesAt(DocTime::of(w.m_doc.records, bPress)).second].ptsUs, before);
+
+        // Saved and opened again: the same clip.
+        QTemporaryDir dir;
+        const QString path = dir.filePath(QStringLiteral("cam.tsf"));
+        QVERIFY(Tsf::write(path, w.documentForSave(false), true));
+        const QByteArray bytes = clip.serialize();
+        MainWindow again;
+        QVERIFY(again.openFile(path));
+        QCOMPARE(again.m_clip.serialize(), bytes);
+        QVERIFY(!again.m_damaged->isVisibleTo(&again)); // the video is outside the original's signature
+        // Looked at: the frames of the recording, not the camera.
+        again.showVideo();
+        QVERIFY(!again.m_video->isLive());
+        again.scrollKlavogramToDocTime(DocTime::of(again.m_doc.records, bPress));
+        QVERIFY(!again.m_video->image().isNull());
+#else
+        QSKIP("built without the webcam");
 #endif
     }
 

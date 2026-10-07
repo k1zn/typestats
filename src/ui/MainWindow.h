@@ -3,6 +3,7 @@
 #include "core/FingerZones.h"
 #include "core/Histograms.h"
 #include "core/Journal.h"
+#include "core/MediaClip.h"
 #include "core/Editing.h"
 #include "core/Recalc.h"
 #include "core/TsfFile.h"
@@ -10,6 +11,7 @@
 #include "platform/KeyboardHook.h"
 
 #include <QElapsedTimer>
+#include <QIcon>
 #include <QPointer>
 #include <QWidget>
 
@@ -30,10 +32,13 @@ class QSpinBox;
 class QSplitter;
 class QSystemTrayIcon;
 class QTableWidget;
+class QTimer;
 class QToolButton;
 class StampRecorder;
 class TextInputWindow;
 class TextView;
+class VideoWindow;
+class WebcamRecorder;
 
 // The main window (Form1); geometry from re/forms_geometry.txt.
 class MainWindow : public QWidget
@@ -115,6 +120,21 @@ private:
     void updatePanelButtons();
     void showAxisMenu(const QPoint &globalPos);
     void setDocument(const TsfDocument &doc, const QString &title, bool damaged);
+
+    // The webcam (re/webcam.md): button 20 - its picture, button 21 - what is recorded.
+    void showVideo();
+    void videoProperties();
+    // The frame of the klavogram's left edge in the video window.
+    void updateVideo();
+    // The document's time of the klavogram's left edge / the klavogram scrolled to a document's time.
+    qint64 klavogramDocTimeUs() const;
+    void scrollKlavogramToDocTime(qint64 docUs);
+    void playVideo(bool play);
+    void playTick();
+    // The recorder learns where the document's time is (after a record, an edit, another document).
+    void syncWebcamClock();
+    // Live picture or the recording's frames; the red dot on the button while the camera records.
+    void updateVideoMode();
     // Room in the records for the keys to come, whenever the records are replaced.
     void keepRoomForRecording();
     // "Ts: ON - Typing statistics v… - file": the capture state goes first, as the original's
@@ -144,6 +164,8 @@ private:
     void textHovered(int textPos, const QPoint &globalPos);
     void showTextMenu(const QPoint &globalPos);
     bool saveDocument(bool block); // false: not saved (cancelled or failed)
+    // What is written (without the properties): the block of the selection or all, with the webcam's clip.
+    TsfDocument documentForSave(bool block) const;
     bool askToSave(); // on exit: false - stay
     // The time stamps of the recording (re/stamps.md): the button of the toolbar and its details.
     void updateProof();
@@ -215,6 +237,17 @@ private:
     QString m_hookCommand;                   // the terminal command that fixes it, if any
     QPointer<QDialog> m_hookErrorBox;
     Recorder m_recorder;
+    // The webcam recording of the document; its bytes in m_doc.webcam only while saving.
+    MediaClip m_clip;
+    qint64 m_docEndUs = 0;      // Σ dt of the document's records: the document's time of now
+    qint64 m_undoOriginUs = 0;  // the clip's origin of the records kept for "Отменить"
+    WebcamRecorder *m_webcam = nullptr;
+    VideoWindow *m_video = nullptr;
+    QToolButton *m_videoButton = nullptr;
+    QIcon m_videoIcon;
+    QTimer *m_playTimer = nullptr;
+    QElapsedTimer m_playClock;
+    qint64 m_playFromUs = 0;
     StampRecorder *m_stamps = nullptr;
     bool m_proofPending = false;
     JournalWriter m_journal;
