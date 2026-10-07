@@ -239,6 +239,7 @@
   "Нет Media Foundation (Windows N: нужен Media Feature Pack)": "No Media Foundation (Windows N needs the Media Feature Pack)",
   "Камера не отдаёт кадры в нужном формате": "The camera gives no frames in a usable format",
   "Камера отключилась": "The camera was disconnected",
+  "Видео под метками: %1 %": "Video under the stamps: %1 %",
   "В Windows нет Sample Grabber DirectShow (qedit.dll)": "Windows has no DirectShow Sample Grabber (qedit.dll)",
   "Нет Media Foundation": "No Media Foundation",
   "Микрофон не отдаёт звук в нужном формате": "The microphone gives no sound in a usable format",

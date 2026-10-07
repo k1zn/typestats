@@ -940,6 +940,10 @@ Copy the command, paste it into a terminal and enter your password. This is need
         <source>Видео: камера записывает</source>
         <translation>Video: the camera is recording</translation>
     </message>
+    <message>
+        <source>Видео под метками: %1 %</source>
+        <translation>Video under the stamps: %1 %</translation>
+    </message>
 </context>
 <context>
     <name>QObject</name>

@@ -702,6 +702,11 @@ private slots:
         QVERIFY(!again.m_video->isLive());
         again.scrollKlavogramToDocTime(DocTime::of(again.m_doc.records, bPress));
         QVERIFY(!again.m_video->image().isNull());
+        // Video going on after a save is not unsaved records (no question when closing).
+        w.m_unsaved = false;
+        cam.addVideo(picture, 3100000);
+        cam.drain();
+        QVERIFY(!w.m_unsaved);
 #else
         QSKIP("built without the webcam");
 #endif
@@ -1195,6 +1200,76 @@ private slots:
         key(u'd', 1000, true);
         QCOMPARE(sent.size(), services + 3);
         QTRY_COMPARE_WITH_TIMEOUT(sent.size(), services + 4, Stamps::kIdleMs + 2000);
+    }
+
+    void stampFlush()
+    {
+        // Before saving: a stamp of everything there is, video too (re/stamps.md).
+        TsfDocument doc;
+        MediaClip clip;
+        clip.addStream(MediaStream::video(320, 240));
+        StampRecorder s;
+        struct Request { QByteArray imprint; StampRecorder::Done done; };
+        QList<Request> sent;
+        s.setSend([&](const QByteArray &imprint, int, StampRecorder::Done done) { sent.append({imprint, std::move(done)}); });
+        QSignalSpy flushed(&s, &StampRecorder::flushed);
+        s.setClip(&clip);
+        s.setEnabled(true);
+        s.attach(&doc, true);
+        const auto key = [&](char16_t c, bool up = false) {
+            KeyRecord r;
+            r.dtUs = 100000;
+            r.flags = quint32(c - u'a' + 0x41) << 16 | 0x1E | KeyRecord::HasChar | (up ? quint32(KeyRecord::KeyUp) : 0u);
+            r.ch = c;
+            doc.records.append(r);
+            s.recordsAdded();
+        };
+        const auto frame = [&](qint64 us) {
+            clip.packets.append({0, clip.packets.isEmpty(), us, QByteArray(10, 'x')});
+            s.packetsAdded();
+        };
+        // Nothing at all: held as it is. Video, but nothing typed since the document came: nothing to stamp it with.
+        s.flush();
+        QCOMPARE(flushed.size(), 1);
+        QCOMPARE(flushed.last()[0].toBool(), true);
+        frame(0);
+        s.flush();
+        QCOMPARE(flushed.size(), 2);
+        QCOMPARE(flushed.last()[0].toBool(), false);
+        key(u'a');
+        QCOMPARE(sent.size(), 1);
+        // A flush while a stamp is on its way: after it, a stamp of all there is.
+        s.flush();
+        QCOMPARE(sent.size(), 1);
+        sent[0].done(fakeToken(sent[0].imprint), {});
+        QCOMPARE(sent.size(), 2);
+        QCOMPARE(flushed.size(), 2);
+        frame(100000); // came after the request: the save leaves it out
+        sent[1].done(fakeToken(sent[1].imprint), {});
+        QCOMPARE(flushed.size(), 3);
+        QCOMPARE(flushed.last()[0].toBool(), true);
+        QCOMPARE(s.cover().records, 1);
+        QCOMPARE(s.cover().packets, 1);
+        QCOMPARE(s.cover().stamps, 2);
+        QCOMPARE(doc.stamps.last().mediaEnd, 1);
+        // Another one: the frame left out, then nothing more - at once, with no request.
+        s.flush();
+        QCOMPARE(sent.size(), 3);
+        sent[2].done(fakeToken(sent[2].imprint), {});
+        QCOMPARE(s.cover().packets, 2);
+        s.flush();
+        QCOMPARE(sent.size(), 3);
+        QCOMPARE(flushed.size(), 5);
+        QCOMPARE(flushed.last()[0].toBool(), true);
+        // All the authorities down: false.
+        key(u'a', true); // within the interval: no stamp of its own
+        QCOMPARE(sent.size(), 3);
+        s.flush();
+        QCOMPARE(sent.size(), 4);
+        for (int i = 0; i < int(StampRecorder::services().size()); ++i)
+            sent.last().done({}, QStringLiteral("down"));
+        QCOMPARE(flushed.size(), 6);
+        QCOMPARE(flushed.last()[0].toBool(), false);
     }
 
     void stampLive()

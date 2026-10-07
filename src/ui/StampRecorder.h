@@ -11,8 +11,8 @@
 class QNetworkAccessManager;
 
 // Takes the time stamps of a recording while it is typed (re/stamps.md): at the first key of a session, at the
-// first key Stamps::kIntervalMs after the last stamped record, Stamps::kIdleMs after the last key, and when
-// recording stops. Only hashes leave the computer; the stamps and the authorities' certificates go into the
+// first key Stamps::kIntervalMs after the last stamped record, Stamps::kIdleMs after the last key, when recording
+// stops, Stamps::kIntervalMs after video the stamps do not hold yet, and before saving (flush). Only hashes leave the computer; the stamps and the authorities' certificates go into the
 // document.
 class StampRecorder : public QObject
 {
@@ -28,14 +28,30 @@ public:
     void setEnabled(bool on);
     bool enabled() const { return m_enabled; }
     // The document: its records are followed, stamps and certificates are added to it. Call again after the
-    // records were replaced (another document, an edit): the chain is built anew, a request in flight dropped.
-    void attach(TsfDocument *doc);
+    // records were replaced (an edit; `another` - another document): the chain is built anew, a request in flight
+    // dropped.
+    void attach(TsfDocument *doc, bool another = false);
     // The webcam's clip of the document: its packets go under the stamps with the records (chain v2).
     void setClip(const MediaClip *clip) { m_clip = clip; m_packetHashes.clear(); }
     // Records were appended to the document (typing).
     void recordsAdded();
+    // Packets were added to the clip: video with no keys is stamped too, an interval after it began.
+    void packetsAdded();
     // Recording was switched on or off: the next key starts a new session; off - what is left is stamped now.
     void captureChanged(bool on);
+
+    // What the last stamp holds: the raw records of the document, the packets of the clip and the stamps up to it.
+    struct Cover
+    {
+        qsizetype records = 0;
+        int packets = 0;
+        qsizetype stamps = 0;
+    };
+    // Before saving: a stamp of everything there is now (after the request on its way, if any); flushed() tells
+    // when it came (true, cover() holds it) or could not be had (false: nothing to stamp with, the authorities did
+    // not answer). It may come at once, from within the call.
+    void flush();
+    Cover cover() const { return m_cover; }
 
     bool busy() const { return m_inFlight; }
     QString lastError() const { return m_error; }
@@ -46,9 +62,12 @@ public:
 
 signals:
     void changed(); // a stamp was added, or a request failed
+    void flushed(bool ok);
 
 private:
     void stampIfDue(bool now);
+    bool covered() const;
+    void flushDone(bool ok);
     void send();
     void received(quint64 generation, const QByteArray &token, const QString &error);
     int stampedEnd() const;
@@ -68,6 +87,7 @@ private:
     {
         int end = 0;
         int mediaEnd = 0;
+        qsizetype raw = 0; // the document's records it holds
         quint32 delayMs = 0;
         QByteArray imprint;
         int service = 0;
@@ -76,6 +96,9 @@ private:
     } m_pending;
     QElapsedTimer m_sinceKept;      // since the last record the normalization kept
     QTimer m_idle;
+    QTimer m_videoDue;              // video the stamps do not hold yet
+    Cover m_cover;
+    bool m_flushing = false, m_flushSent = false;
     QString m_error;
     Send m_send;
     QNetworkAccessManager *m_net = nullptr;

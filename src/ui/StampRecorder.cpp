@@ -30,6 +30,8 @@ StampRecorder::StampRecorder(QObject *parent) : QObject(parent)
 {
     m_idle.setSingleShot(true);
     connect(&m_idle, &QTimer::timeout, this, [this] { stampIfDue(true); });
+    m_videoDue.setSingleShot(true);
+    connect(&m_videoDue, &QTimer::timeout, this, [this] { stampIfDue(true); });
     m_send = [this](const QByteArray &imprint, int service, Done done) {
         sendOverNetwork(imprint, service, std::move(done));
     };
@@ -48,18 +50,22 @@ void StampRecorder::setEnabled(bool on)
     m_enabled = on;
     if (!on) {
         m_idle.stop();
+        m_videoDue.stop();
         ++m_generation; // an answer still on its way is not wanted
         m_inFlight = false;
+        flushDone(false);
     }
     m_sessionStamped = false;
 }
 
-void StampRecorder::attach(TsfDocument *doc)
+void StampRecorder::attach(TsfDocument *doc, bool another)
 {
     m_doc = doc;
     ++m_generation;
     m_inFlight = false;
     m_idle.stop();
+    m_videoDue.stop();
+    flushDone(false);
     m_chain.reset();
     m_raw = 0;
     m_packetHashes.clear();
@@ -69,6 +75,11 @@ void StampRecorder::attach(TsfDocument *doc)
     m_sessionStamped = false;
     m_pending = {};
     m_error.clear();
+    m_cover = {};
+    if (another)
+        m_sinceKept.invalidate(); // its records were not typed now
+    if (m_doc && !m_doc->stamps.isEmpty() && stampedEnd() == m_chain.size())
+        m_cover = {m_raw, stampedMediaEnd(), m_doc->stamps.size()};
 }
 
 void StampRecorder::recordsAdded()
@@ -87,6 +98,44 @@ void StampRecorder::recordsAdded()
     m_sinceKept.start();
     m_idle.start(Stamps::kIdleMs);
     stampIfDue(false);
+}
+
+void StampRecorder::packetsAdded()
+{
+    if (m_enabled && m_doc && !m_videoDue.isActive())
+        m_videoDue.start(Stamps::kIntervalMs);
+}
+
+bool StampRecorder::covered() const
+{
+    return m_doc && m_cover.records == m_doc->records.size() && m_cover.packets == (m_clip ? m_clip->packets.size() : 0)
+           && m_cover.stamps == m_doc->stamps.size();
+}
+
+void StampRecorder::flush()
+{
+    recordsAdded();
+    if (covered()) {
+        emit flushed(true);
+        return;
+    }
+    // No key since the document came: its records are not this recording's to stamp now.
+    if (!m_enabled || !m_doc || !m_sinceKept.isValid()) {
+        emit flushed(false);
+        return;
+    }
+    m_flushing = true;
+    m_flushSent = !m_inFlight;
+    if (!m_inFlight)
+        send();
+}
+
+void StampRecorder::flushDone(bool ok)
+{
+    if (!m_flushing)
+        return;
+    m_flushing = false;
+    emit flushed(ok);
 }
 
 void StampRecorder::captureChanged(bool on)
@@ -133,6 +182,7 @@ void StampRecorder::send()
         if (const std::optional<TimeStamp::Info> info = TimeStamp::info(m_doc->stamps.last().token))
             previous = info->imprint;
     m_pending.end = n;
+    m_pending.raw = m_raw;
     m_pending.delayMs = quint32(m_sinceKept.elapsed());
     // The packets the encoders gave so far (chain v2, re/stamps.md).
     const int mediaFrom = stampedMediaEnd(), mediaTo = m_clip ? int(m_clip->packets.size()) : 0;
@@ -169,6 +219,7 @@ void StampRecorder::received(quint64 generation, const QByteArray &token, const 
         m_pending.tries = 0;
         m_pending.errors.clear();
         emit changed();
+        flushDone(false);
         m_idle.start(kRetryMs); // the records wait; the next try covers them with its own delay
         return;
     }
@@ -184,8 +235,18 @@ void StampRecorder::received(quint64 generation, const QByteArray &token, const 
     stamp.version = 2;
     stamp.mediaEnd = m_pending.mediaEnd;
     m_doc->stamps.append(stamp);
+    m_cover = {m_pending.raw, m_pending.mediaEnd, m_doc->stamps.size()};
     m_sessionStamped = true;
     emit changed();
+    if (m_flushing) {
+        if (m_flushSent) {
+            flushDone(true);
+        } else { // the request on its way was older than the flush
+            m_flushSent = true;
+            send();
+            return;
+        }
+    }
     // Typed on while it was on its way: the idle stamp covers the rest if nothing else does.
     if (m_chain.size() > m_pending.end && !m_idle.isActive())
         m_idle.start(Stamps::kIdleMs);

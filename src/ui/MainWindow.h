@@ -10,10 +10,12 @@
 #include "core/TsfFile.h"
 #include "export/TableExport.h"
 #include "platform/KeyboardHook.h"
+#include "ui/StampRecorder.h"
 
 #include <QElapsedTimer>
 #include <QIcon>
 #include <QPointer>
+#include <optional>
 #include <QWidget>
 
 class AxisPanel;
@@ -35,7 +37,6 @@ class QSystemTrayIcon;
 class QTableWidget;
 class QTimer;
 class QToolButton;
-class StampRecorder;
 class TextInputWindow;
 class TextView;
 class VideoWindow;
@@ -169,7 +170,10 @@ private:
     bool saveDocument(bool block); // false: not saved (cancelled or failed)
     // What is written (without the properties): the block of the selection or all, with the webcam's clip.
     // `revealed`: records outside the block that its stamps carry as they are (stamps v1, edges of groups).
-    TsfDocument documentForSave(bool block, int *revealed = nullptr) const;
+    // `cover`: the part of the recording a stamp taken for the save holds (the rest came while it was on its way).
+    TsfDocument documentForSave(bool block, int *revealed = nullptr, const StampRecorder::Cover *cover = nullptr) const;
+    // Before saving a recording being stamped: a stamp of all of it (re/stamps.md); none - it could not be had.
+    std::optional<StampRecorder::Cover> stampForSave();
     // The report of the stamps of the document, with its video.
     Stamps::Report stampReport() const;
     bool askToSave(); // on exit: false - stay

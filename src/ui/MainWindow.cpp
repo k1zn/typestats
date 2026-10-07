@@ -37,6 +37,7 @@
 #include <QClipboard>
 #include <QCloseEvent>
 #include <QDateTime>
+#include <QEventLoop>
 #include <QComboBox>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -141,10 +142,9 @@ MainWindow::MainWindow(QWidget *parent)
     m_stamps = new StampRecorder(this);
     m_stamps->setClip(&m_clip);
     m_stamps->attach(&m_doc);
-    connect(m_stamps, &StampRecorder::changed, this, [this] {
-        m_unsaved = true;
-        updateProof();
-    });
+    // A stamp (or a failed request) and the video alone are not unsaved records: a save takes a stamp of all there
+    // is (stampForSave), and video that goes on after it is not worth a question when closing.
+    connect(m_stamps, &StampRecorder::changed, this, &MainWindow::updateProof);
     updateTitle();
     setMinimumWidth(220);
 #ifdef TS_HAVE_WEBCAM
@@ -156,7 +156,7 @@ MainWindow::MainWindow(QWidget *parent)
     m_video->setClip(&m_clip);
     connect(m_webcam, &WebcamRecorder::picture, m_video, &VideoWindow::setPicture);
     connect(m_webcam, &WebcamRecorder::recordingChanged, this, &MainWindow::updateVideoMode);
-    connect(m_webcam, &WebcamRecorder::packetsAdded, this, [this] { m_unsaved = true; });
+    connect(m_webcam, &WebcamRecorder::packetsAdded, m_stamps, &StampRecorder::packetsAdded);
     connect(m_webcam, &WebcamRecorder::failed, this, [this](const QString &reason) {
         m_video->setMessage(reason);
         if (m_videoButton)
@@ -720,7 +720,10 @@ void MainWindow::updateProof()
         // Short: the corner has room for little; the words are in the hint and the details.
         QString text, hint;
         QColor color = Look::colors().dimInk;
-        const qint64 percent = r.records ? qint64(r.confirmed) * 100 / r.records : 0;
+        // The records whose time is confirmed and the video under the stamps: the smaller part.
+        qint64 percent = r.records ? qint64(r.confirmed) * 100 / r.records : 100;
+        if (r.packets)
+            percent = std::min(percent, qint64(r.packetsStamped) * 100 / r.packets);
         switch (r.status) {
         case Stamps::Report::Status::None:
             text = tr("Метки");
@@ -732,8 +735,10 @@ void MainWindow::updateProof()
             color = Look::colors().proofOk;
             break;
         case Stamps::Report::Status::Partial:
-            text = QStringLiteral("✓ %1 %").arg(percent);
-            hint = tr("Время подтверждено для %1 % записей").arg(percent);
+            text = QStringLiteral("✓ %1 %").arg(std::min<qint64>(percent, 99)); // 100 % is for all of it
+            hint = tr("Время подтверждено для %1 % записей").arg(r.records ? qint64(r.confirmed) * 100 / r.records : 0);
+            if (r.packets)
+                hint += u'\n' + tr("Видео под метками: %1 %").arg(qint64(r.packetsStamped) * 100 / r.packets);
             color = Look::colors().proofPartial;
             break;
         case Stamps::Report::Status::Broken:
@@ -1789,7 +1794,7 @@ void MainWindow::setDocument(const TsfDocument &doc, const QString &title, bool 
     }
 #endif
     keepRoomForRecording();
-    m_stamps->attach(&m_doc);
+    m_stamps->attach(&m_doc, true);
     setTitle(title);
     m_damaged->setVisible(damaged);
     m_damaged->raise();
@@ -1867,9 +1872,13 @@ void MainWindow::save()
     saveDocument(false);
 }
 
-TsfDocument MainWindow::documentForSave(bool block, int *revealed) const
+TsfDocument MainWindow::documentForSave(bool block, int *revealed, const StampRecorder::Cover *cover) const
 {
     TsfDocument doc = m_doc;
+    if (cover && !block) {
+        doc.records.resize(cover->records);
+        doc.stamps.resize(cover->stamps);
+    }
     if (revealed)
         *revealed = 0;
     if (block) {
@@ -1908,7 +1917,13 @@ TsfDocument MainWindow::documentForSave(bool block, int *revealed) const
                 doc.stampCertificates.clear();
         }
     } else if (!m_clip.isEmpty()) {
-        doc.webcam = m_clip.serialize();
+        if (cover && cover->packets < m_clip.packets.size()) {
+            MediaClip clip = m_clip;
+            clip.packets.resize(cover->packets);
+            doc.webcam = clip.serialize();
+        } else {
+            doc.webcam = m_clip.serialize();
+        }
     }
     // The finger layout goes into the file unless it is the built-in one.
     doc.fingerZonesName.clear();
@@ -1918,6 +1933,28 @@ TsfDocument MainWindow::documentForSave(bool block, int *revealed) const
         doc.fingers = m_schemes.zones(m_fingers->currentText()).toStrings();
     }
     return doc;
+}
+
+std::optional<StampRecorder::Cover> MainWindow::stampForSave()
+{
+    // The authorities answer in about a second; six of them failing one after another would take half a minute.
+    std::optional<bool> ok;
+    QEventLoop loop;
+    const QMetaObject::Connection c = connect(m_stamps, &StampRecorder::flushed, &loop, [&](bool done) {
+        ok = done;
+        loop.quit();
+    });
+    QTimer::singleShot(15000, &loop, &QEventLoop::quit);
+    m_stamps->flush();
+    if (!ok) {
+        QApplication::setOverrideCursor(Qt::WaitCursor);
+        loop.exec();
+        QApplication::restoreOverrideCursor();
+    }
+    disconnect(c);
+    if (!ok || !*ok)
+        return std::nullopt; // saved as it is: the stamps hold less of it
+    return m_stamps->cover();
 }
 
 bool MainWindow::saveDocument(bool block)
@@ -1939,8 +1976,11 @@ bool MainWindow::saveDocument(bool block)
     if (QFileInfo(path).suffix().isEmpty())
         path += QStringLiteral(".tsf");
 
+    std::optional<StampRecorder::Cover> cover;
+    if (!block && m_stamps->enabled())
+        cover = stampForSave();
     int revealed = 0;
-    TsfDocument doc = documentForSave(block, &revealed);
+    TsfDocument doc = documentForSave(block, &revealed, cover ? &*cover : nullptr);
     // Stamps of the old chain (v1) hash their records in a row: the block carries the records around it as they are.
     if (block && revealed > 0
         && QMessageBox::question(this, appTitle(),
@@ -1963,13 +2003,18 @@ bool MainWindow::saveDocument(bool block)
     }
     if (block)
         return true;
+    // The recording goes on as it is (with what came after the stamp of the save).
     const KeyRecords records = m_doc.records;
+    const QList<Stamp> stamps = m_doc.stamps;
+    const QList<QByteArray> certificates = m_doc.stampCertificates;
     m_doc = doc;
     m_doc.records = records;
+    m_doc.stamps = stamps;
+    m_doc.stampCertificates = certificates;
     m_doc.webcam.clear();
     m_path = path;
     m_loaded = true;
-    m_unsaved = false;
+    m_unsaved = doc.records.size() < m_doc.records.size(); // typed while the stamp was on its way
     setTitle(QFileInfo(path).fileName());
     return true;
 }
