@@ -649,23 +649,24 @@ private slots:
         QVERIFY(std::abs(w.klavogramDocTimeUs() - 1000000) <= 1000);
         QCOMPARE(clip.docTime(clip.packets[clip.videoFramesAt(w.klavogramDocTimeUs()).second].ptsUs), 1000000);
 
-        // "Сохранить блок" of "b": the records from a's release to b's, the video of their time only.
+        // "Сохранить блок" of "b": b's press and release (a's release before it is dropped: the block starts at a
+        // press), the video of their time only.
         select(w, 1, 1);
         const TsfDocument block = w.documentForSave(true);
-        QCOMPARE(block.records.size(), 3);
+        QCOMPARE(block.records.size(), 2);
         MediaClip cut;
         QVERIFY(MediaClip::parse(block.webcam, cut));
         qint64 lastVideo = MediaClip::kAll;
         for (const MediaPacket &p : cut.packets)
             if (cut.streams[p.stream].kind == MediaStream::Video)
                 lastVideo = std::max(lastVideo, cut.docTime(p.ptsUs));
-        // The block's records: a's release at 80 ms of its time (its dt), b's release at 1080 ms.
-        QCOMPARE(DocTime::of(block.records, 0), 80000);
-        QCOMPARE(DocTime::end(block.records), 1080000);
-        QCOMPARE(lastVideo, 1000000);        // the last frame within the block
-        QCOMPARE(cut.docTime(cut.startUs), 80000); // shown from the block's first record
-        QCOMPARE(cut.videoFramesAt(79000).first, -1);
-        QCOMPARE(cut.docTime(cut.packets[cut.videoFramesAt(1000000).second].ptsUs), 1000000);
+        // The block's records: b's press at 920 ms of its time (its dt), its release at 1000 ms.
+        QCOMPARE(DocTime::of(block.records, 0), 920000);
+        QCOMPARE(DocTime::end(block.records), 1000000);
+        QCOMPARE(lastVideo, 920000);               // the frame of b's press is the last within the block
+        QCOMPARE(cut.docTime(cut.startUs), 920000); // shown from the block's first record
+        QCOMPARE(cut.videoFramesAt(919000).first, -1);
+        QCOMPARE(cut.docTime(cut.packets[cut.videoFramesAt(920000).second].ptsUs), 920000);
         // The whole recording as a block: the normalized records (the first at 60 s), the same frames at their keys.
         select(w, 0, 0);
         MediaClip all;
@@ -1149,7 +1150,8 @@ private slots:
         Stamps::Chain chain;
         for (const KeyRecord &r : doc.records)
             chain.push(r);
-        QVERIFY(sent[0].imprint == chain.hash({}, 0, 2, 0) || sent[0].imprint == chain.hash({}, 0, 2, 1));
+        // The chain v2: the records as leaves, no video here.
+        QVERIFY(sent[0].imprint == chain.hashV2({}, 0, 2, 0, {}, 0) || sent[0].imprint == chain.hashV2({}, 0, 2, 1, {}, 0));
         key(u'b', 1000, true); // while it is on its way: no second request
         QCOMPARE(sent.size(), 1);
         sent[0].done(fakeToken(sent[0].imprint), {});
@@ -1233,6 +1235,31 @@ private slots:
         QCOMPARE(r.bad, 0);
         QVERIFY(r.stamps >= 3);
         QCOMPARE(r.status, Stamps::Report::Status::Confirmed);
+    }
+
+    void blockKeepsStamps()
+    {
+        // "Сохранить блок" of a stamped recording with video: the block carries the stamps of what it holds, the
+        // rest of the recording hidden (re/stamps.md, chain v2); the video is under them.
+        MainWindow w;
+        QVERIFY(w.openFile(golden("stamps/video.tsf")));
+        QCOMPARE(w.stampReport().status, Stamps::Report::Status::Confirmed);
+        select(w, 20, 40);
+        int revealed = -1;
+        const TsfDocument block = w.documentForSave(true, &revealed);
+        QVERIFY(!block.stamps.isEmpty());
+        QVERIFY(revealed <= 14);
+        QTemporaryDir dir;
+        const QString path = dir.filePath(QStringLiteral("block.tsf"));
+        QVERIFY(Tsf::write(path, block, true));
+        MainWindow again;
+        QVERIFY(again.openFile(path));
+        QVERIFY(!again.m_model.text.isEmpty() && w.m_model.text.contains(again.m_model.text.left(10)));
+        const Stamps::Report r = again.stampReport();
+        QCOMPARE(r.status, Stamps::Report::Status::Confirmed);
+        QVERIFY(r.hiddenBeforeUs > 0 && r.hiddenAfterUs > 0);
+        QVERIFY(r.packets > 0);
+        QCOMPARE(r.packetsStamped, r.packets);
     }
 
     void proofButton()

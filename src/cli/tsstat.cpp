@@ -108,7 +108,16 @@ int main(int argc, char *argv[])
         return f.open(QIODevice::WriteOnly) && f.write(Webm::write(clip)) >= 0 ? 0 : 1;
     }
     if (verify) {
-        const Stamps::Report r = Stamps::verify(Recalc::normalized(doc.records), doc.stamps, doc.stampCertificates);
+        MediaClip clip;
+        const bool video = !doc.webcam.isEmpty() && MediaClip::parse(doc.webcam, clip);
+        std::optional<quint32> firstDt;
+        for (const KeyRecord &rec : doc.records)
+            if (rec.isDown()) {
+                firstDt = rec.dtUs;
+                break;
+            }
+        const Stamps::Report r = Stamps::verify(Recalc::normalized(doc.records), doc.stamps, doc.stampCertificates,
+                                                video ? &clip : nullptr, DocTime::modelOffset(doc.records), firstDt);
         static const char *const status[] = {"none", "confirmed", "partial", "broken"};
         const auto utc = [](qint64 ms) {
             return ms ? QDateTime::fromMSecsSinceEpoch(ms, QTimeZone::utc()).toString(Qt::ISODate) : QString();
@@ -126,6 +135,11 @@ int main(int argc, char *argv[])
             {"last", utc(r.lastMs)},
             {"injected", QString::number(r.injected)},
             {"authorities", r.authorities.join(QStringLiteral(", "))},
+            {"packets", QString::number(r.packets)},
+            {"packets_stamped", QString::number(r.packetsStamped)},
+            {"packets_late", QString::number(r.packetsLate)},
+            {"hidden_before_ms", QString::number(r.hiddenBeforeUs / 1000)},
+            {"hidden_after_ms", QString::number(r.hiddenAfterUs / 1000)},
         };
         for (const auto &[name, value] : rows)
             out << name << "\t" << value << "\n";

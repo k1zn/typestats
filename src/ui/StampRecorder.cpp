@@ -62,6 +62,7 @@ void StampRecorder::attach(TsfDocument *doc)
     m_idle.stop();
     m_chain.reset();
     m_raw = 0;
+    m_packetHashes.clear();
     if (m_doc)
         for (; m_raw < m_doc->records.size(); ++m_raw)
             m_chain.push(m_doc->records[m_raw]);
@@ -101,12 +102,20 @@ int StampRecorder::stampedEnd() const
     return m_doc && !m_doc->stamps.isEmpty() ? m_doc->stamps.last().end : 0;
 }
 
+int StampRecorder::stampedMediaEnd() const
+{
+    // Stamps v1 (an older recording typed on) do not cover packets.
+    return m_doc && !m_doc->stamps.isEmpty() && m_doc->stamps.last().version >= 2 ? m_doc->stamps.last().mediaEnd : 0;
+}
+
 void StampRecorder::stampIfDue(bool now)
 {
     if (!m_enabled || !m_doc || m_inFlight || !m_sinceKept.isValid())
         return;
     const int n = m_chain.size(), last = stampedEnd();
-    if (n <= last)
+    // The video after the last key is stamped when recording stops or goes idle.
+    const bool morePackets = m_clip && m_clip->packets.size() > stampedMediaEnd();
+    if (n <= last && !(now && morePackets))
         return;
     // A session starts with a stamp at its first key; then one per interval of typing, and one after it.
     if (now || !m_sessionStamped || last == 0
@@ -125,7 +134,15 @@ void StampRecorder::send()
             previous = info->imprint;
     m_pending.end = n;
     m_pending.delayMs = quint32(m_sinceKept.elapsed());
-    m_pending.imprint = m_chain.hash(previous, last, n, m_pending.delayMs);
+    // The packets the encoders gave so far (chain v2, re/stamps.md).
+    const int mediaFrom = stampedMediaEnd(), mediaTo = m_clip ? int(m_clip->packets.size()) : 0;
+    for (int i = int(m_packetHashes.size() / 32); i < mediaTo; ++i)
+        m_packetHashes += Stamps::packetHash(m_clip->packets[i]);
+    m_pending.mediaEnd = mediaTo;
+    m_pending.imprint = m_chain.hashV2(previous, last, n, m_pending.delayMs,
+                                       QByteArrayView(m_packetHashes).sliced(qsizetype(mediaFrom) * 32,
+                                                                             qsizetype(mediaTo - mediaFrom) * 32),
+                                       mediaTo - mediaFrom);
     m_pending.service = (m_service + m_pending.tries) % kServiceCount;
     m_inFlight = true;
     const quint64 generation = m_generation;
@@ -160,7 +177,13 @@ void StampRecorder::received(quint64 generation, const QByteArray &token, const 
     m_pending.errors.clear();
     m_error.clear();
     Stamps::addCertificates(m_doc->stampCertificates, TimeStamp::certificates(token));
-    m_doc->stamps.append(Stamp{m_pending.end, m_pending.delayMs, false, TimeStamp::withoutCertificates(token)});
+    Stamp stamp;
+    stamp.end = m_pending.end;
+    stamp.delayMs = m_pending.delayMs;
+    stamp.token = TimeStamp::withoutCertificates(token);
+    stamp.version = 2;
+    stamp.mediaEnd = m_pending.mediaEnd;
+    m_doc->stamps.append(stamp);
     m_sessionStamped = true;
     emit changed();
     // Typed on while it was on its way: the idle stamp covers the rest if nothing else does.

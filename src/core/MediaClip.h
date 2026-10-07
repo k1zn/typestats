@@ -62,7 +62,8 @@ public:
 
     // The clip of [fromUs, toUs] (the document's time); its time starts at fromUs. Packets are copied as they are:
     // video from the key frame at or before fromUs to the last frame at or before toUs, audio with its preroll.
-    MediaClip cut(qint64 fromUs, qint64 toUs) const;
+    // `kept`: the indexes of the packets copied (the stamps of a block follow them).
+    MediaClip cut(qint64 fromUs, qint64 toUs, QList<int> *kept = nullptr) const;
     // After an edit moved the start of the document's time: the clip's time follows (a clip of an empty
     // document stays as it is).
     void moveOrigin(qint64 deltaUs) { originUs += deltaUs; }

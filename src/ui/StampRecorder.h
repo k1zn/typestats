@@ -30,6 +30,8 @@ public:
     // The document: its records are followed, stamps and certificates are added to it. Call again after the
     // records were replaced (another document, an edit): the chain is built anew, a request in flight dropped.
     void attach(TsfDocument *doc);
+    // The webcam's clip of the document: its packets go under the stamps with the records (chain v2).
+    void setClip(const MediaClip *clip) { m_clip = clip; m_packetHashes.clear(); }
     // Records were appended to the document (typing).
     void recordsAdded();
     // Recording was switched on or off: the next key starts a new session; off - what is left is stamped now.
@@ -50,9 +52,12 @@ private:
     void send();
     void received(quint64 generation, const QByteArray &token, const QString &error);
     int stampedEnd() const;
+    int stampedMediaEnd() const;
     void sendOverNetwork(const QByteArray &imprint, int service, Done done);
 
     TsfDocument *m_doc = nullptr;
+    const MediaClip *m_clip = nullptr;
+    QByteArray m_packetHashes;      // SHA-256 of the clip's packets so far, 32 bytes each
     Stamps::Chain m_chain;
     qsizetype m_raw = 0;            // records of the document the chain has seen
     bool m_enabled = false;
@@ -62,6 +67,7 @@ private:
     struct Pending
     {
         int end = 0;
+        int mediaEnd = 0;
         quint32 delayMs = 0;
         QByteArray imprint;
         int service = 0;

@@ -139,6 +139,7 @@ MainWindow::MainWindow(QWidget *parent)
 {
     m_doc.platform = currentKeyPlatform(); // a recording made here
     m_stamps = new StampRecorder(this);
+    m_stamps->setClip(&m_clip);
     m_stamps->attach(&m_doc);
     connect(m_stamps, &StampRecorder::changed, this, [this] {
         m_unsaved = true;
@@ -711,7 +712,7 @@ void MainWindow::updateProof()
             m_proofButton->hide();
             return;
         }
-        const Stamps::Report r = Stamps::verify(Recalc::normalized(m_doc.records), m_doc.stamps, m_doc.stampCertificates);
+        const Stamps::Report r = stampReport();
         // Short: the corner has room for little; the words are in the hint and the details.
         QString text, hint;
         QColor color = Look::colors().dimInk;
@@ -750,9 +751,22 @@ void MainWindow::updateProof()
     });
 }
 
+Stamps::Report MainWindow::stampReport() const
+{
+    // A block's first record: the dt the chain had (the normalization gives the first press 60 s).
+    std::optional<quint32> firstDt;
+    for (const KeyRecord &r : m_doc.records)
+        if (r.isDown()) {
+            firstDt = r.dtUs;
+            break;
+        }
+    return Stamps::verify(Recalc::normalized(m_doc.records), m_doc.stamps, m_doc.stampCertificates, &m_clip,
+                          DocTime::modelOffset(m_doc.records), firstDt);
+}
+
 void MainWindow::showProof()
 {
-    const Stamps::Report r = Stamps::verify(Recalc::normalized(m_doc.records), m_doc.stamps, m_doc.stampCertificates);
+    const Stamps::Report r = stampReport();
     const QLocale loc;
     const auto percent = [&](int part) { return r.records ? qint64(part) * 100 / r.records : 0; };
     QStringList lines;
@@ -769,6 +783,16 @@ void MainWindow::showProof()
                      .arg(r.confirmed)
                      .arg(percent(r.confirmed))
                      .arg(loc.toString(r.driftMs / 1000.0, 'f', 1));
+        if (r.packets)
+            lines << tr("Видео: пакетов %1, под метками: %2 (%3 %)")
+                         .arg(r.packets)
+                         .arg(r.packetsStamped)
+                         .arg(qint64(r.packetsStamped) * 100 / r.packets);
+        if (r.packetsLate)
+            lines << tr("Кадры позже своей метки: %1").arg(r.packetsLate);
+        if (r.hiddenBeforeUs || r.hiddenAfterUs)
+            lines << tr("Блок из записи, заверенной метками: до него скрыто %1 с, после — %2 с")
+                         .arg(loc.toString(r.hiddenBeforeUs / 1e6, 'f', 1), loc.toString(r.hiddenAfterUs / 1e6, 'f', 1));
         if (r.voided)
             lines << tr("Изменено после записи: участков — %1").arg(r.voided);
         if (r.bad)
@@ -1033,7 +1057,7 @@ void MainWindow::beginEdit()
 void MainWindow::endEdit()
 {
     // The stamps follow their records; those whose records changed are voided (re/stamps.md).
-    Stamps::follow(m_doc.stamps, m_doc.records);
+    Stamps::follow(m_doc.stamps, m_undo, m_doc.records);
     // The clip follows the time of the first record: an edit changes it, the times after it stay.
     if (!m_doc.records.isEmpty()) {
         const int old = int(m_doc.records[0].tag) - 1;
@@ -1839,29 +1863,45 @@ void MainWindow::save()
     saveDocument(false);
 }
 
-TsfDocument MainWindow::documentForSave(bool block) const
+TsfDocument MainWindow::documentForSave(bool block, int *revealed) const
 {
     TsfDocument doc = m_doc;
+    if (revealed)
+        *revealed = 0;
     if (block) {
         // The records of the selection; nothing selected - all of them.
-        const auto [from, to] = Editing::recordRange(m_model, m_text->selectionStart(), m_text->selectionLength());
+        auto [from, to] = Editing::recordRange(m_model, m_text->selectionStart(), m_text->selectionLength());
+        // The block starts at a press: releases before it are dropped by the normalization anyway (and its stamps
+        // must find the records they hashed).
+        while (to != 0 && from < to && m_model.records[from].isUp())
+            ++from;
         doc.records = to == 0 ? m_model.records : m_model.records.mid(from, to - from);
         doc.attachedVideo.clear();
         // The webcam's clip of the same time (re/webcam.md, "Сохранить блок"): the records are the normalized ones.
+        QList<int> kept;
         if (!m_clip.isEmpty()) {
             const qint64 offset = DocTime::modelOffset(m_doc.records);
             MediaClip clip = m_clip;
             if (to == 0) {
                 clip.moveOrigin(offset);
-            } else {
-                clip = m_clip.cut(DocTime::of(m_model.records, from) + offset, DocTime::of(m_model.records, to - 1) + offset);
+            } else if (from < to) {
+                clip = m_clip.cut(DocTime::of(m_model.records, from) + offset, DocTime::of(m_model.records, to - 1) + offset,
+                                  &kept);
                 clip.moveOrigin(-qint64(m_model.records[from].dtUs));
             }
-            doc.webcam = clip.serialize();
+            doc.webcam = clip.isEmpty() ? QByteArray() : clip.serialize();
         }
-        if (to != 0) { // a part: the stamps cover the whole recording
-            doc.stamps.clear();
-            doc.stampCertificates.clear();
+        // A part keeps the stamps of what it holds: the rest of the recording as hidden parts (re/stamps.md).
+        if (to != 0) {
+            std::optional<quint32> firstDt;
+            for (const KeyRecord &r : m_doc.records)
+                if (r.isDown()) {
+                    firstDt = r.dtUs;
+                    break;
+                }
+            doc.stamps = Stamps::extract(m_doc.stamps, m_model.records, &m_clip, from, to, kept, revealed, firstDt);
+            if (doc.stamps.isEmpty())
+                doc.stampCertificates.clear();
         }
     } else if (!m_clip.isEmpty()) {
         doc.webcam = m_clip.serialize();
@@ -1895,7 +1935,18 @@ bool MainWindow::saveDocument(bool block)
     if (QFileInfo(path).suffix().isEmpty())
         path += QStringLiteral(".tsf");
 
-    TsfDocument doc = documentForSave(block);
+    int revealed = 0;
+    TsfDocument doc = documentForSave(block, &revealed);
+    // Stamps of the old chain (v1) hash their records in a row: the block carries the records around it as they are.
+    if (block && revealed > 0
+        && QMessageBox::question(this, appTitle(),
+                                 tr("Чтобы блок сохранил метки времени, в файл попадут скрыто (без показа и статистики) "
+                                    "соседние нажатия записи: %1. Сохранить метки?")
+                                     .arg(revealed))
+               != QMessageBox::Yes) {
+        doc.stamps.clear();
+        doc.stampCertificates.clear();
+    }
     doc.author = properties.author();
     doc.date = properties.date();
     doc.comment = properties.description();

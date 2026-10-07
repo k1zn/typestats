@@ -6,6 +6,7 @@
 #include "core/MediaClip.h"
 #include "core/Editing.h"
 #include "core/Recalc.h"
+#include "core/Stamps.h"
 #include "core/TsfFile.h"
 #include "export/TableExport.h"
 #include "platform/KeyboardHook.h"
@@ -166,7 +167,10 @@ private:
     void showTextMenu(const QPoint &globalPos);
     bool saveDocument(bool block); // false: not saved (cancelled or failed)
     // What is written (without the properties): the block of the selection or all, with the webcam's clip.
-    TsfDocument documentForSave(bool block) const;
+    // `revealed`: records outside the block that its stamps carry as they are (stamps v1, edges of groups).
+    TsfDocument documentForSave(bool block, int *revealed = nullptr) const;
+    // The report of the stamps of the document, with its video.
+    Stamps::Report stampReport() const;
     bool askToSave(); // on exit: false - stay
     // The time stamps of the recording (re/stamps.md): the button of the toolbar and its details.
     void updateProof();

@@ -82,7 +82,7 @@ qint64 MediaClip::lastUs() const
     return last == kAll ? 0 : docTime(last);
 }
 
-MediaClip MediaClip::cut(qint64 fromUs, qint64 toUs) const
+MediaClip MediaClip::cut(qint64 fromUs, qint64 toUs, QList<int> *kept) const
 {
     MediaClip out;
     out.streams = streams;
@@ -112,6 +112,8 @@ MediaClip MediaClip::cut(qint64 fromUs, qint64 toUs) const
             continue;
         }
         out.packets.append(p);
+        if (kept)
+            kept->append(i);
     }
     return out;
 }

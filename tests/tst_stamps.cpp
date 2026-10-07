@@ -28,6 +28,19 @@ Stamps::Report report(const TsfDocument &doc)
     return Stamps::verify(Recalc::normalized(doc.records), doc.stamps, doc.stampCertificates);
 }
 
+// With the webcam's clip, as the program asks (MainWindow::stampReport).
+Stamps::Report reportWith(const TsfDocument &doc, const MediaClip &clip)
+{
+    std::optional<quint32> firstDt;
+    for (const KeyRecord &r : doc.records)
+        if (r.isDown()) {
+            firstDt = r.dtUs;
+            break;
+        }
+    return Stamps::verify(Recalc::normalized(doc.records), doc.stamps, doc.stampCertificates, &clip,
+                          DocTime::modelOffset(doc.records), firstDt);
+}
+
 } // namespace
 
 class TstStamps : public QObject
@@ -241,8 +254,9 @@ private slots:
         KeyRecords recs = Recalc::normalized(doc.records);
         for (int i = 0; i < recs.size(); ++i)
             recs[i].tag = quint32(i + 1);
+        KeyRecords before = recs;
         Editing::deleteRange(recs, 120, 124);
-        Stamps::follow(doc.stamps, recs);
+        Stamps::follow(doc.stamps, before, recs);
         QCOMPARE(doc.stamps[1].end, 89);
         QVERIFY(!doc.stamps[0].voided && !doc.stamps[1].voided && doc.stamps[2].voided);
         QVERIFY(doc.stamps[2].end < 176);
@@ -257,8 +271,9 @@ private slots:
         recs = Recalc::normalized(doc.records);
         for (int i = 0; i < recs.size(); ++i)
             recs[i].tag = quint32(i + 1);
+        before = recs;
         Editing::deleteRange(recs, 30, 32);
-        Stamps::follow(doc.stamps, recs);
+        Stamps::follow(doc.stamps, before, recs);
         QVERIFY(!doc.stamps[0].voided && doc.stamps[1].voided && !doc.stamps[2].voided);
         doc.records = recs;
         r = report(doc);
@@ -291,6 +306,182 @@ private slots:
         QVERIFY(c.push(shift));
         QVERIFY(!c.push(shift));
         QCOMPARE(c.size(), 1);
+    }
+
+    void videoChain()
+    {
+        // The chain v2 with a webcam clip (make_stamped.py --v2 --video): records and packets confirmed.
+        const TsfDocument doc = load("video.tsf");
+        QCOMPARE(doc.stamps.first().version, 2);
+        MediaClip clip;
+        QVERIFY(MediaClip::parse(doc.webcam, clip));
+        QCOMPARE(clip.packets.size(), 206);
+        Stamps::Report r = reportWith(doc, clip);
+        QCOMPARE(r.status, Stamps::Report::Status::Confirmed);
+        QCOMPARE(r.packetsStamped, 206);
+        QCOMPARE(r.packetsLate, 0);
+        QCOMPARE(r.confirmed, 176);
+
+        // A packet changed, one dropped, the video taken away: the stamps do not check.
+        MediaClip changed = clip;
+        changed.packets[100].data[0] = char(changed.packets[100].data[0] ^ 1);
+        QCOMPARE(reportWith(doc, changed).status, Stamps::Report::Status::Broken);
+        MediaClip dropped = clip;
+        dropped.packets.removeAt(50);
+        QCOMPARE(reportWith(doc, dropped).status, Stamps::Report::Status::Broken);
+        QCOMPARE(report(doc).status, Stamps::Report::Status::Broken);
+        // A packet re-dated (its bytes hold the time): broken too.
+        MediaClip redated = clip;
+        redated.packets[10].ptsUs += 1000;
+        QCOMPARE(reportWith(doc, redated).status, Stamps::Report::Status::Broken);
+        // Video added after the last stamp: not under the stamps.
+        MediaClip more = clip;
+        more.packets.append({0, false, clip.packets.last().ptsUs + 100000, "x"});
+        r = reportWith(doc, more);
+        QCOMPARE(r.status, Stamps::Report::Status::Partial);
+        QCOMPARE(r.packetsStamped, 206);
+
+        // The video claims to be 5 s later than the stamps that hold it.
+        const TsfDocument lateDoc = load("video_late.tsf");
+        MediaClip late;
+        QVERIFY(MediaClip::parse(lateDoc.webcam, late));
+        r = reportWith(lateDoc, late);
+        QCOMPARE(r.status, Stamps::Report::Status::Broken);
+        QVERIFY(r.packetsLate > 0);
+    }
+
+    void liveChainV2()
+    {
+        // The chain v2 record by record, with the packets of each stamp: the imprints that were stamped.
+        const TsfDocument doc = load("video.tsf");
+        MediaClip clip;
+        QVERIFY(MediaClip::parse(doc.webcam, clip));
+        Stamps::Chain chain;
+        for (const KeyRecord &r : doc.records)
+            QVERIFY(chain.push(r));
+        QByteArray previous;
+        int from = 0, media = 0;
+        for (const Stamp &s : doc.stamps) {
+            QByteArray hashes;
+            for (int i = media; i < s.mediaEnd; ++i)
+                hashes += Stamps::packetHash(clip.packets[i]);
+            const QByteArray imprint = TimeStamp::info(s.token)->imprint;
+            QCOMPARE(chain.hashV2(previous, from, s.end, s.delayMs, hashes, s.mediaEnd - media), imprint);
+            previous = imprint;
+            from = s.end;
+            media = s.mediaEnd;
+        }
+    }
+
+    void blocks_data()
+    {
+        QTest::addColumn<QString>("file");
+        QTest::addColumn<int>("from");
+        QTest::addColumn<int>("to");
+        QTest::newRow("middle") << "video.tsf" << 30 << 120;
+        QTest::newRow("start") << "video.tsf" << 0 << 40;
+        QTest::newRow("end") << "video.tsf" << 130 << 176;
+        QTest::newRow("in one chunk") << "video.tsf" << 100 << 110;
+        QTest::newRow("group edges") << "video.tsf" << 8 << 96;
+        QTest::newRow("v1") << "stamped.tsf" << 30 << 120;
+        QTest::newRow("v1 end") << "stamped.tsf" << 95 << 176;
+    }
+
+    void blocks()
+    {
+        // "Сохранить блок": the stamps of the records and packets of the block, the rest hidden; through the file.
+        QFETCH(QString, file);
+        QFETCH(int, from);
+        QFETCH(int, to);
+        const TsfDocument doc = load(file.toLatin1().constData());
+        MediaClip clip;
+        const bool video = MediaClip::parse(doc.webcam, clip);
+        const KeyRecords normalized = Recalc::normalized(doc.records);
+        while (normalized[from].isUp()) // the block starts at a press (MainWindow::documentForSave)
+            ++from;
+        QList<int> kept;
+        MediaClip cut;
+        if (video) {
+            const qint64 offset = DocTime::modelOffset(doc.records);
+            cut = clip.cut(DocTime::of(normalized, from) + offset, DocTime::of(normalized, to - 1) + offset, &kept);
+            cut.moveOrigin(-qint64(normalized[from].dtUs));
+        }
+        int revealed = 0;
+        TsfDocument block;
+        block.records = normalized.mid(from, to - from);
+        block.stamps = Stamps::extract(doc.stamps, normalized, video ? &clip : nullptr, from, to, kept, &revealed);
+        block.stampCertificates = doc.stampCertificates;
+        if (video)
+            block.webcam = cut.serialize();
+        QVERIFY(!block.stamps.isEmpty());
+        // Records outside go as they are only for v1 or a group cut by an edge (at most 7 on each side).
+        if (file.startsWith(u"stamped"))
+            QVERIFY(revealed > 0);
+        else
+            QVERIFY2(revealed <= 14, qPrintable(QString::number(revealed)));
+        const TsfDocument back = Tsf::parse(Tsf::serialize(block, true));
+        QCOMPARE(back.stamps.size(), block.stamps.size());
+        for (int i = 0; i < block.stamps.size(); ++i) {
+            QCOMPARE(back.stamps[i].parts, block.stamps[i].parts);
+            QCOMPARE(back.stamps[i].previous, block.stamps[i].previous);
+            QCOMPARE(back.stamps[i].mediaEnd, block.stamps[i].mediaEnd);
+        }
+        MediaClip backClip;
+        if (video)
+            QVERIFY(MediaClip::parse(back.webcam, backClip));
+        const Stamps::Report r = reportWith(back, backClip);
+        QCOMPARE(r.status, Stamps::Report::Status::Confirmed);
+        QCOMPARE(r.bad, 0);
+        QCOMPARE(r.confirmed, int(back.records.size()));
+        if (video)
+            QCOMPARE(r.packetsStamped, int(backClip.packets.size()));
+        QCOMPARE(r.hiddenBeforeUs > 0, from > 0);
+        QCOMPARE(r.hiddenAfterUs > 0, to < normalized.size());
+
+        // A hidden group's duration or a hidden record changed: broken.
+        TsfDocument forged = back;
+        bool touched = false;
+        for (Stamp &s : forged.stamps)
+            for (StampPart &p : s.parts)
+                if (!touched && p.kind == StampPart::Leaf) {
+                    p.durationUs += 1000;
+                    touched = true;
+                } else if (!touched && p.kind == StampPart::Hidden) {
+                    p.data[0] = char(p.data[0] ^ 1);
+                    touched = true;
+                }
+        if (touched)
+            QCOMPARE(reportWith(forged, backClip).status, Stamps::Report::Status::Broken);
+        // A record of the block changed: broken.
+        TsfDocument edited = back;
+        edited.records[2].ch = u'Z';
+        QCOMPARE(reportWith(edited, backClip).status, Stamps::Report::Status::Broken);
+    }
+
+    void followV2()
+    {
+        // An edit voids the stamp of its records, which keeps them as leaves: its packets stay stamped.
+        TsfDocument doc = load("video.tsf");
+        MediaClip clip;
+        QVERIFY(MediaClip::parse(doc.webcam, clip));
+        KeyRecords recs = Recalc::normalized(doc.records);
+        for (int i = 0; i < recs.size(); ++i)
+            recs[i].tag = quint32(i + 1);
+        const KeyRecords before = recs;
+        Editing::deleteRange(recs, 120, 124);
+        Stamps::follow(doc.stamps, before, recs);
+        QVERIFY(!doc.stamps[0].voided && !doc.stamps[1].voided && doc.stamps[2].voided);
+        QVERIFY(!doc.stamps[2].parts.isEmpty());
+        doc.records = recs;
+        Stamps::Report r = reportWith(doc, clip);
+        QCOMPARE(r.status, Stamps::Report::Status::Partial);
+        QCOMPARE(r.bad, 0);
+        QCOMPARE(r.voided, 1);
+        QCOMPARE(r.confirmed, 89);
+        QCOMPARE(r.packetsStamped, 206);
+        // Through the file.
+        const TsfDocument back = Tsf::parse(Tsf::serialize(doc, true));
+        QCOMPARE(reportWith(back, clip).packetsStamped, 206);
     }
 };
 
