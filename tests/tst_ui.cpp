@@ -777,6 +777,9 @@ private slots:
         w.showVideo();
         QVERIFY(!w.m_video->isLive()); // nothing recorded: no camera
         QVERIFY(!w.m_video->m_message.isEmpty());
+        QVERIFY(!w.m_video->m_play->isEnabled()); // and nothing to play, seek or save
+        QVERIFY(!w.m_video->m_slider->isEnabled());
+        QVERIFY(!w.m_video->m_save->isEnabled());
         HookEvent e;
         e.timeUs = 1000;
         e.flags = quint32('A') << 16 | 'A' | KeyRecord::HasChar;
@@ -803,6 +806,8 @@ private slots:
         w.setDocument(doc, QStringLiteral("v"), false);
         QVERIFY(!cam.isRecording());
         QCOMPARE(w.m_cameraButton->text(), QStringLiteral("1:01"));
+        QVERIFY(w.m_video->m_play->isEnabled());
+        QVERIFY(w.m_video->m_slider->isEnabled());
         QVERIFY(w.m_cameraKey.contains(Look::colors().proofOk.name())); // green
         // Ts: OFF stops a recording.
         w.keyEvent(e);

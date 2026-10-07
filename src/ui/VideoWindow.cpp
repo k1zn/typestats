@@ -219,6 +219,14 @@ void VideoWindow::showTime(qint64 docUs)
         m_slider->setValue(int(std::clamp<qint64>((docUs - m_spanFromUs) / 1000, 0, m_slider->maximum())));
         updateTimeLabel(docUs);
     }
+    // Nothing recorded: nothing to play, seek or save.
+    const bool any = m_clip && !m_clip->isEmpty();
+    m_play->setEnabled(any);
+    m_slider->setEnabled(any);
+    m_time->setEnabled(any);
+    m_save->setEnabled(any);
+    if (!any)
+        m_play->setChecked(false);
     const auto [key, frame] = m_clip ? m_clip->videoFramesAt(docUs) : std::pair{-1, -1};
     if (frame < 0) {
         m_image = QImage();
