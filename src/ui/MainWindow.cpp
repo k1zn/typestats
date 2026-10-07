@@ -505,7 +505,8 @@ QWidget *MainWindow::createToolBar()
         m_cameraSave->setEnabled(!m_clip.isEmpty());
         // While recording: the recording of this document ends here; stopped: typing goes on recording it again.
         m_cameraStop->setText(m_cameraStopped ? tr("Продолжить запись камеры") : tr("Остановить запись камеры"));
-        m_cameraStop->setEnabled(m_cameraStopped ? (s.video || s.audio) : m_webcam->isRecording());
+        // Hidden when there is nothing to stop (a disabled item of the native style looks like doubled text).
+        m_cameraStop->setVisible(m_cameraStopped ? (s.video || s.audio) : m_webcam->isRecording());
     });
     auto toggle = [this](bool WebcamRecorder::Settings::*what, bool on) {
         WebcamRecorder::Settings s = m_webcam->settings();
@@ -2209,11 +2210,14 @@ void MainWindow::clear()
 void MainWindow::stopCamera(bool stop)
 {
     // Stopped: what was recorded stays in the document as it is (its packets are flushed as with "Выкл"); the keys
-    // typed after it have no video. Continued: from the next key, as at the start.
+    // typed after it have no video. Continued: at once while the capture is on (the document is being typed into),
+    // else from the next key.
     m_cameraStopped = stop;
 #ifdef TS_HAVE_WEBCAM
     if (stop)
         m_webcam->setCapture(false);
+    else if (m_capture->isChecked() && !m_doc.records.isEmpty())
+        m_webcam->setCapture(true);
     updateVideoMode();
 #endif
 }

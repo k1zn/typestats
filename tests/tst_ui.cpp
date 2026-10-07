@@ -804,7 +804,7 @@ private slots:
         QVERIFY(w.m_cameraKey.contains(Look::colors().proofBad.name())); // red
         // "Остановить запись камеры": the keys after it have no video; "Продолжить": from the next key again.
         emit w.m_cameraButton->menu()->aboutToShow();
-        QVERIFY(w.m_cameraStop->isEnabled());
+        QVERIFY(w.m_cameraStop->isVisible());
         w.m_cameraStop->trigger();
         QVERIFY(!cam.isRecording());
         e.timeUs += 100000;
@@ -813,10 +813,11 @@ private slots:
         emit w.m_cameraButton->menu()->aboutToShow();
         QCOMPARE(w.m_cameraStop->text(), QStringLiteral("Продолжить запись камеры"));
         w.m_cameraStop->trigger();
-        QVERIFY(!cam.isRecording());
-        e.timeUs += 100000;
-        w.keyEvent(e);
-        QVERIFY(cam.isRecording());
+        QVERIFY(cam.isRecording()); // at once: the document is being typed into
+        emit w.m_cameraButton->menu()->aboutToShow();
+        QVERIFY(w.m_cameraStop->isVisible());
+        QCOMPARE(w.m_cameraStop->text(), QStringLiteral("Остановить запись камеры"));
+        QVERIFY(w.m_cameraKey.contains(Look::colors().proofBad.name())); // red again
         w.m_cameraStop->trigger();
         // Another document: the camera waits again (not stopped any more); one with video shows it, green.
         w.clear();
