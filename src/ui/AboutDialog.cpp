@@ -49,10 +49,10 @@ AboutDialog::AboutDialog(QWidget *parent) : QDialog(parent)
 
     // In place of the original's links: whose program this is.
     auto *credits = new QLabel(
-        tr("<b>Typing statistics v%1</b><br>ремейк на Qt 6 для Windows, Linux и macOS<br><br>"
+        tr("<b>Typing statistics (%1)</b><br>ремейк на Qt 6 для Windows, Linux и macOS<br><br>"
            "Оригинал (2008–2016):<br><a href=\"https://klavogonki.ru/u/#/147900/\">Игорь В. Филимонов</a><br><br>"
-           "Ремейк (2026), версия %2:<br><a href=\"https://klavogonki.ru/u/#/600585/\">Эрик (kiZzn)</a>")
-            .arg(QCoreApplication::applicationVersion(), QStringLiteral(TS_REMAKE_VERSION)),
+           "Ремейк (2026):<br><a href=\"https://klavogonki.ru/u/#/600585/\">Эрик (kiZzn)</a>")
+            .arg(QStringLiteral(TS_VERSION)),
         this);
     credits->setWordWrap(true);
     credits->setOpenExternalLinks(true);

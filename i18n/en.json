@@ -232,7 +232,7 @@
   "Метки": "Stamps",
   "Метки ставят службы времени DigiCert, Sectigo, GlobalSign, Certum, SwissSign и Microsoft: они подтверждают, что записи были набраны в это время и не менялись позже. Наружу уходят только хэши, без вашего набранного текста. Включается в настройках.": "The stamps come from the time stamping services of DigiCert, Sectigo, GlobalSign, Certum, SwissSign and Microsoft: they confirm that the records were typed at that time and not changed later. Only hashes leave the computer, without the text you typed. Turned on in the settings.",
   "Метки ставят службы времени DigiCert, Sectigo, GlobalSign, Certum, SwissSign и Microsoft: они подтверждают, что записи были набраны в это время и не менялись позже. Наружу уходят только хэши, без вашего набранного текста.": "The stamps come from the time stamping services of DigiCert, Sectigo, GlobalSign, Certum, SwissSign and Microsoft: they confirm that the records were typed at that time and not changed later. Only hashes leave the computer, without the text you typed.",
-  "<b>Typing statistics v%1</b><br>ремейк на Qt 6 для Windows, Linux и macOS<br><br>Оригинал (2008–2016):<br><a href=\"https://klavogonki.ru/u/#/147900/\">Игорь В. Филимонов</a><br><br>Ремейк (2026), версия %2:<br><a href=\"https://klavogonki.ru/u/#/600585/\">Эрик (kiZzn)</a>": "<b>Typing statistics v%1</b><br>a Qt 6 remake for Windows, Linux and macOS<br><br>Original (2008–2016):<br><a href=\"https://klavogonki.ru/u/#/147900/\">Igor V. Filimonov</a><br><br>Remake (2026), version %2:<br><a href=\"https://klavogonki.ru/u/#/600585/\">Erik (kiZzn)</a>",
+  "<b>Typing statistics (%1)</b><br>ремейк на Qt 6 для Windows, Linux и macOS<br><br>Оригинал (2008–2016):<br><a href=\"https://klavogonki.ru/u/#/147900/\">Игорь В. Филимонов</a><br><br>Ремейк (2026):<br><a href=\"https://klavogonki.ru/u/#/600585/\">Эрик (kiZzn)</a>": "<b>Typing statistics (%1)</b><br>a Qt 6 remake for Windows, Linux and macOS<br><br>Original (2008–2016):<br><a href=\"https://klavogonki.ru/u/#/147900/\">Igor V. Filimonov</a><br><br>Remake (2026):<br><a href=\"https://klavogonki.ru/u/#/600585/\">Erik (kiZzn)</a>",
   "Запись камеры на этой системе пока не поддерживается": "Webcam recording is not supported on this system yet",
   "Запись звука на этой системе пока не поддерживается": "Sound recording is not supported on this system yet",
   "Устройство не найдено": "Device not found",
@@ -302,5 +302,8 @@
   "Свойства камеры": "Camera properties",
   "Поток видео: больше — чётче, но файл крупнее. Подбирается по размеру и частоте кадров, пока не поставлен свой": "Video bitrate: higher is sharper, but the file is larger. Chosen by the frame size and rate until you set your own",
   "авто": "auto",
-  "Подбирать поток по размеру и частоте кадров": "Choose the bitrate by the frame size and rate"
+  "Подбирать поток по размеру и частоте кадров": "Choose the bitrate by the frame size and rate",
+  "Продолжить запись камеры": "Resume camera recording",
+  "Остановить запись камеры": "Stop camera recording",
+  "Запись камеры остановлена: ▾ — продолжить": "Camera recording stopped: ▾ to resume"
 }

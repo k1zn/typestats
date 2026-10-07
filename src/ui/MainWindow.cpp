@@ -111,7 +111,7 @@ QIcon cameraIcon(const QColor &color, bool dot)
 
 QString appTitle()
 {
-    return QStringLiteral("Typing statistics v") + QCoreApplication::applicationVersion();
+    return QStringLiteral("Typing statistics (" TS_VERSION ")");
 }
 
 // A report-style list with grid lines (TListView, vsReport + GridLines + RowSelect).
@@ -494,6 +494,7 @@ QWidget *MainWindow::createToolBar()
     m_cameraVideo->setCheckable(true);
     m_cameraAudio = menu->addAction(tr("Записывать звук с микрофона"));
     m_cameraAudio->setCheckable(true);
+    m_cameraStop = menu->addAction(QString(), this, [this] { stopCamera(!m_cameraStopped); });
     menu->addSeparator();
     menu->addAction(tr("Свойства камеры…"), this, &MainWindow::videoProperties);
     m_cameraSave = menu->addAction(tr("Сохранить видео в WebM…"), this, &MainWindow::saveVideo);
@@ -502,6 +503,9 @@ QWidget *MainWindow::createToolBar()
         m_cameraVideo->setChecked(s.video);
         m_cameraAudio->setChecked(s.audio);
         m_cameraSave->setEnabled(!m_clip.isEmpty());
+        // While recording: the recording of this document ends here; stopped: typing goes on recording it again.
+        m_cameraStop->setText(m_cameraStopped ? tr("Продолжить запись камеры") : tr("Остановить запись камеры"));
+        m_cameraStop->setEnabled(m_cameraStopped ? (s.video || s.audio) : m_webcam->isRecording());
     });
     auto toggle = [this](bool WebcamRecorder::Settings::*what, bool on) {
         WebcamRecorder::Settings s = m_webcam->settings();
@@ -1436,7 +1440,7 @@ void MainWindow::keyEvent(const HookEvent &e)
 #ifdef TS_HAVE_WEBCAM
         // The camera records what is typed into this document: from its first key (a document only opened to be looked
         // at does not open the camera). It takes a moment to start: the first keys may come before the first frame.
-        if (m_webcam && m_capture->isChecked() && !m_webcam->isRecording())
+        if (m_webcam && m_capture->isChecked() && !m_cameraStopped && !m_webcam->isRecording())
             m_webcam->setCapture(true);
 #endif
     }
@@ -1952,6 +1956,7 @@ void MainWindow::setDocument(const TsfDocument &doc, const QString &title, bool 
     if (m_webcam) {
         // Another document (opened, cleared): the camera waits until it is typed into.
         m_webcam->setCapture(false);
+        m_cameraStopped = false;
         m_webcam->setClip(&m_clip);
         m_video->setClip(&m_clip);
         syncWebcamClock();
@@ -2201,6 +2206,18 @@ void MainWindow::clear()
 
 // --- the webcam (re/webcam.md) ---
 
+void MainWindow::stopCamera(bool stop)
+{
+    // Stopped: what was recorded stays in the document as it is (its packets are flushed as with "Выкл"); the keys
+    // typed after it have no video. Continued: from the next key, as at the start.
+    m_cameraStopped = stop;
+#ifdef TS_HAVE_WEBCAM
+    if (stop)
+        m_webcam->setCapture(false);
+    updateVideoMode();
+#endif
+}
+
 void MainWindow::syncWebcamClock()
 {
 #ifdef TS_HAVE_WEBCAM
@@ -2313,6 +2330,8 @@ void MainWindow::updateCameraButton()
     } else if (!m_clip.isEmpty()) {
         color = c.proofOk;
         hint = tr("В записи есть видео (%1)").arg(text);
+    } else if (m_cameraStopped && (s.video || s.audio)) {
+        hint = tr("Запись камеры остановлена: ▾ — продолжить");
     } else if (s.video || s.audio) {
         hint = s.video ? tr("Камера включится, когда начнётся набор") : tr("Микрофон включится, когда начнётся набор");
     } else {

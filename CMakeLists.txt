@@ -1,11 +1,10 @@
 cmake_minimum_required(VERSION 3.21)
 # macOS: the oldest system Qt 6.8 runs on; CGPreflightListenEventAccess needs 10.15.
 set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum macOS version")
-project(TypingStatistics VERSION 1.43 LANGUAGES C CXX)
-# The version shown: the original's, which the remake reproduces.
-set(TS_VERSION "1.43c")
-# The version of the remake itself (the "About" window; the release tags are v<it>).
-set(TS_REMAKE_VERSION "1.1.0")
+project(TypingStatistics VERSION 1.2.0 LANGUAGES C CXX)
+# The version of the remake (the release tags are v<it>); shown everywhere as "re-<it>".
+set(TS_REMAKE_VERSION "${PROJECT_VERSION}")
+set(TS_VERSION "re-${TS_REMAKE_VERSION}")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -151,7 +150,7 @@ target_link_libraries(tsui PUBLIC tscore tsplatform Qt6::Widgets Qt6::Network QX
 if(TS_WEBCAM)
     target_link_libraries(tsui PUBLIC tsmedia)
 endif()
-target_compile_definitions(tsui PRIVATE TS_REMAKE_VERSION="${TS_REMAKE_VERSION}")
+
 
 qt_add_executable(TypingStatistics WIN32 MACOSX_BUNDLE src/main.cpp resources/resources.qrc)
 if(WIN32)
@@ -166,11 +165,12 @@ elseif(APPLE)
         MACOSX_BUNDLE_GUI_IDENTIFIER org.typingstatistics.TypingStatistics
         MACOSX_BUNDLE_BUNDLE_NAME "Typing statistics"
         MACOSX_BUNDLE_ICON_FILE app.icns
-        MACOSX_BUNDLE_SHORT_VERSION_STRING ${TS_VERSION}
+        MACOSX_BUNDLE_SHORT_VERSION_STRING ${TS_REMAKE_VERSION}
         MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
         MACOSX_BUNDLE_COPYRIGHT "Typing statistics: Igor V. Filimonov, 2016. Qt port.")
 endif()
 target_compile_definitions(TypingStatistics PRIVATE TS_VERSION="${TS_VERSION}")
+target_compile_definitions(tsui PRIVATE TS_VERSION="${TS_VERSION}")
 target_link_libraries(TypingStatistics PRIVATE tsui)
 
 # --- installation ---

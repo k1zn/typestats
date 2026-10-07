@@ -41,6 +41,7 @@
 #include <QSpinBox>
 #include <QCheckBox>
 #include <QLineEdit>
+#include <QMenu>
 #include <QScrollBar>
 #include <QSplitter>
 #include <QSettings>
@@ -164,7 +165,7 @@ private slots:
         QVERIFY(w.m_legend->isVisible());
         // The capture state goes first in the title: it is what the task bar shows. An opened file switches
         // recording off (LoadTsf).
-        QVERIFY(w.windowTitle().startsWith(QStringLiteral("Ts: OFF - Typing statistics v")));
+        QVERIFY(w.windowTitle().startsWith(QStringLiteral("Ts: OFF - Typing statistics (re-")));
         QVERIFY(w.windowTitle().endsWith(QStringLiteral(" - обыка.tsf")));
         w.m_capture->setChecked(true);
         QVERIFY(w.windowTitle().startsWith(QStringLiteral("Ts: ON - ")));
@@ -801,7 +802,23 @@ private slots:
         QVERIFY(w.m_video->isLive());
         QCOMPARE(w.m_cameraButton->text(), QStringLiteral("0:00"));
         QVERIFY(w.m_cameraKey.contains(Look::colors().proofBad.name())); // red
-        // Another document: the camera waits again; one with video shows it, green.
+        // "Остановить запись камеры": the keys after it have no video; "Продолжить": from the next key again.
+        emit w.m_cameraButton->menu()->aboutToShow();
+        QVERIFY(w.m_cameraStop->isEnabled());
+        w.m_cameraStop->trigger();
+        QVERIFY(!cam.isRecording());
+        e.timeUs += 100000;
+        w.keyEvent(e);
+        QVERIFY(!cam.isRecording());
+        emit w.m_cameraButton->menu()->aboutToShow();
+        QCOMPARE(w.m_cameraStop->text(), QStringLiteral("Продолжить запись камеры"));
+        w.m_cameraStop->trigger();
+        QVERIFY(!cam.isRecording());
+        e.timeUs += 100000;
+        w.keyEvent(e);
+        QVERIFY(cam.isRecording());
+        w.m_cameraStop->trigger();
+        // Another document: the camera waits again (not stopped any more); one with video shows it, green.
         w.clear();
         QVERIFY(!cam.isRecording());
         QVERIFY(!w.m_video->isLive());
