@@ -55,7 +55,8 @@ public:
     // At the first start: offers to open .tsf files in the program by a double click (asked once). An association
     // of this program whose exe has moved is brought up to date silently.
     void offerFileAssociation();
-    // Opens a form by name (`--show NAME`, for screenshots): settings, extra, hist, hist-fingers, hist-extra, kbd, about, input.
+    // Opens a form by name (`--show NAME`, for screenshots): settings, extra, hist, hist-fingers, hist-extra, kbd, about, input,
+    // video, video-props.
     void showForm(const QString &name);
 
 protected:

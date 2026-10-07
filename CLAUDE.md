@@ -13,8 +13,13 @@ n-граммы и слова, зоны пальцев, оперативная с
 - стек — Qt 6 Widgets + C++;
 - старые `.tsf`/`.tsj` должны открываться (бинарная совместимость);
 - делаем Excel-экспорт (xlsx/csv), копирование с тегами, мультиязычность (ru/en);
-- видео (прикреплённый AVI, синхронный с клавограммой) было сделано через QtMultimedia и **убрано** (2026-10-05):
-  кнопки 20/21 на месте и всегда выключены; поля `AttachedVideo`/`VideoTimeShift` `.tsf` читаются и пишутся как есть;
+- видео оригинала (прикреплённый AVI) было сделано через QtMultimedia и **убрано** (2026-10-05); поля
+  `AttachedVideo`/`VideoTimeShift` `.tsf` читаются и пишутся как есть. Вместо него (2026-10-07, своё, `re/webcam.md`) —
+  **веб-камера**: по желанию (кнопка 21, ключи `Webcam*`) во время набора пишется камера (AV1, libaom realtime) и
+  микрофон (Opus) **внутрь `.tsf`** (строки `Webcam`/`WebcamData<i>`, Z85); «Сохранить блок» режет видео по времени
+  блока; кнопка 20 — картинка камеры / кадр левого края клавограммы, воспроизведение со звуком, WebM. Видео заверяется
+  метками времени вместе с записями (`re/stamps.md`). Захват — свои
+  бэкенды (Media Foundation через `LoadLibrary`, AVFoundation, V4L2 + PulseAudio через `dlopen`), без QtMultimedia;
 - сознательно выкидываем: «Запускать Ts на одном ядре». Регистрацию `.tsf` (оригинал писал её в реестр сам) порт
   делает по согласию: при первом запуске спрашивает один раз (`platform/FileAssociation`, все три ОС).
 - **метки времени записи** (2026-10-06, своё): по желанию (настройка `StampRecording`, выкл.); устройство — в
@@ -40,7 +45,11 @@ cd build && ctest
 ```
 
 Опции CMake: `TS_LRELEASE` (путь к `lrelease.exe`, если у Qt нет LinguistTools — статический Qt), `TS_SOFT_EXT80` (OFF; ON —
-программная 80-битная арифметика и на x86, чтобы проверить её golden-тестами).
+программная 80-битная арифметика и на x86, чтобы проверить её golden-тестами), `TS_WEBCAM` (ON; OFF — без кодеков,
+кнопки 20/21 выключены), `TS_DEPS_DIR` (папка с архивами libaom/opus, здесь `D:/Qt/src/deps`; иначе скачиваются),
+`TS_SYSTEM_CODECS` (OFF; ON — системные libaom/opus через pkg-config). libaom собирается своим вызовом CMake
+(`cmake/Media.cmake`, ExternalProject: он пишет свои флаги в глобальные `CMAKE_*_FLAGS*`), всегда Release; на MinGW
+кодеки — с `-Wa,-muse-unaligned-vector-move` (GCC не выравнивает стек Win64 под AVX2 — иначе падение).
 
 **Linux и macOS** — сделано, ждёт ручной проверки: `re/crossplatform.md` (решения, устройство бэкендов, сборка под
 Linux в Docker, список ручных проверок). Linux: нужны `xkbcommon` (обязательно), `xkbregistry`, `xkbcommon-x11` + `xcb-xkb`,
@@ -77,7 +86,7 @@ windeployqt --release --no-translations --no-opengl-sw --no-system-d3d-compiler 
 `Qt6Svg.dll`, `Qt6Network.dll` (были нужны QtMultimedia). С видео было ~54 МБ, zip ~24 МБ; без него не перемерено.
 Проверено запуском с `PATH` без Qt/MinGW.
 
-**Один exe** (`dist/TypingStatistics-single.exe`, ~17 МБ): статический qtbase 6.8.3 собран из исходников
+**Один exe** (`dist/TypingStatistics-single.exe`, ~20,7 МБ; без веб-камеры — 17,1): статический qtbase 6.8.3 собран из исходников
 (`D:\Qt\src`; установка `6.8.3\mingw_64_static_net` — `ci/windows/static-qt.sh`, с network для меток
 времени; прежняя `mingw_64_static_min` — без network). Конфигурация qtbase:
 `-DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Release -DFEATURE_optimize_size=ON -DFEATURE_static_runtime=ON`, выключены
@@ -93,7 +102,7 @@ cmake --build build-static-o2 --target TypingStatistics
 ```
 CI собирает так же (`ci/windows/static-qt.sh` — та же конфигурация qtbase плюс явные `FEATURE_system_*=OFF`).
 Предупреждения `-Wall -Wextra` включает сам CMakeLists — только для своих целей, не для QXlsx. В exe только системные DLL Windows; плагины — qwindows, qmodernwindowsstyle, qico. Вес: Qt Gui/Widgets/Core ~4 МБ
-каждый, libstdc++ 0,9, HarfBuzz 0,7, QXlsx 0,7.
+каждый, libstdc++ 0,9, HarfBuzz 0,7, QXlsx 0,7, кодеки камеры ~3,6 (libaom собирается `MinSizeRel` без AVX-512: −2,2 МБ, кадр 640×360 — 1,5 мс).
 
 **Сторонние библиотеки (vendored):**
 - `third_party/QXlsx` (MIT). В его `CMakeLists.txt` закомментирован `include(CPackConfig)`.
@@ -147,13 +156,21 @@ src/core/      только QtCore, тестируемо
   Der.*, Rsa.*        разбор/запись DER; проверка подписи RSA PKCS#1 v1.5 (Монтгомери) — для меток времени
   TimeStamp.*         RFC 3161 (`re/stamps.md`)
   Stamps.*            метки записи (`re/stamps.md`)
+  MediaClip.*         веб-камера (`re/webcam.md`): контейнер пакетов AV1/Opus во времени документа (`originUs`, `startUs`,
+                      `shiftMs`), `cut` с прероллом, `videoFramesAt`; `DocTime` — время документа `Σdt` и модели
+  Z85.*, WebmWriter.* Z85 для строк `.tsf`; экспорт клипа в WebM (ffprobe/ffmpeg читают)
   Ext80.h             80-битная x87-арифметика: `Ext` = `long double` там, где он x87 (GCC/Clang на x86), иначе
                       программный `Ext80` (arm64, MSVC); `kExtMilli` = 0.001L, `extFloor`/`extFabs`. Всё ядро и окна
                       считают «как оригинал» через `Ext`
 src/cli/tsstat.cpp  консольная утилита: `tsstat [--split MS] [--only-text] [--by-pauses] [--sel S L] [--text|--runs] f.tsf`
                     печатает «Параметр\tЗначение» как ListView2 (для дифф-стенда);
                     `--extra KIND [--avg] [--sort N] [--desc] [--pattern P] [--only S] [--any S] [--exclude S]` — список Form3;
-                    `--to-journal out.tsj f.tsf` — записи файла журналом; `--verify f.tsf` — метки времени
+                    `--to-journal out.tsj f.tsf` — записи файла журналом; `--verify f.tsf` — метки времени (и видео);
+                    `--extract-video out.webm f.tsf` — видео файла
+src/media/          библиотека `tsmedia` (при `TS_WEBCAM`): `Av1Codec` (libaom realtime: `cpu-used` 10, без задержки, ключ раз
+                    в 4 с), `OpusCodec` (моно 48 кГц, 16 кбит/с, ресемплинг), `Yuv`, `Capture` (Camera/Microphone: Windows —
+                    `CaptureWin.cpp`, Media Foundation через `LoadLibrary`; `mac/CaptureMac.mm`; `linux/CaptureLinux.cpp`),
+                    `AudioOut` (waveOut / AudioQueue / PulseAudio)
 src/platform/       библиотека `tsplatform`. `KeyboardHook.h`: сигналы `key(HookEvent{timeUs, flags, ch, chars, firstCh,
                     window, ownWindow})` в потоке GUI, `failed(причина)`, `started()`; статические `toUnicode`/`clearDeadKey`/
                     `capsLock` (преобразование раскладки), `layoutKeyName` (Tkbd), `foregroundWindow()/foregroundTitle()/
@@ -232,6 +249,10 @@ src/ui/
                       однократный перенос реестра оригинала (флаг `RegistryImported`, вызывается из main)
   TextInputWindow.*   Form9 «Ввод текста» (F4; Esc — скрыть, F2 — очистить); набор в нём записывается
   AboutDialog.*       Form7 «О программе» (меню кнопки «Справка»)
+  WebcamRecorder.*    веб-камера во время записи: устройства, кодеры в своём потоке, время кадра по таймеру хука
+                      (`Recorder::timerUs`: `T = Σdt + (s − таймер)`), пакеты в `MainWindow::m_clip`
+  VideoWindow.*       кнопка 20: картинка камеры (при записи и до неё), кадр левого края клавограммы, ▶ (клавограмма в
+                      реальном времени, звук), 💾 WebM; `VideoPropertiesDialog.*` — кнопка 21
   StampRecorder.*     метки времени во время записи: когда брать, отправка (QtNetwork; `setSend` — подмена в
                       тестах), приём в документ; MainWindow: `beginEdit`/`endEdit` (метки следуют правке),
                       `updateProof`/`showProof` (кнопка слева от кнопки темы и окно подробностей)
@@ -262,7 +283,8 @@ tests/tst_ui.cpp    главное окно без экрана (ctest став�
                     открытие и отрисовка, удалить/отменить/копировать, метки, связка графика с клавограммой и мышь на
                     графике, запись через `keyEvent`, настройки, Form3, Form4, Tkbd, пресеты, выключение перехвата,
                     экспорт, свёрнутый график, преобразование раскладки, кнопки панелей (и выключенные кнопки видео),
-                    заголовок. Тест — друг окон (`friend class TstUi`). Окна собраны в
+                    заголовок, веб-камера (`webcam`: поддельные кадры, время, блок, правка), метки в блоке
+                    (`blockKeepsStamps`). Тест — друг окон (`friend class TstUi`). Окна собраны в
                     библиотеку `tsui` (src/ui + src/platform + src/export), ресурсы — в самих exe
 tests/tst_recorder.cpp Recorder: записи и dt, игнорируемые события, хоткеи, автокомментарии, мёртвые клавиши, оперативная
                     статистика
@@ -276,6 +298,8 @@ tests/tst_stamps.cpp ядро меток времени (`re/stamps.md`) на `t
 tests/tst_platform.cpp  все ОС: таблицы кодов (scan↔VK, evdev, Mac), разбор ответов sway/Hyprland/GNOME/KDE, i3-IPC
 tests/tst_evdev.cpp только Linux: XkbKeyboard (символы, флаги, группы, мёртвые клавиши, golden-записи через перевод),
                     EvdevReader на FIFO с поддельным sysfs
+tests/tst_clip.cpp  контейнер камеры, Z85, обрезка, строки `.tsf`, WebM
+tests/tst_media.cpp кодеки (AV1 туда-обратно, скорость, Opus), YUV, WebM из настоящего AV1, список устройств
 tests/tst_ext80.cpp Ext80 против аппаратного x87: 3,4 млн операций побитно (на x86; иначе только самопроверки)
 tests/tst_perf.cpp  стенд производительности (не в ctest; `re/perf.md`)
 tests/golden/       реальные .tsf пользователя с рабочего стола (801, 824, обыка, цифры13зн)
@@ -484,7 +508,7 @@ python re/scripts/diffstand.py файл --journal                               
    не обрезаются по высоте; кнопка «Дополнительная статистика» в Form4 открывает и Form3; кнопка на панели задач
    прячется только у свёрнутого в трей окна; экспорт пишет файл (xlsx/csv) и открывает его, а не управляет Excel по OLE;
    подписи Tkbd вне Windows — по US-раскладке; «Преобразовать в текущую раскладку» не трогает VK_PACKET; видео
-   (Form5, Form6) нет — кнопки 20/21 всегда выключены (`re/video.md` — справка по оригиналу).
+   (Form5, Form6) оригинала нет (`re/video.md` — справка); кнопки 20/21 — веб-камера порта (`re/webcam.md`).
    Ремейк помечен (2026-10-05): иконка и баннер Form7 — цвета оригинала с переставленными красным и синим каналами
    (синие тона); вместо ссылок Form7 (сайт, форум, письма…) — текст об авторах оригинала и ремейка. Версия — `1.43c`, как
    у оригинала (`TS_VERSION` в CMakeLists; `project()` — 1.43); заголовок окна тот же, что у оригинала.
@@ -517,6 +541,9 @@ python re/scripts/diffstand.py файл --journal                               
      Стенд: `scrollFrames` (кадр при любом `QT_SCALE_FACTOR`, `TS_PERF_STYLE=Fusion`; на Windows offscreen — только с
      `QT_QPA_FONTDIR=C:/Windows/Fonts`), `numbers`, `macPath`; статический Qt — `tst_perf` на `minimal:enable_fonts`.
      Хук Windows в потоке — сделан (выше); один exe собирается с `-O2` (Release; +0,45 МБ, ядро быстрее на 25–45 %);
+   - **веб-камера** (2026-10-07, `re/webcam.md`, `re/stamps.md`): сделано и покрыто тестами на Windows
+     (поддельная камера); **не проверено на живой камере** (у машины разработки камеры нет), Linux и macOS не собирались
+     ни разу (Docker не поднялся, macOS — только CI). Ручные проверки — `re/webcam.md`, `re/crossplatform.md`;
    - не проверено руками (пользователь пока не пробовал): запись в чужих окнах, мышь графика и клавограммы, панели,
      трей, Form9 (набор в нём должен записываться), импорт настроек оригинала; «Преобразовать в текущую раскладку» на
      настоящей раскладке (ToUnicodeEx).

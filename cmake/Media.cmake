@@ -37,13 +37,15 @@ if(MINGW AND CMAKE_C_COMPILER_ID STREQUAL "GNU")
     set(ts_codec_flags "-Wa,-muse-unaligned-vector-move")
 endif()
 
-# libaom: its own CMake run (it writes its options and warnings into the global compiler flags), always optimized.
-# The realtime encoder and the decoder, 8 bits, nothing else.
+# libaom: its own CMake run (it writes its options and warnings into the global compiler flags), optimized for size
+# (the realtime encoder at speed 10 is far ahead of the camera all the same; the single exe is 2 MB smaller), without
+# AVX-512. The realtime encoder and the decoder, 8 bits, nothing else.
 ts_archive_url(aom_url libaom-${TS_AOM_VERSION}.tar.gz https://storage.googleapis.com/aom-releases)
 set(aom_prefix ${CMAKE_BINARY_DIR}/_deps/aom)
 set(aom_lib ${aom_prefix}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}aom${CMAKE_STATIC_LIBRARY_SUFFIX})
 set(aom_args
-    -DCMAKE_BUILD_TYPE=Release
+    -DCMAKE_BUILD_TYPE=MinSizeRel
+    -DENABLE_AVX512=0
     -DCMAKE_INSTALL_PREFIX=${aom_prefix}
     -DCMAKE_INSTALL_LIBDIR=lib
     -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}

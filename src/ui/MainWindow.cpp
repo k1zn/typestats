@@ -655,6 +655,10 @@ void MainWindow::showForm(const QString &name)
         showTextInput();
     else if (name == QLatin1String("kbd"))
         editFingerZones();
+    else if (name == QLatin1String("video"))
+        showVideo();
+    else if (name == QLatin1String("video-props"))
+        videoProperties();
     else if (name.startsWith(QLatin1String("hist"))) {
         showHistograms();
         if (name == QLatin1String("hist-fingers"))
