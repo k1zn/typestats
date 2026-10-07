@@ -214,7 +214,14 @@ elseif(TS_FILES)
 endif()
 # Qt's own texts in Russian (Yes/No/Cancel/Close, the file dialog outside Windows): the program is a single file,
 # so the translation is inside it. A static Qt has no translations: take them from a shared one (TS_QT_TRANSLATIONS).
-set(TS_QT_TRANSLATIONS "${QT6_INSTALL_PREFIX}/${QT6_INSTALL_TRANSLATIONS}" CACHE PATH "Qt's translations (qtbase_ru.qm)")
+set(ts_qt_translations "${QT6_INSTALL_PREFIX}/${QT6_INSTALL_TRANSLATIONS}")
+if(NOT EXISTS "${ts_qt_translations}/qtbase_ru.qm" AND TS_LRELEASE)
+    # The shared Qt whose lrelease builds a static one's program has them (<qt>/bin/lrelease -> <qt>/translations).
+    get_filename_component(ts_lrelease_qt "${TS_LRELEASE}" DIRECTORY)
+    get_filename_component(ts_lrelease_qt "${ts_lrelease_qt}" DIRECTORY)
+    set(ts_qt_translations "${ts_lrelease_qt}/translations")
+endif()
+set(TS_QT_TRANSLATIONS "${ts_qt_translations}" CACHE PATH "Qt's translations (qtbase_ru.qm)")
 if(EXISTS "${TS_QT_TRANSLATIONS}/qtbase_ru.qm")
     qt_add_resources(TypingStatistics qt_i18n PREFIX /i18n BASE "${TS_QT_TRANSLATIONS}"
                      FILES "${TS_QT_TRANSLATIONS}/qtbase_ru.qm")

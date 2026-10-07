@@ -74,6 +74,13 @@
 
 namespace {
 
+// The text of the time stamps' button: its colour, bold, little padding (the toolbar is tight).
+QString proofStyle(const QColor &color)
+{
+    return QStringLiteral("QToolButton { color: %1; font-weight: bold; padding: 0px 2px; }").arg(color.name());
+}
+
+
 QString appTitle()
 {
     return QStringLiteral("Typing statistics v") + QCoreApplication::applicationVersion();
@@ -147,7 +154,7 @@ MainWindow::MainWindow(QWidget *parent)
     // is (stampForSave), and video that goes on after it is not worth a question when closing.
     connect(m_stamps, &StampRecorder::changed, this, &MainWindow::updateProof);
     updateTitle();
-    setMinimumWidth(220);
+
 #ifdef TS_HAVE_WEBCAM
     // The webcam (re/webcam.md): recording follows the capture once it starts (startCapture).
     m_webcam = new WebcamRecorder(this);
@@ -199,7 +206,9 @@ MainWindow::MainWindow(QWidget *parent)
     left->setStretchFactor(1, 1);
     left->setStretchFactor(2, 0);
     left->setSizes({120, 192, 200});
-    left->setMinimumHeight(150);
+    // The least the panes are usable at: two lines of text, the graph, the nine tracks of the klavogram with their
+    // labels (its minimumSizeHint). The window holds them all (the graph can still be folded to its scroll bar by hand).
+    m_text->setMinimumHeight(40);
 
     // Right: main statistics and the keys of the visible part of the klavogram.
     m_stats = reportList({tr("Параметр"), tr("Значение")}, font());
@@ -213,6 +222,8 @@ MainWindow::MainWindow(QWidget *parent)
     m_keys->horizontalHeader()->resizeSection(1, 80);
     m_keys->horizontalHeader()->setStretchLastSection(true);
     m_keys->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    m_keys->setMinimumHeight(m_keys->horizontalHeader()->sizeHint().height() + 2 * m_keys->frameWidth()
+                             + 3 * m_keys->verticalHeader()->defaultSectionSize()); // three keys
     auto *right = new QWidget;
     auto *rightLayout = new QVBoxLayout(right);
     rightLayout->setContentsMargins(0, 0, 0, 0);
@@ -229,6 +240,7 @@ MainWindow::MainWindow(QWidget *parent)
     split->setSizes({652, 218});
     right->setMinimumWidth(100);
     m_leftSplit = left;
+    updatePanesMinimum();
     connect(left, &QSplitter::splitterMoved, this, &MainWindow::graphPaneResized);
     m_mainSplit = split;
     root->addWidget(split, 1);
@@ -440,6 +452,12 @@ QWidget *MainWindow::createToolBar()
     m_proofButton->hide();
     connect(m_proofButton, &QToolButton::clicked, this, &MainWindow::showProof);
     bar->installEventFilter(this);
+    // The window is no narrower than the toolbar with the widest text of the time stamps: nothing overlaps.
+    m_proofButton->setText(QStringLiteral("✓ 100 % !"));
+    m_proofButton->setStyleSheet(proofStyle(Qt::black));
+    const int proofWidth = m_proofButton->sizeHint().width();
+    bar->setMinimumWidth(editZones->geometry().right() + 1 + kCornerGap + proofWidth + kCornerGap
+                         + m_themeButton->width() + kCornerMargin);
     return bar;
 }
 
@@ -629,6 +647,7 @@ void MainWindow::applySettings()
     m_input->setFontSize(textFont);
     m_tray->setVisible(s.value(QStringLiteral("MinimizeToTray"), false).toBool() && QSystemTrayIcon::isSystemTrayAvailable());
     m_klav->setFontSize(std::clamp(s.value(QStringLiteral("KlavogrFontSize"), 9).toInt(), 8, 24));
+    updatePanesMinimum();
     m_keyDigits = std::clamp(s.value(QStringLiteral("DlitDigits"), 3).toInt(), 0, 3);
     m_live->setSpeedRange(s.value(QStringLiteral("opLoSpeed"), 200).toInt(), s.value(QStringLiteral("opHiSpeed"), 500).toInt());
     m_globalOnOff = s.value(QStringLiteral("GlobalOnOff"), true).toBool();
@@ -697,6 +716,9 @@ bool MainWindow::askToSave()
     QMessageBox box(QMessageBox::Question, appTitle(), tr("Записи не сохранены. Сохранить их перед выходом?"),
                     QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, this);
     box.setDefaultButton(QMessageBox::Save);
+    box.button(QMessageBox::Save)->setText(tr("Сохранить"));
+    box.button(QMessageBox::Discard)->setText(tr("Не сохранять"));
+    box.button(QMessageBox::Cancel)->setText(tr("Отмена"));
     auto *never = new QCheckBox(tr("Больше не спрашивать"), &box);
     box.setCheckBox(never);
     const int answer = box.exec();
@@ -765,11 +787,11 @@ void MainWindow::updateProof()
             hint += u'\n' + tr("Метку времени получить не удалось: %1").arg(m_stamps->lastError());
         }
         m_proofButton->setText(text);
-        m_proofButton->setStyleSheet(QStringLiteral("QToolButton { color: %1; font-weight: bold; }").arg(color.name()));
+        m_proofButton->setStyleSheet(proofStyle(color));
         m_proofButton->setToolTip(hint + u'\n' + tr("Подробнее — по щелчку"));
         m_proofButton->adjustSize();
-        m_proofButton->move(m_themeButton->x() - m_proofButton->width() - 4, 4);
         m_proofButton->show();
+        placeCornerButtons();
     });
 }
 
@@ -1377,6 +1399,12 @@ void MainWindow::showLiveStats()
 void MainWindow::resizeEvent(QResizeEvent *e)
 {
     QWidget::resizeEvent(e);
+    // A smaller window takes the height from the graph first (it stretches): below its least the text and the
+    // klavogram give way instead - the graph folds only by hand.
+    if (!m_panesPending && !m_graphFolded && m_leftSplit->sizes().value(1) < kGraphMinHeight) {
+        const QList<int> sizes = m_leftSplit->sizes();
+        fitGraph(sizes.value(0), sizes.value(2));
+    }
     updateKeyList(); // the list holds another number of rows
     m_legend->keepInside();
     m_axisPanel->keepInside();
@@ -1387,22 +1415,38 @@ void MainWindow::layOutPanes()
     m_panesPending = false;
     const QList<int> sizes = m_leftSplit->sizes();
     const int total = sizes.value(0) + sizes.value(1) + sizes.value(2);
-    int text = std::max(20, m_panes.text), klav = std::max(20, m_panes.klav);
+    const int textMin = m_text->minimumHeight(), klavMin = m_klav->minimumSizeHint().height();
+    int text = std::max(textMin, m_panes.text), klav = std::max(klavMin, m_panes.klav);
     if (m_panes.graphFolded) {
         const int bar = m_graphScroll->sizeHint().height();
-        m_leftSplit->setSizes({text, bar, std::max(20, total - text - bar)});
+        m_leftSplit->setSizes({text, bar, std::max(klavMin, total - text - bar)});
     } else {
-        // The panes as they were; on a smaller window the text and the klavogram give way, so that the graph keeps the
-        // least it is shown at (graphPaneResized folds it below).
-        const int room = total - kGraphMinHeight;
-        if (text + klav > room) {
-            const int both = std::max(40, room);
-            text = std::max(20, int(qint64(both) * text / (text + klav)));
-            klav = std::max(20, both - text);
-        }
-        m_leftSplit->setSizes({text, std::max(kGraphMinHeight, total - text - klav), klav});
+        fitGraph(text, klav);
     }
     graphPaneResized();
+}
+
+// The left column holds the text, the graph shown and the klavogram at their least (the klavogram's grows with its font).
+void MainWindow::updatePanesMinimum()
+{
+    m_leftSplit->setMinimumHeight(m_text->minimumHeight() + kGraphMinHeight + m_klav->minimumSizeHint().height()
+                                  + 2 * m_leftSplit->handleWidth());
+}
+
+// The panes with the text and the klavogram as tall as asked; on a smaller window they give way, so that the graph keeps
+// the least it is shown at (graphPaneResized folds it below).
+void MainWindow::fitGraph(int text, int klav)
+{
+    const QList<int> sizes = m_leftSplit->sizes();
+    const int total = sizes.value(0) + sizes.value(1) + sizes.value(2);
+    const int textMin = m_text->minimumHeight(), klavMin = m_klav->minimumSizeHint().height();
+    const int room = total - kGraphMinHeight;
+    if (text + klav > room) {
+        const int both = std::max(textMin + klavMin, room);
+        text = std::clamp(int(qint64(both) * text / (text + klav)), textMin, std::max(textMin, both - klavMin));
+        klav = std::max(klavMin, both - text);
+    }
+    m_leftSplit->setSizes({text, std::max(kGraphMinHeight, total - text - klav), klav});
 }
 
 void MainWindow::showEvent(QShowEvent *e)
@@ -1418,12 +1462,17 @@ void MainWindow::showEvent(QShowEvent *e)
     m_legend->keepInside();
 }
 
+// The theme and the time stamps in the right corner of the toolbar.
+void MainWindow::placeCornerButtons()
+{
+    m_themeButton->move(m_themeButton->parentWidget()->width() - m_themeButton->width() - kCornerMargin, 4);
+    m_proofButton->move(m_themeButton->x() - m_proofButton->width() - kCornerGap, 4);
+}
+
 bool MainWindow::eventFilter(QObject *o, QEvent *e)
 {
-    if (m_themeButton && o == m_themeButton->parentWidget() && e->type() == QEvent::Resize) {
-        m_themeButton->move(m_themeButton->parentWidget()->width() - m_themeButton->width() - 6, 4);
-        m_proofButton->move(m_themeButton->x() - m_proofButton->width() - 4, 4);
-    }
+    if (m_themeButton && o == m_themeButton->parentWidget() && e->type() == QEvent::Resize)
+        placeCornerButtons();
     // The wheel over the graph moves its scroll bar by a small step.
     if (o == m_graph && e->type() == QEvent::Wheel) {
         const int delta = static_cast<QWheelEvent *>(e)->angleDelta().y();

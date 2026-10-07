@@ -58,9 +58,16 @@ KlavogramWidget::KlavogramWidget(QWidget *parent) : QWidget(parent), m_font(Look
     setContextMenuPolicy(Qt::PreventContextMenu);
 }
 
+QSize KlavogramWidget::minimumSizeHint() const
+{
+    const int text = QFontMetrics(m_font).height();
+    return {50, text + kTracks * (text + 1)};
+}
+
 void KlavogramWidget::setFontSize(int points)
 {
     m_font.setPixelSize(Look::pointsToPixels(points));
+    updateGeometry();
     update();
 }
 

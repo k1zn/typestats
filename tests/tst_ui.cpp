@@ -397,7 +397,7 @@ private slots:
         w.show();
         QVERIFY(w.openFile(golden("824.tsf")));
         QWidget *bar = w.m_themeButton->parentWidget();
-        QCOMPARE(w.m_themeButton->geometry().right(), bar->width() - 7);
+        QCOMPARE(w.m_themeButton->geometry().right(), bar->width() - MainWindow::kCornerMargin - 1);
         QVERIFY(!w.m_themeButton->isChecked() && !Look::isDark());
         const QSet<QRgb> light = foregrounds(w.m_text->document());
         QVERIFY(light.contains(QColor(255, 0, 0).rgb())); // erased characters
@@ -436,6 +436,27 @@ private slots:
         Look::applySavedTheme();
         QVERIFY(Look::isDark());
         Look::setDark(false);
+    }
+
+    void minimumSize()
+    {
+        // The window is no smaller than what holds everything: the toolbar with the widest text of the time stamps,
+        // the panes at their least with the graph shown, the statistics and three keys.
+        MainWindow w;
+        w.show();
+        w.m_proofButton->setText(QStringLiteral("✓ 100 % !"));
+        w.m_proofButton->adjustSize();
+        w.m_proofButton->show();
+        w.placeCornerButtons();
+        w.resize(100, 100);
+        QCoreApplication::processEvents();
+        QCOMPARE(w.size(), w.minimumSizeHint());
+        QVERIFY(w.m_proofButton->x() > w.m_newZonesButton->geometry().right() + 23); // the button right of it too
+        QVERIFY(w.m_proofButton->geometry().right() < w.m_themeButton->x());
+        QVERIFY(w.m_themeButton->geometry().right() < w.m_themeButton->parentWidget()->width());
+        QVERIFY(w.m_graph->isVisible());
+        QVERIFY(w.m_graph->height() > 50);
+        QVERIFY(w.m_keys->height() >= w.m_keys->minimumHeight());
     }
 
     void panelButtons()

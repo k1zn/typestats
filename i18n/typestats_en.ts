@@ -952,6 +952,14 @@ Copy the command, paste it into a terminal and enter your password. This is need
         <source>Последнее набранное и снятое ждёт следующей метки</source>
         <translation>The latest typed and filmed waits for the next stamp</translation>
     </message>
+    <message>
+        <source>Не сохранять</source>
+        <translation>Don't save</translation>
+    </message>
+    <message>
+        <source>Отмена</source>
+        <translation>Cancel</translation>
+    </message>
 </context>
 <context>
     <name>QObject</name>

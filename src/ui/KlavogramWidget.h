@@ -17,6 +17,8 @@ public:
     void setModel(const TextModel *m);
     void setZones(const FingerZones &zones);
     void setFontSize(int points);
+    // The time scale and nine tracks tall enough for the labels of the keys.
+    QSize minimumSizeHint() const override;
     // Puts the element at a text position to the left edge (FUN_00414500).
     void scrollToPosition(int textPos);
     // Set by the graph; viewChanged() is not emitted.

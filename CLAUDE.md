@@ -220,7 +220,11 @@ src/ui/
                       (`graphPaneResized`, `m_graphFolded`). `showForm(name)` — для `--show NAME` (снимки форм):
                       settings, extra, hist, hist-fingers, hist-extra, kbd, about, input.
                       «Преобразовать в текущую раскладку» — `convertLayout` (`m_toUnicode` подменяется в тестах).
-                      Панели: `showAxisPanel`/`showLegend` только открывают, `updatePanelButtons`, `m_legendOpen`
+                      Панели: `showAxisPanel`/`showLegend` только открывают, `updatePanelButtons`, `m_legendOpen`.
+                      Минимальный размер окна — всё влезает (своё): ширина — тулбар с самой длинной подписью меток
+                      «✓ 100 % !» (~894 px, у оригинала окно 878), высота — правая колонка (статистика + 3 клавиши) или
+                      левая (текст 40, график 100, клавограмма с подписями — `KlavogramWidget::minimumSizeHint`);
+                      при сжатии уступают текст и клавограмма (`fitGraph`), график сворачивается только руками
   GraphWidget.*       PaintBox1 по `re/graph_paint.md`: ось Y (три подписи на линию), 8 серий, строка текста, линейка
                       (двойной правый клик), курсор (двойной клик), мышь (ЛКМ — сдвиг, ПКМ — масштаб, СКМ — быстрый сдвиг,
                       ЛКМ+ПКМ — масштаб клавограммы), `setKlavogramRange`/`pullKlavogramRange` (FUN_0043a918),
