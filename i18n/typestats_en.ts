@@ -1275,18 +1275,6 @@ The camera starts recording with the first key.</translation>
         <translation>Camera</translation>
     </message>
     <message>
-        <source>Экономно: 320×240, 10 к/с (~0,4 МБ/мин)</source>
-        <translation>Economy: 320×240, 10 fps (~0.4 MB/min)</translation>
-    </message>
-    <message>
-        <source>Обычно: 640×360, 15 к/с (~0,9 МБ/мин)</source>
-        <translation>Normal: 640×360, 15 fps (~0.9 MB/min)</translation>
-    </message>
-    <message>
-        <source>Хорошо: 640×480, 24 к/с (~1,9 МБ/мин)</source>
-        <translation>Good: 640×480, 24 fps (~1.9 MB/min)</translation>
-    </message>
-    <message>
         <source>Качество</source>
         <translation>Quality</translation>
     </message>
@@ -1367,8 +1355,20 @@ The camera starts recording with the first key.</translation>
         <translation>Choose the bitrate by the frame size and rate</translation>
     </message>
     <message>
-        <source>Запишется %1×%2: картинка камеры (%3×%4) целиком, в её пропорциях</source>
-        <translation>Recorded as %1×%2: the camera's picture (%3×%4) whole, in its proportions</translation>
+        <source>Экономно: %1, 10 к/с (~0,4 МБ/мин)</source>
+        <translation>Economy: %1, 10 fps (~0.4 MB/min)</translation>
+    </message>
+    <message>
+        <source>Обычно: %1, 15 к/с (~0,9 МБ/мин)</source>
+        <translation>Normal: %1, 15 fps (~0.9 MB/min)</translation>
+    </message>
+    <message>
+        <source>Хорошо: %1, 24 к/с (~1,9 МБ/мин)</source>
+        <translation>Good: %1, 24 fps (~1.9 MB/min)</translation>
+    </message>
+    <message>
+        <source>запишется %1×%2</source>
+        <translation>recorded as %1×%2</translation>
     </message>
 </context>
 <context>

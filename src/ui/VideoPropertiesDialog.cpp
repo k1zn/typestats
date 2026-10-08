@@ -52,16 +52,11 @@ VideoPropertiesDialog::VideoPropertiesDialog(QWidget *parent) : QDialog(parent)
     form->addRow(QString(), m_preview);
     connect(m_camera, &QComboBox::currentIndexChanged, this, &VideoPropertiesDialog::cameraChanged);
     m_quality = new QComboBox;
-    // Sizes in the file are for a person at a keyboard: a still scene takes less.
-    m_quality->addItem(tr("Экономно: 320×240, 10 к/с (~0,4 МБ/мин)"));
-    m_quality->addItem(tr("Обычно: 640×360, 15 к/с (~0,9 МБ/мин)"));
-    m_quality->addItem(tr("Хорошо: 640×480, 24 к/с (~1,9 МБ/мин)"));
-    m_quality->addItem(tr("Своё…"));
+    // The sizes - of the camera's picture in the quality's frame (updateSizes).
+    for (int i = 0; i < 4; ++i)
+        m_quality->addItem(QString());
+    updateSizes();
     form->addRow(tr("Качество"), m_quality);
-    // The quality's size is a frame: the camera's picture goes into it whole (WebcamRecorder::fit).
-    m_recordedSize = new QLabel;
-    m_recordedSize->setWordWrap(true);
-    m_recordedSize->hide();
 
     auto *customRow = new QWidget;
     auto *custom = new QHBoxLayout(customRow);
@@ -102,15 +97,12 @@ VideoPropertiesDialog::VideoPropertiesDialog(QWidget *parent) : QDialog(parent)
     customRows->addWidget(customRow);
     customRows->addWidget(m_estimate);
     form->addRow(QString(), m_custom);
-    form->addRow(QString(), m_recordedSize);
     for (QSpinBox *box : {m_width, m_height, m_fps, m_kbps}) {
         connect(box, &QSpinBox::valueChanged, this, &VideoPropertiesDialog::updateEstimate);
         connect(box, &QSpinBox::editingFinished, this, [this] { m_customTouched = true; });
     }
     for (QSpinBox *box : {m_width, m_height, m_fps})
         connect(box, &QSpinBox::valueChanged, this, &VideoPropertiesDialog::suggestKbps);
-    for (QSpinBox *box : {m_width, m_height})
-        connect(box, &QSpinBox::valueChanged, this, &VideoPropertiesDialog::updateRecordedSize);
     connect(m_kbps, &QSpinBox::valueChanged, this, [this] {
         if (!m_settingKbps) // typed by the user: theirs from now on
             m_autoKbps->setChecked(false);
@@ -217,7 +209,6 @@ void VideoPropertiesDialog::updateEnabled()
     m_custom->setEnabled(m_video->isChecked());
     m_mic->setEnabled(m_audio->isChecked());
     updateEstimate();
-    updateRecordedSize();
     adjustSize();
 }
 
@@ -242,26 +233,28 @@ void VideoPropertiesDialog::setPicture(const QImage &image)
     m_preview->setPixmap(pm);
     if (image.size() != m_cameraSize) {
         m_cameraSize = image.size();
-        updateRecordedSize();
+        updateSizes();
+        updateEstimate();
     }
 }
 
-void VideoPropertiesDialog::updateRecordedSize()
+QSize VideoPropertiesDialog::recordedSize(const WebcamRecorder::Preset &p) const
 {
-    const WebcamRecorder::Preset p = settings().preset();
-    const QSize frame(p.width, p.height);
-    const QSize size = WebcamRecorder::fit(m_cameraSize, frame);
-    const bool shown = m_video->isChecked() && !m_cameraSize.isEmpty() && size != frame;
-    if (shown)
-        m_recordedSize->setText(tr("Запишется %1×%2: картинка камеры (%3×%4) целиком, в её пропорциях")
-                                    .arg(size.width())
-                                    .arg(size.height())
-                                    .arg(m_cameraSize.width())
-                                    .arg(m_cameraSize.height()));
-    if (shown != m_recordedSize->isVisibleTo(this)) {
-        m_recordedSize->setVisible(shown);
-        adjustSize();
-    }
+    // The quality's size is a frame: the camera's picture goes into it whole (WebcamRecorder::fit).
+    return WebcamRecorder::fit(m_cameraSize, QSize(p.width, p.height));
+}
+
+void VideoPropertiesDialog::updateSizes()
+{
+    // Sizes in the file are for a person at a keyboard: a still scene takes less.
+    auto size = [this](int quality) {
+        const QSize s = recordedSize(WebcamRecorder::preset(quality));
+        return QStringLiteral("%1×%2").arg(s.width()).arg(s.height());
+    };
+    m_quality->setItemText(WebcamRecorder::Economy, tr("Экономно: %1, 10 к/с (~0,4 МБ/мин)").arg(size(WebcamRecorder::Economy)));
+    m_quality->setItemText(WebcamRecorder::Normal, tr("Обычно: %1, 15 к/с (~0,9 МБ/мин)").arg(size(WebcamRecorder::Normal)));
+    m_quality->setItemText(WebcamRecorder::Good, tr("Хорошо: %1, 24 к/с (~1,9 МБ/мин)").arg(size(WebcamRecorder::Good)));
+    m_quality->setItemText(WebcamRecorder::Custom, tr("Своё…"));
 }
 
 void VideoPropertiesDialog::setPreviewMessage(const QString &text)
@@ -276,6 +269,11 @@ void VideoPropertiesDialog::updateEstimate()
     const double mbPerMin = m_kbps->value() / 100.0;
     const double bitsPerPixel = m_kbps->value() * 1000.0 / (double(m_width->value()) * m_height->value() * m_fps->value());
     QString text = tr("~%1 МБ/мин").arg(QLocale().toString(mbPerMin, 'f', mbPerMin < 10 ? 1 : 0));
+    // The frame typed is a frame too: what is recorded of this camera, when it is not the same.
+    const WebcamRecorder::Preset p = WebcamRecorder::Preset{m_width->value(), m_height->value(), m_fps->value(), 10}.bounded();
+    const QSize recorded = recordedSize(p);
+    if (recorded != QSize(p.width, p.height))
+        text = tr("запишется %1×%2").arg(recorded.width()).arg(recorded.height()) + QStringLiteral(", ") + text;
     if (bitsPerPixel < 0.01)
         text += QStringLiteral(" · ") + tr("мало для такого кадра: картинка будет размытой");
     m_estimate->setText(text);

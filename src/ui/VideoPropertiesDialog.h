@@ -34,7 +34,8 @@ private:
     friend class TstUi;
     void updateEnabled();
     void updateEstimate();
-    void updateRecordedSize();
+    void updateSizes();
+    QSize recordedSize(const WebcamRecorder::Preset &p) const;
     void setKbps(int kbps); // not as typed by the user
     void suggestKbps();     // when "авто" is on
 
@@ -47,8 +48,7 @@ private:
     QToolButton *m_autoKbps = nullptr;
     bool m_settingKbps = false;
     QLabel *m_estimate = nullptr;
-    QLabel *m_recordedSize = nullptr; // the size written when the camera's aspect is not the quality's
-    QSize m_cameraSize;               // of the preview's picture
+    QSize m_cameraSize; // of the preview's picture: the sizes shown are what is recorded of it
     bool m_customTouched = false; // "Своё" has its own values (else it starts from the quality chosen before)
     int m_lastQuality = WebcamRecorder::Normal;
     QCheckBox *m_audio = nullptr;

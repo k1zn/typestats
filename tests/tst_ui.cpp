@@ -940,26 +940,28 @@ private slots:
         QCOMPARE(WebcamRecorder::fit(QSize(1080, 1920), QSize(640, 480)), QSize(270, 480));
         QCOMPARE(WebcamRecorder::fit(QSize(1280, 720), QSize(640, 360)), QSize(640, 360));
         QCOMPARE(WebcamRecorder::fit(QSize(), QSize(640, 480)), QSize(640, 480));
-        // "Свойства камеры" tells the size written when the camera's aspect is not the quality's.
+        // "Свойства камеры": the sizes of the qualities are what is recorded of this camera.
         {
             VideoPropertiesDialog d;
             WebcamRecorder::Settings good;
             good.video = true;
             good.quality = WebcamRecorder::Good;
             d.setSettings(good);
-            QVERIFY(!d.m_recordedSize->isVisibleTo(&d)); // no picture yet
+            QVERIFY(d.m_quality->itemText(WebcamRecorder::Good).contains(QStringLiteral("640×480"))); // no picture yet
             QImage wide(1920, 1080, QImage::Format_RGB32);
             wide.fill(Qt::gray);
             d.setPicture(wide);
-            QVERIFY(d.m_recordedSize->isVisibleTo(&d));
-            QVERIFY(d.m_recordedSize->text().contains(QStringLiteral("640×360")));
-            QVERIFY(d.m_recordedSize->text().contains(QStringLiteral("1920×1080")));
-            d.m_quality->setCurrentIndex(WebcamRecorder::Normal); // 640×360: the same aspect
-            QVERIFY(!d.m_recordedSize->isVisibleTo(&d));
-            d.m_quality->setCurrentIndex(WebcamRecorder::Economy); // 320×240
-            QVERIFY(d.m_recordedSize->text().contains(QStringLiteral("320×180")));
-            d.m_video->setChecked(false);
-            QVERIFY(!d.m_recordedSize->isVisibleTo(&d));
+            QVERIFY(d.m_quality->itemText(WebcamRecorder::Economy).contains(QStringLiteral("320×180")));
+            QVERIFY(d.m_quality->itemText(WebcamRecorder::Normal).contains(QStringLiteral("640×360")));
+            QVERIFY(d.m_quality->itemText(WebcamRecorder::Good).contains(QStringLiteral("640×360")));
+            QVERIFY(!d.m_quality->itemText(WebcamRecorder::Good).contains(QStringLiteral("640×480")));
+            // "Своё": the frame typed, and what is recorded of it.
+            d.m_quality->setCurrentIndex(WebcamRecorder::Custom);
+            d.m_width->setValue(800);
+            d.m_height->setValue(600);
+            QVERIFY(d.m_estimate->text().contains(QStringLiteral("800×450")));
+            d.m_height->setValue(450);
+            QVERIFY(!d.m_estimate->text().contains(QStringLiteral("×")));
         }
         MainWindow w;
         if (QApplication::activeWindow())
