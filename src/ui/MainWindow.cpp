@@ -1044,6 +1044,8 @@ void MainWindow::captureToggled(bool on)
     // Off: the camera stops. On: it waits for a key typed into this document (keyEvent).
     if (m_webcam && !on)
         m_webcam->setCapture(false);
+    if (m_webcam)
+        updateVideoMode();
 #endif
     m_text->setFocus();
 }
@@ -1112,7 +1114,11 @@ void MainWindow::deletePreset()
 
 void MainWindow::startCapture()
 {
-    m_hook.start(); // the webcam starts with the first key (keyEvent)
+    m_hook.start(); // the webcam records from the first key (keyEvent)
+    m_hookStarted = true;
+#ifdef TS_HAVE_WEBCAM
+    updateVideoMode(); // the camera opens to be ready for it
+#endif
 }
 
 void MainWindow::offerFileAssociation()
@@ -2298,13 +2304,15 @@ void MainWindow::updateVideoMode()
     // What the camera records while it records into this document; the document's frames otherwise. The camera is
     // not opened just to be looked at here (its picture to place it is in "Свойства камеры").
     const bool live = m_webcam->isRecording() && m_webcam->settings().video;
+    // Ready for the first key: the camera is open while it would record one (it takes up to a second to start).
+    m_webcam->setArmed(m_hookStarted && m_capture->isChecked() && !m_cameraStopped);
     m_video->setLive(live);
     m_video->setRecording(m_webcam->isRecording());
     m_webcam->setPreview(live && m_video->isVisible());
     if (!live) {
         const WebcamRecorder::Settings &s = m_webcam->settings();
         m_video->setMessage(!m_clip.isEmpty() ? QString()
-                            : s.video     ? tr("В этой записи нет видео.\nКамера включится, когда начнётся набор.")
+                            : s.video     ? tr("В этой записи нет видео.\nКамера начнёт запись с первой клавиши.")
                                           : tr("В этой записи нет видео.\nЗапись камеры включается в меню её кнопки (▾)."));
         updateVideo();
     }
@@ -2337,7 +2345,7 @@ void MainWindow::updateCameraButton()
     } else if (m_cameraStopped && (s.video || s.audio)) {
         hint = tr("Запись камеры остановлена: ▾ — продолжить");
     } else if (s.video || s.audio) {
-        hint = s.video ? tr("Камера включится, когда начнётся набор") : tr("Микрофон включится, когда начнётся набор");
+        hint = s.video ? tr("Камера начнёт запись с первой клавиши") : tr("Микрофон включится, когда начнётся набор");
     } else {
         hint = tr("Запись камеры выключена");
     }

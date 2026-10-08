@@ -46,6 +46,7 @@
 #include <QSplitter>
 #include <QSettings>
 #include <QTableWidget>
+#include <QStyleHints>
 #include <QTemporaryDir>
 #include <QDataStream>
 #include <QFile>
@@ -429,11 +430,13 @@ private slots:
         QCOMPARE(w.m_legend->palette().color(QPalette::WindowText), QColor(Qt::black)); // the frame
         QCOMPARE(foregrounds(w.m_text->document()), light);
 
-        // The first start takes the system's theme (offscreen has none: light) and keeps it; later the saved one.
+        // The first start takes the system's theme (offscreen: the desktop's one on Windows, else light) and keeps it;
+        // later the saved one.
+        const bool systemDark = QGuiApplication::styleHints()->colorScheme() == Qt::ColorScheme::Dark;
         QSettings().remove(QStringLiteral("DarkTheme"));
         Look::applySavedTheme();
-        QVERIFY(!Look::isDark());
-        QCOMPARE(QSettings().value(QStringLiteral("DarkTheme")), QVariant(false));
+        QCOMPARE(Look::isDark(), systemDark);
+        QCOMPARE(QSettings().value(QStringLiteral("DarkTheme")), QVariant(systemDark));
         QSettings().setValue(QStringLiteral("DarkTheme"), true);
         Look::applySavedTheme();
         QVERIFY(Look::isDark());
@@ -842,6 +845,70 @@ private slots:
         QVERIFY(cam.isRecording());
         w.m_capture->setChecked(false);
         QVERIFY(!cam.isRecording());
+#else
+        QSKIP("built without the webcam");
+#endif
+    }
+
+    void webcamWarmFrame()
+    {
+#ifdef TS_HAVE_WEBCAM
+        // The camera is open before the first key (it takes up to a second to start): the video starts with its last
+        // frame before the key, not with black (re/webcam.md).
+        MainWindow w;
+        if (QApplication::activeWindow())
+            QSKIP("the test window got the focus");
+        WebcamRecorder &cam = *w.m_webcam;
+        cam.setDevicesEnabled(false);
+        WebcamRecorder::Settings s;
+        s.video = true;
+        s.quality = 0; // 10 fps
+        cam.setSettings(s);
+        QVERIFY(!cam.isArmed()); // no hook yet
+        w.m_hookStarted = true;
+        w.updateVideoMode();
+        QVERIFY(cam.isArmed());
+        QVERIFY(!cam.isRecording());
+        const I420Frame picture = Yuv::fromImage(QImage(320, 240, QImage::Format_RGB32));
+        auto key = [&w](qint64 ms) {
+            HookEvent e;
+            e.timeUs = ms * 1000;
+            e.flags = quint32('A') << 16 | 'A' | KeyRecord::HasChar;
+            e.ch = u'a';
+            e.chars = 1;
+            w.keyEvent(e);
+        };
+        auto videoTimes = [&w] {
+            QList<qint64> t;
+            for (const MediaPacket &p : w.m_clip.packets)
+                if (w.m_clip.streams[p.stream].kind == MediaStream::Video)
+                    t.append(w.m_clip.docTime(p.ptsUs));
+            return t;
+        };
+        cam.addVideo(picture, 300000);
+        cam.addVideo(picture, 430000); // the last one before the key
+        key(500);
+        QVERIFY(cam.isRecording());
+        cam.addVideo(picture, 530000);
+        cam.drain();
+        cam.addVideo(picture, 630000);
+        cam.drain();
+        QCOMPARE(videoTimes(), (QList<qint64>{-70000, 30000, 130000}));
+        QVERIFY(w.m_clip.packets[0].key);
+        // A frame older than a second is not the picture of the key.
+        w.m_capture->setChecked(false);
+        QVERIFY(!cam.isArmed());
+        w.clear();
+        w.m_capture->setChecked(true);
+        QVERIFY(cam.isArmed());
+        cam.addVideo(picture, 1000000);
+        key(2500);
+        cam.addVideo(picture, 2530000);
+        cam.drain();
+        QCOMPARE(videoTimes(), (QList<qint64>{DocTime::of(w.m_doc.records, 0) + 30000})); // 30 ms after the key
+        // "Остановить запись камеры": not armed, the camera closes.
+        w.stopCamera(true);
+        QVERIFY(!cam.isArmed());
 #else
         QSKIP("built without the webcam");
 #endif

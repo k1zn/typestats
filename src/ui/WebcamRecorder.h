@@ -55,6 +55,10 @@ public:
     bool isCapturing() const { return m_capture; }
     // The picture of the camera is shown (the video window is open while recording or not).
     void setPreview(bool on);
+    // Recording starts with the next key typed into the document: the camera is open already (it takes up to a second
+    // to start and to settle its exposure), and the session starts with its last frame before the key.
+    void setArmed(bool on);
+    bool isArmed() const { return m_armed; }
     bool isRecording() const { return m_recording; }
     // The document's time of a moment `s` of the recording: docEndUs + (s − timerUs) (Recorder::timerUs). Packets
     // wait until there is a timer.
@@ -84,6 +88,7 @@ private:
     void update();
     void startSession();
     void stopSession();
+    void encode(const I420Frame &picture, qint64 steadyUs);
     void encoded(int generation, int kind, const EncodedFrame &f);
     void place(int kind, const EncodedFrame &f);
 
@@ -93,13 +98,15 @@ private:
     Microphone *m_mic = nullptr;
     QThread m_thread;
     Worker *m_worker = nullptr;
-    bool m_capture = false, m_preview = false, m_recording = false, m_devices = true;
+    bool m_capture = false, m_preview = false, m_armed = false, m_recording = false, m_devices = true;
     std::atomic<int> m_generation{0};
     std::atomic<bool> m_accepting{false};
     std::atomic<qint64> m_lastFrameUs{0};
     std::atomic<qint64> m_lastPictureUs{0};
     std::atomic<int> m_queued{0};
     std::atomic<int> m_fps{15};          // of the session, read by the camera's thread
+    I420Frame m_warm;                    // armed: the last frame before the session (the camera's thread only)
+    qint64 m_warmUs = 0;
     int m_videoStream = -1, m_audioStream = -1;
     qint64 m_docEndUs = 0;
     std::optional<qint64> m_timerUs;

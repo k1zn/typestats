@@ -165,6 +165,12 @@ void WebcamRecorder::setPreview(bool on)
     update();
 }
 
+void WebcamRecorder::setArmed(bool on)
+{
+    m_armed = on;
+    update();
+}
+
 void WebcamRecorder::setClock(qint64 docEndUs, std::optional<qint64> timerUs)
 {
     m_docEndUs = docEndUs;
@@ -187,7 +193,7 @@ void WebcamRecorder::update()
             stopSession();
         emit recordingChanged(m_recording);
     }
-    const bool camera = m_devices && m_settings.video && (m_recording || m_preview);
+    const bool camera = m_devices && m_settings.video && (m_recording || m_preview || m_armed);
     const bool mic = m_devices && m_settings.audio && m_recording;
     const Preset p = m_settings.preset();
     if (camera && !m_camera->isActive())
@@ -234,12 +240,27 @@ void WebcamRecorder::addVideo(const I420Frame &picture, qint64 steadyUs)
         QMetaObject::invokeMethod(this, [this, image = Yuv::toImage(picture)] { emit this->picture(image); },
                                   Qt::QueuedConnection);
     }
-    if (!m_accepting)
+    if (!m_accepting) {
+        // Armed: the frame the session will start with (the camera's last one before the key).
+        m_warm = picture;
+        m_warmUs = steadyUs;
         return;
+    }
+    // The session's first frame: the one before its start if it is fresh, so the video has a picture from the key on
+    // (the camera has been open for a while: its exposure has settled).
+    if (m_lastFrameUs == 0 && m_warmUs != 0 && steadyUs - m_warmUs < 1000000)
+        encode(m_warm, m_warmUs);
+    m_warm = {};
+    m_warmUs = 0;
     // The rate of the preset (a camera may give more), and no queue when the encoder falls behind.
     const int fps = m_fps;
     if (m_lastFrameUs != 0 && steadyUs - m_lastFrameUs < 1000000 / fps - 8000)
         return;
+    encode(picture, steadyUs);
+}
+
+void WebcamRecorder::encode(const I420Frame &picture, qint64 steadyUs)
+{
     if (m_queued >= 2)
         return;
     m_lastFrameUs = steadyUs;

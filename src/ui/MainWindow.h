@@ -275,6 +275,7 @@ private:
     // The webcam's button in the corner (under the time stamps) and its menu.
     QToolButton *m_cameraButton = nullptr;
     QAction *m_cameraVideo = nullptr, *m_cameraAudio = nullptr, *m_cameraSave = nullptr, *m_cameraStop = nullptr;
+    bool m_hookStarted = false;   // startCapture: keys can come (the camera is ready for them)
     bool m_cameraStopped = false; // "Остановить запись камеры": this document is typed into without it
     void stopCamera(bool stop);
     QString m_cameraError; // the last failure of a device

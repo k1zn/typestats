@@ -982,12 +982,6 @@ Copy the command, paste it into a terminal and enter your password. This is need
     </message>
     <message>
         <source>В этой записи нет видео.
-Камера включится, когда начнётся набор.</source>
-        <translation>This recording has no video.
-The camera starts when typing does.</translation>
-    </message>
-    <message>
-        <source>В этой записи нет видео.
 Запись камеры включается в меню её кнопки (▾).</source>
         <translation>This recording has no video.
 Camera recording is turned on in its button's menu (▾).</translation>
@@ -1003,10 +997,6 @@ Camera recording is turned on in its button's menu (▾).</translation>
     <message>
         <source>В записи есть видео (%1)</source>
         <translation>The recording has video (%1)</translation>
-    </message>
-    <message>
-        <source>Камера включится, когда начнётся набор</source>
-        <translation>The camera starts when typing does</translation>
     </message>
     <message>
         <source>Микрофон включится, когда начнётся набор</source>
@@ -1031,6 +1021,16 @@ Camera recording is turned on in its button's menu (▾).</translation>
     <message>
         <source>Запись камеры остановлена: ▾ — продолжить</source>
         <translation>Camera recording stopped: ▾ to resume</translation>
+    </message>
+    <message>
+        <source>В этой записи нет видео.
+Камера начнёт запись с первой клавиши.</source>
+        <translation>This recording has no video.
+The camera starts recording with the first key.</translation>
+    </message>
+    <message>
+        <source>Камера начнёт запись с первой клавиши</source>
+        <translation>The camera starts recording with the first key</translation>
     </message>
 </context>
 <context>
