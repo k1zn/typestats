@@ -1366,6 +1366,10 @@ The camera starts recording with the first key.</translation>
         <source>Подбирать поток по размеру и частоте кадров</source>
         <translation>Choose the bitrate by the frame size and rate</translation>
     </message>
+    <message>
+        <source>Запишется %1×%2: картинка камеры (%3×%4) целиком, в её пропорциях</source>
+        <translation>Recorded as %1×%2: the camera's picture (%3×%4) whole, in its proportions</translation>
+    </message>
 </context>
 <context>
     <name>VideoWindow</name>

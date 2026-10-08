@@ -940,6 +940,27 @@ private slots:
         QCOMPARE(WebcamRecorder::fit(QSize(1080, 1920), QSize(640, 480)), QSize(270, 480));
         QCOMPARE(WebcamRecorder::fit(QSize(1280, 720), QSize(640, 360)), QSize(640, 360));
         QCOMPARE(WebcamRecorder::fit(QSize(), QSize(640, 480)), QSize(640, 480));
+        // "Свойства камеры" tells the size written when the camera's aspect is not the quality's.
+        {
+            VideoPropertiesDialog d;
+            WebcamRecorder::Settings good;
+            good.video = true;
+            good.quality = WebcamRecorder::Good;
+            d.setSettings(good);
+            QVERIFY(!d.m_recordedSize->isVisibleTo(&d)); // no picture yet
+            QImage wide(1920, 1080, QImage::Format_RGB32);
+            wide.fill(Qt::gray);
+            d.setPicture(wide);
+            QVERIFY(d.m_recordedSize->isVisibleTo(&d));
+            QVERIFY(d.m_recordedSize->text().contains(QStringLiteral("640×360")));
+            QVERIFY(d.m_recordedSize->text().contains(QStringLiteral("1920×1080")));
+            d.m_quality->setCurrentIndex(WebcamRecorder::Normal); // 640×360: the same aspect
+            QVERIFY(!d.m_recordedSize->isVisibleTo(&d));
+            d.m_quality->setCurrentIndex(WebcamRecorder::Economy); // 320×240
+            QVERIFY(d.m_recordedSize->text().contains(QStringLiteral("320×180")));
+            d.m_video->setChecked(false);
+            QVERIFY(!d.m_recordedSize->isVisibleTo(&d));
+        }
         MainWindow w;
         if (QApplication::activeWindow())
             QSKIP("the test window got the focus");

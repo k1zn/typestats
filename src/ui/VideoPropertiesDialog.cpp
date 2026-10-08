@@ -58,6 +58,10 @@ VideoPropertiesDialog::VideoPropertiesDialog(QWidget *parent) : QDialog(parent)
     m_quality->addItem(tr("Хорошо: 640×480, 24 к/с (~1,9 МБ/мин)"));
     m_quality->addItem(tr("Своё…"));
     form->addRow(tr("Качество"), m_quality);
+    // The quality's size is a frame: the camera's picture goes into it whole (WebcamRecorder::fit).
+    m_recordedSize = new QLabel;
+    m_recordedSize->setWordWrap(true);
+    m_recordedSize->hide();
 
     auto *customRow = new QWidget;
     auto *custom = new QHBoxLayout(customRow);
@@ -98,12 +102,15 @@ VideoPropertiesDialog::VideoPropertiesDialog(QWidget *parent) : QDialog(parent)
     customRows->addWidget(customRow);
     customRows->addWidget(m_estimate);
     form->addRow(QString(), m_custom);
+    form->addRow(QString(), m_recordedSize);
     for (QSpinBox *box : {m_width, m_height, m_fps, m_kbps}) {
         connect(box, &QSpinBox::valueChanged, this, &VideoPropertiesDialog::updateEstimate);
         connect(box, &QSpinBox::editingFinished, this, [this] { m_customTouched = true; });
     }
     for (QSpinBox *box : {m_width, m_height, m_fps})
         connect(box, &QSpinBox::valueChanged, this, &VideoPropertiesDialog::suggestKbps);
+    for (QSpinBox *box : {m_width, m_height})
+        connect(box, &QSpinBox::valueChanged, this, &VideoPropertiesDialog::updateRecordedSize);
     connect(m_kbps, &QSpinBox::valueChanged, this, [this] {
         if (!m_settingKbps) // typed by the user: theirs from now on
             m_autoKbps->setChecked(false);
@@ -210,6 +217,7 @@ void VideoPropertiesDialog::updateEnabled()
     m_custom->setEnabled(m_video->isChecked());
     m_mic->setEnabled(m_audio->isChecked());
     updateEstimate();
+    updateRecordedSize();
     adjustSize();
 }
 
@@ -232,6 +240,28 @@ void VideoPropertiesDialog::setPicture(const QImage &image)
         image.scaled(m_preview->size() * devicePixelRatioF(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
     pm.setDevicePixelRatio(devicePixelRatioF());
     m_preview->setPixmap(pm);
+    if (image.size() != m_cameraSize) {
+        m_cameraSize = image.size();
+        updateRecordedSize();
+    }
+}
+
+void VideoPropertiesDialog::updateRecordedSize()
+{
+    const WebcamRecorder::Preset p = settings().preset();
+    const QSize frame(p.width, p.height);
+    const QSize size = WebcamRecorder::fit(m_cameraSize, frame);
+    const bool shown = m_video->isChecked() && !m_cameraSize.isEmpty() && size != frame;
+    if (shown)
+        m_recordedSize->setText(tr("Запишется %1×%2: картинка камеры (%3×%4) целиком, в её пропорциях")
+                                    .arg(size.width())
+                                    .arg(size.height())
+                                    .arg(m_cameraSize.width())
+                                    .arg(m_cameraSize.height()));
+    if (shown != m_recordedSize->isVisibleTo(this)) {
+        m_recordedSize->setVisible(shown);
+        adjustSize();
+    }
 }
 
 void VideoPropertiesDialog::setPreviewMessage(const QString &text)

@@ -298,6 +298,7 @@
   "Камера начнёт запись с первой клавиши": "The camera starts recording with the first key",
   "Микрофон включится, когда начнётся набор": "The microphone starts when typing does",
   "Запись камеры выключена": "Camera recording is off",
+  "Запишется %1×%2: картинка камеры (%3×%4) целиком, в её пропорциях": "Recorded as %1×%2: the camera's picture (%3×%4) whole, in its proportions",
   "Щелчок — что записывать": "Click: what to record",
   "Щелчок — видео, ▾ — что записывать": "Click: the video; ▾: what to record",
   "Свойства камеры": "Camera properties",
