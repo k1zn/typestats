@@ -298,6 +298,7 @@
   "Камера начнёт запись с первой клавиши": "The camera starts recording with the first key",
   "Микрофон включится, когда начнётся набор": "The microphone starts when typing does",
   "Запись камеры выключена": "Camera recording is off",
+  "Щелчок — что записывать": "Click: what to record",
   "Щелчок — видео, ▾ — что записывать": "Click: the video; ▾: what to record",
   "Свойства камеры": "Camera properties",
   "Поток видео: больше — чётче, но файл крупнее. Подбирается по размеру и частоте кадров, пока не поставлен свой": "Video bitrate: higher is sharper, but the file is larger. Chosen by the frame size and rate until you set your own",

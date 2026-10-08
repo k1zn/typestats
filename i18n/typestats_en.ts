@@ -1032,6 +1032,10 @@ The camera starts recording with the first key.</translation>
         <source>Камера начнёт запись с первой клавиши</source>
         <translation>The camera starts recording with the first key</translation>
     </message>
+    <message>
+        <source>Щелчок — что записывать</source>
+        <translation>Click: what to record</translation>
+    </message>
 </context>
 <context>
     <name>QObject</name>

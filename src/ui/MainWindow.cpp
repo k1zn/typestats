@@ -2326,12 +2326,12 @@ void MainWindow::updateCameraButton()
 #ifdef TS_HAVE_WEBCAM
     if (!m_cameraButton)
         return;
-    // Recording: red, the length so far; a document with video: green, its length; else the camera alone, dim when
-    // it is not to record.
+    // Recording: red, the length so far; a document with video: green, its length; else the camera alone (wider than
+    // its icon), disabled-looking when it is not to record - a click then opens the menu, there is no video to show.
     const WebcamRecorder::Settings &s = m_webcam->settings();
     const bool recording = m_webcam->isRecording();
     const Look::Colors &c = Look::colors();
-    QColor color = s.video || s.audio ? c.ink : c.dimInk;
+    QColor color = s.video || s.audio ? c.ink : m_cameraButton->palette().color(QPalette::Disabled, QPalette::ButtonText);
     QString text, hint;
     if (recording || !m_clip.isEmpty()) {
         const qint64 secs = m_clip.isEmpty() ? 0 : std::max<qint64>(0, (m_clip.lastUs() - m_clip.firstUs()) / 1000000);
@@ -2352,13 +2352,15 @@ void MainWindow::updateCameraButton()
     }
     if (!m_cameraError.isEmpty() && (s.video || s.audio))
         hint += u'\n' + m_cameraError;
-    hint += u'\n' + tr("Щелчок — видео, ▾ — что записывать");
+    hint += u'\n' + (text.isEmpty() ? tr("Щелчок — что записывать") : tr("Щелчок — видео, ▾ — что записывать"));
     // Only what changed: a style sheet is costly, and this comes with every packet.
     const QString key = text + color.name() + (recording ? u'r' : u'-');
     if (key != m_cameraKey) {
         m_cameraKey = key;
         m_cameraButton->setText(text);
         m_cameraButton->setToolButtonStyle(text.isEmpty() ? Qt::ToolButtonIconOnly : Qt::ToolButtonTextBesideIcon);
+        m_cameraButton->setPopupMode(text.isEmpty() ? QToolButton::InstantPopup : QToolButton::MenuButtonPopup);
+        m_cameraButton->setMinimumWidth(text.isEmpty() ? kCameraIdleWidth : 0);
         m_cameraButton->setIcon(cameraIcon(color, recording && s.video));
         m_cameraButton->setStyleSheet(proofStyle(color));
         m_cameraButton->adjustSize();

@@ -787,7 +787,9 @@ private slots:
         cam.setSettings(s);
         QVERIFY(w.m_capture->isChecked()); // no hook: on Linux CI it would fail and switch the capture off
         QVERIFY(!cam.isRecording());
-        QVERIFY(w.m_cameraButton->text().isEmpty()); // the camera alone
+        QVERIFY(w.m_cameraButton->text().isEmpty()); // the camera alone, wider than its icon; a click opens the menu
+        QVERIFY(w.m_cameraButton->width() >= MainWindow::kCameraIdleWidth);
+        QCOMPARE(w.m_cameraButton->popupMode(), QToolButton::InstantPopup);
         w.showVideo();
         QVERIFY(!w.m_video->isLive()); // nothing recorded: no camera
         QVERIFY(!w.m_video->m_message.isEmpty());
@@ -803,6 +805,7 @@ private slots:
         QVERIFY(cam.isRecording());
         QVERIFY(w.m_video->isLive());
         QCOMPARE(w.m_cameraButton->text(), QStringLiteral("0:00"));
+        QCOMPARE(w.m_cameraButton->popupMode(), QToolButton::MenuButtonPopup); // a click: the video
         QVERIFY(w.m_cameraKey.contains(Look::colors().proofBad.name())); // red
         // "Остановить запись камеры": the keys after it have no video; "Продолжить": from the next key again.
         emit w.m_cameraButton->menu()->aboutToShow();

@@ -226,6 +226,7 @@ private:
     AxisPanel *m_axisPanel = nullptr;
     bool m_legendPlaced = false;
     static constexpr int kCornerMargin = 4, kCornerGap = 2; // the theme and the time stamps in the toolbar's corner
+    static constexpr int kCameraIdleWidth = 44; // the camera's button without a length: wider than its icon
     static constexpr int kGraphMinHeight = 100; // below it the graph folds to its scroll bar (Panel1CanResize)
     struct Panes
     {
