@@ -30,6 +30,8 @@ public:
     };
     enum Quality { Economy, Normal, Good, Custom };
     static Preset preset(int quality); // Economy..Good
+    // The size of the recording of a camera's picture: the picture whole within the preset's frame, even sizes.
+    static QSize fit(QSize camera, QSize frame);
     struct Settings
     {
         bool video = false;   // "WebcamOn"
@@ -85,14 +87,15 @@ private:
     {
         int kind;
         EncodedFrame frame;
+        QSize size; // of a video frame
     };
     void update();
     void startSession();
     void stopSession();
     void encode(const I420Frame &picture, qint64 steadyUs);
     void encodeAudio(const QVector<float> &pcm, int channels, int rate, qint64 steadyUs);
-    void encoded(int generation, int kind, const EncodedFrame &f);
-    void place(int kind, const EncodedFrame &f);
+    void encoded(int generation, int kind, const EncodedFrame &f, QSize size = {});
+    void place(int kind, const EncodedFrame &f, QSize size);
 
     Settings m_settings;
     MediaClip *m_clip = nullptr;
@@ -118,6 +121,7 @@ private:
     static constexpr qint64 kWarmAudioUs = 300000;
     QList<WarmAudio> m_warmAudio;        // armed: the last 0.3 s of sound before the session (the microphone's thread)
     int m_videoStream = -1, m_audioStream = -1;
+    bool m_withVideo = false; // the session records the camera (its stream comes with the first frame)
     qint64 m_docEndUs = 0;
     std::optional<qint64> m_timerUs;
     qint64 m_lastPts[2] = {MediaClip::kAll, MediaClip::kAll};

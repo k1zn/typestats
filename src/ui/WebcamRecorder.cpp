@@ -22,16 +22,26 @@ public:
     void open(const Preset &p, bool withAudio)
     {
         preset = p;
-        Av1Settings s;
-        s.width = p.width;
-        s.height = p.height;
-        s.fps = p.fps;
-        s.kbps = p.kbps;
-        if (p.width * p.height > 640 * 480) // larger frames of "Своё": in time for the next one
-            s.threads = 4;
-        video.open(s);
+        video.close(); // opened by the first frame: its size has the camera's aspect
         audio = withAudio ? std::make_unique<OpusAudioEncoder>() : nullptr;
         lastGeneration = -1;
+    }
+    // The size of the session's video: the camera's picture whole, within the preset's frame (1920×1080 in 640×480 -
+    // 640×360), so it is what the preview shows. Later frames of another aspect are cropped to it.
+    QSize openFor(const I420Frame &picture)
+    {
+        if (!video.isOpen()) {
+            Av1Settings s;
+            const QSize size = WebcamRecorder::fit(QSize(picture.width, picture.height), QSize(preset.width, preset.height));
+            s.width = size.width();
+            s.height = size.height();
+            s.fps = preset.fps;
+            s.kbps = preset.kbps;
+            if (s.width * s.height > 640 * 480) // larger frames of "Своё": in time for the next one
+                s.threads = 4;
+            video.open(s);
+        }
+        return QSize(video.settings().width, video.settings().height);
     }
     void close()
     {
@@ -93,6 +103,17 @@ int WebcamRecorder::Preset::suggestedKbps(int width, int height, int fps)
     return std::clamp(int(std::lround((20 + bits / 1000) / 10)) * 10, 10, 4000);
 }
 
+QSize WebcamRecorder::fit(QSize camera, QSize frame)
+{
+    if (camera.isEmpty())
+        return frame;
+    // Even sizes (I420), at least 16.
+    auto even = [](double v) { return std::max(16, int(std::lround(v / 2)) * 2); };
+    if (qint64(camera.width()) * frame.height() >= qint64(camera.height()) * frame.width())
+        return QSize(frame.width() & ~1, std::min(frame.height() & ~1, even(double(frame.width()) * camera.height() / camera.width())));
+    return QSize(std::min(frame.width() & ~1, even(double(frame.height()) * camera.width() / camera.height())), frame.height() & ~1);
+}
+
 WebcamRecorder::Preset WebcamRecorder::Preset::bounded() const
 {
     return {std::clamp(width, 160, 1920) & ~1, std::clamp(height, 120, 1080) & ~1, std::clamp(fps, 1, 30),
@@ -147,7 +168,7 @@ void WebcamRecorder::setClip(MediaClip *clip)
     m_clip = clip;
     m_lastPts[0] = m_lastPts[1] = MediaClip::kAll;
     if (m_recording && m_clip) {
-        m_videoStream = m_settings.video ? m_clip->addStream(MediaStream::video(m_preset.width, m_preset.height)) : -1;
+        m_videoStream = -1; // with the first frame: its size
         m_audioStream = m_settings.audio ? m_clip->addStream(MediaStream::audio(OpusAudioEncoder::kRate, 1)) : -1;
     }
     update();
@@ -178,7 +199,7 @@ void WebcamRecorder::setClock(qint64 docEndUs, std::optional<qint64> timerUs)
     if (m_timerUs && !m_pending.isEmpty()) {
         const QList<Pending> pending = std::exchange(m_pending, {});
         for (const Pending &p : pending)
-            place(p.kind, p.frame);
+            place(p.kind, p.frame, p.size);
         emit packetsAdded();
     }
 }
@@ -214,7 +235,8 @@ void WebcamRecorder::startSession()
     ++m_generation;
     m_pending.clear();
     m_lastPts[0] = m_lastPts[1] = MediaClip::kAll;
-    m_videoStream = m_settings.video ? m_clip->addStream(MediaStream::video(m_preset.width, m_preset.height)) : -1;
+    m_videoStream = -1; // with the first frame: its size
+    m_withVideo = m_settings.video;
     m_audioStream = m_settings.audio ? m_clip->addStream(MediaStream::audio(OpusAudioEncoder::kRate, 1)) : -1;
     const Preset p = m_preset;
     const bool audio = m_settings.audio;
@@ -270,11 +292,12 @@ void WebcamRecorder::encode(const I420Frame &picture, qint64 steadyUs)
         m_worker,
         [this, w = m_worker, generation, picture, steadyUs] {
             --m_queued;
-            const I420Frame frame = Yuv::scaled(picture, w->preset.width, w->preset.height);
+            const QSize size = w->openFor(picture);
+            const I420Frame frame = Yuv::scaled(picture, size.width(), size.height());
             const bool key = generation != w->lastGeneration;
             w->lastGeneration = generation;
             for (const EncodedFrame &f : w->video.encode(frame, steadyUs, key))
-                QMetaObject::invokeMethod(this, [this, generation, f] { encoded(generation, MediaStream::Video, f); },
+                QMetaObject::invokeMethod(this, [this, generation, f, size] { encoded(generation, MediaStream::Video, f, size); },
                                           Qt::QueuedConnection);
         },
         Qt::QueuedConnection);
@@ -318,20 +341,22 @@ void WebcamRecorder::drain()
     QCoreApplication::sendPostedEvents(this, QEvent::MetaCall);
 }
 
-void WebcamRecorder::encoded(int generation, int kind, const EncodedFrame &f)
+void WebcamRecorder::encoded(int generation, int kind, const EncodedFrame &f, QSize size)
 {
     if (generation != m_generation || !m_clip || !m_recording)
         return;
     if (!m_timerUs) {
-        m_pending.append({kind, f});
+        m_pending.append({kind, f, size});
         return;
     }
-    place(kind, f);
+    place(kind, f, size);
     emit packetsAdded();
 }
 
-void WebcamRecorder::place(int kind, const EncodedFrame &f)
+void WebcamRecorder::place(int kind, const EncodedFrame &f, QSize size)
 {
+    if (kind == MediaStream::Video && m_videoStream < 0 && m_withVideo && !size.isEmpty())
+        m_videoStream = m_clip->addStream(MediaStream::video(size.width(), size.height()));
     const int stream = kind == MediaStream::Video ? m_videoStream : m_audioStream;
     if (stream < 0)
         return;

@@ -931,6 +931,45 @@ private slots:
 #endif
     }
 
+    void webcamAspect()
+    {
+#ifdef TS_HAVE_WEBCAM
+        // The picture of the camera is recorded whole, as the preview shows it: in the preset's frame, the camera's aspect.
+        QCOMPARE(WebcamRecorder::fit(QSize(1920, 1080), QSize(640, 480)), QSize(640, 360));
+        QCOMPARE(WebcamRecorder::fit(QSize(640, 480), QSize(640, 360)), QSize(480, 360));
+        QCOMPARE(WebcamRecorder::fit(QSize(1080, 1920), QSize(640, 480)), QSize(270, 480));
+        QCOMPARE(WebcamRecorder::fit(QSize(1280, 720), QSize(640, 360)), QSize(640, 360));
+        QCOMPARE(WebcamRecorder::fit(QSize(), QSize(640, 480)), QSize(640, 480));
+        MainWindow w;
+        if (QApplication::activeWindow())
+            QSKIP("the test window got the focus");
+        WebcamRecorder &cam = *w.m_webcam;
+        cam.setDevicesEnabled(false);
+        WebcamRecorder::Settings s;
+        s.video = true;
+        s.quality = WebcamRecorder::Good; // 640×480
+        cam.setSettings(s);
+        cam.setCapture(true);
+        HookEvent e;
+        e.timeUs = 0;
+        e.flags = quint32('A') << 16 | 'A' | KeyRecord::HasChar;
+        e.ch = u'a';
+        e.chars = 1;
+        w.keyEvent(e);
+        const I420Frame picture = Yuv::fromImage(QImage(1920, 1080, QImage::Format_RGB32));
+        cam.addVideo(picture, 0);
+        cam.drain();
+        const int stream = w.m_clip.streamOf(MediaStream::Video);
+        QVERIFY(stream >= 0);
+        QCOMPARE(int(w.m_clip.streams[stream].a), 640);
+        QCOMPARE(int(w.m_clip.streams[stream].b), 360);
+        QVERIFY(!w.m_clip.isEmpty());
+        QCOMPARE(int(w.m_clip.packets[0].stream), stream);
+#else
+        QSKIP("built without the webcam");
+#endif
+    }
+
     void webcamCustomQuality()
     {
 #ifdef TS_HAVE_WEBCAM
@@ -984,6 +1023,14 @@ private slots:
         }());
         w.m_webcam->setCapture(true);
         QVERIFY(w.m_webcam->isRecording());
+        HookEvent e; // the packets wait for the first record
+        e.flags = quint32('A') << 16 | 'A' | KeyRecord::HasChar;
+        e.ch = u'a';
+        e.chars = 1;
+        w.keyEvent(e);
+        // The stream comes with the first frame: a camera of the same aspect fills the frame chosen.
+        w.m_webcam->addVideo(Yuv::fromImage(QImage(640, 360, QImage::Format_RGB32)), 0);
+        w.m_webcam->drain();
         const int stream = w.m_clip.streamOf(MediaStream::Video);
         QVERIFY(stream >= 0);
         QCOMPARE(w.m_clip.streams[stream].a, 1920);
