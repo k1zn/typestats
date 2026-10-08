@@ -853,8 +853,8 @@ private slots:
     void webcamWarmFrame()
     {
 #ifdef TS_HAVE_WEBCAM
-        // The camera is open before the first key (it takes up to a second to start): the video starts with its last
-        // frame before the key, not with black (re/webcam.md).
+        // The camera and the microphone are open before the first key (the camera takes up to a second to start): the
+        // video starts with its last frame before the key, not with black, the sound - 0.3 s before it (re/webcam.md).
         MainWindow w;
         if (QApplication::activeWindow())
             QSKIP("the test window got the focus");
@@ -863,6 +863,7 @@ private slots:
         WebcamRecorder::Settings s;
         s.video = true;
         s.quality = 0; // 10 fps
+        s.audio = true;
         cam.setSettings(s);
         QVERIFY(!cam.isArmed()); // no hook yet
         w.m_hookStarted = true;
@@ -885,12 +886,25 @@ private slots:
                     t.append(w.m_clip.docTime(p.ptsUs));
             return t;
         };
+        const QVector<float> sound(4800, 0.1f); // 100 ms, mono 48 kHz
+        for (int ms = 0; ms < 500; ms += 100)
+            cam.addAudio(sound, 1, 48000, qint64(ms) * 1000);
         cam.addVideo(picture, 300000);
         cam.addVideo(picture, 430000); // the last one before the key
         key(500);
         QVERIFY(cam.isRecording());
+        cam.addAudio(sound, 1, 48000, 500000);
         cam.addVideo(picture, 530000);
         cam.drain();
+        qint64 firstSound = MediaClip::kAll;
+        int sounds = 0;
+        for (const MediaPacket &p : w.m_clip.packets)
+            if (w.m_clip.streams[p.stream].kind == MediaStream::Audio) {
+                firstSound = std::min(firstSound == MediaClip::kAll ? p.ptsUs : firstSound, p.ptsUs);
+                ++sounds;
+            }
+        QCOMPARE(w.m_clip.docTime(firstSound), -400000); // the buffers from 100 ms: 0.3 s before the last one
+        QCOMPARE(sounds, 25);                             // 100..600 ms in 20 ms packets
         cam.addVideo(picture, 630000);
         cam.drain();
         QCOMPARE(videoTimes(), (QList<qint64>{-70000, 30000, 130000}));

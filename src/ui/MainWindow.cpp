@@ -2304,7 +2304,8 @@ void MainWindow::updateVideoMode()
     // What the camera records while it records into this document; the document's frames otherwise. The camera is
     // not opened just to be looked at here (its picture to place it is in "Свойства камеры").
     const bool live = m_webcam->isRecording() && m_webcam->settings().video;
-    // Ready for the first key: the camera is open while it would record one (it takes up to a second to start).
+    // Ready for the first key: the camera and the microphone are open while they would record one (the camera takes
+    // up to a second to start).
     m_webcam->setArmed(m_hookStarted && m_capture->isChecked() && !m_cameraStopped);
     m_video->setLive(live);
     m_video->setRecording(m_webcam->isRecording());

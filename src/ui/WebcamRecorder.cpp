@@ -194,7 +194,7 @@ void WebcamRecorder::update()
         emit recordingChanged(m_recording);
     }
     const bool camera = m_devices && m_settings.video && (m_recording || m_preview || m_armed);
-    const bool mic = m_devices && m_settings.audio && m_recording;
+    const bool mic = m_devices && m_settings.audio && (m_recording || m_armed);
     const Preset p = m_settings.preset();
     if (camera && !m_camera->isActive())
         m_camera->start(m_settings.camera, QSize(p.width, p.height), p.fps);
@@ -282,8 +282,23 @@ void WebcamRecorder::encode(const I420Frame &picture, qint64 steadyUs)
 
 void WebcamRecorder::addAudio(const QVector<float> &pcm, int channels, int rate, qint64 steadyUs)
 {
-    if (!m_accepting)
+    if (!m_accepting) {
+        // Armed: the last moments before the session (the key's own sound may start in a buffer that came before it).
+        m_warmAudio.append({pcm, channels, rate, steadyUs});
+        while (m_warmAudio.size() > 1 && steadyUs - m_warmAudio[1].steadyUs >= kWarmAudioUs)
+            m_warmAudio.removeFirst();
         return;
+    }
+    // The session's first sound: the buffers before its start if they are fresh and run on into this one.
+    if (!m_warmAudio.isEmpty() && steadyUs - m_warmAudio.last().steadyUs < 1000000)
+        for (const WarmAudio &a : std::as_const(m_warmAudio))
+            encodeAudio(a.pcm, a.channels, a.rate, a.steadyUs);
+    m_warmAudio.clear();
+    encodeAudio(pcm, channels, rate, steadyUs);
+}
+
+void WebcamRecorder::encodeAudio(const QVector<float> &pcm, int channels, int rate, qint64 steadyUs)
+{
     const int generation = m_generation;
     QMetaObject::invokeMethod(
         m_worker,
