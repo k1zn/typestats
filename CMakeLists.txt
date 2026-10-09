@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 # macOS: the oldest system Qt 6.8 runs on; CGPreflightListenEventAccess needs 10.15.
 set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum macOS version")
-project(TypingStatistics VERSION 1.2.0 LANGUAGES C CXX)
+project(TypingStatistics VERSION 1.2.1 LANGUAGES C CXX)
 # The version of the remake (the release tags are v<it>); shown everywhere as "re-<it>".
 set(TS_REMAKE_VERSION "${PROJECT_VERSION}")
 set(TS_VERSION "re-${TS_REMAKE_VERSION}")
