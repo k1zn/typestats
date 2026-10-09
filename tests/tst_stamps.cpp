@@ -351,6 +351,14 @@ private slots:
         r = reportWith(lateDoc, late);
         QCOMPARE(r.status, Stamps::Report::Status::Broken);
         QVERIFY(r.packetsLate > 0);
+
+        // The clip's origin (under no hash) slid so the whole video reads earlier than its stamps: caught too - the
+        // window is two-sided, not only "from the future".
+        MediaClip early = clip;
+        early.originUs += 10000000;
+        r = reportWith(doc, early);
+        QCOMPARE(r.status, Stamps::Report::Status::Broken);
+        QVERIFY(r.packetsLate > 0);
     }
 
     void cache()
@@ -377,19 +385,29 @@ private slots:
 
     void unknownVersion()
     {
-        // A stamp of a version this program does not check (the unreleased v2, a newer one): its records are not
-        // stamped, but nothing is broken, and the stamps after it are checked.
+        // A file made entirely of stamps this program does not check (the unreleased v2, a newer one): it is simply
+        // from a newer program - the records are not stamped, but nothing is broken.
         TsfDocument doc = load("video.tsf");
         MediaClip clip;
         QVERIFY(MediaClip::parse(doc.webcam, clip));
-        doc.stamps[0].version = 4;
-        TsfDocument back = Tsf::parse(Tsf::serialize(doc, true));
-        QCOMPARE(back.stamps[0].version, 4);
-        const Stamps::Report r = reportWith(back, clip);
-        QCOMPARE(r.unknown, 1);
+        TsfDocument whole = doc;
+        for (Stamp &s : whole.stamps)
+            s.version = 4;
+        whole = Tsf::parse(Tsf::serialize(whole, true));
+        Stamps::Report r = reportWith(whole, clip);
+        QCOMPARE(r.unknown, whole.stamps.size());
         QCOMPARE(r.bad, 0);
-        QCOMPARE(r.status, Stamps::Report::Status::Partial);
-        QVERIFY(r.stamped >= 175);
+        QVERIFY(r.status != Stamps::Report::Status::Broken);
+
+        // But an uncheckable stamp mixed in with checkable ones is tampering (a stamp relabelled to a version that is
+        // skipped, to turn a broken chain into a reassuring "partial"): it must break the chain.
+        TsfDocument mixed = doc;
+        mixed.stamps[0].version = 4;
+        mixed = Tsf::parse(Tsf::serialize(mixed, true));
+        QCOMPARE(mixed.stamps[0].version, 4);
+        r = reportWith(mixed, clip);
+        QVERIFY(r.bad > 0);
+        QCOMPARE(r.status, Stamps::Report::Status::Broken);
     }
 
     void liveChainV3()

@@ -546,16 +546,31 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
     std::optional<qint64> modelMinusVirtual;
     bool seenPresent = false;
     qint64 hiddenTail = 0;
+    bool anyChecked = false;
+    for (const Stamp &s : stamps)
+        if (isVersionChecked(s.version)) {
+            anyChecked = true;
+            break;
+        }
     for (int k = 0; k < stamps.size(); ++k) {
         const Stamp &s = stamps[k];
         const QByteArray previous = k == 0 ? s.previous : imprintOf(stamps[k - 1].token);
         if (!isVersionChecked(s.version)) {
-            // Not this program's to check: its records are not stamped, but nothing is broken; the chain goes on
-            // after it (its chunk ends where it says).
+            // A file made only of such stamps is just from a newer program; but one mixed in with stamps this program
+            // does check means the chain was tampered with (a stamp relabelled to a version that is skipped), and the
+            // rest of the chain, which leans on its unverified imprint, cannot be trusted either.
+            if (anyChecked) {
+                ++rep.bad;
+                structure = false;
+                lastGoodEnd = -1;
+                continue;
+            }
             ++rep.unknown;
             lastGoodEnd = -1;
             if (structure && (s.end < recordCursor || s.mediaEnd < packetCursor))
                 structure = false;
+            for (int i = recordCursor; i < s.end && i < records.size(); ++i)
+                virtualUs += dtOf(records.at(i));
             recordCursor = s.end;
             packetCursor = s.mediaEnd;
             continue;
@@ -573,6 +588,7 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
             continue;
         }
         // The time through the chunk; the constant between the model's time and the chain's.
+        const qint64 chunkStartVirtual = virtualUs;
         qint64 lastUs = virtualUs;
         for (const RecItem &r : l.records) {
             const qint64 d = qint64(durationOf(r));
@@ -626,10 +642,14 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
             bool late = false;
             if (clip && modelMinusVirtual) {
                 const qint64 stampModelUs = lastUs + *modelMinusVirtual + qint64(s.delayMs) * 1000;
+                // A chunk's packets were recorded between its start and the request. A packet far outside that window -
+                // the clip's origin (not under any hash) slid against the records - is as bad as one from the future.
+                const qint64 lo = chunkStartVirtual + *modelMinusVirtual - kToleranceMs * 1000;
+                const qint64 hi = stampModelUs + kToleranceMs * 1000;
                 for (const PacketItem &p : l.packets)
                     if (p.doc >= 0) {
                         const qint64 t = clip->docTime(clip->packets[p.doc].ptsUs) - clipModelOffsetUs;
-                        if (t > stampModelUs + kToleranceMs * 1000) {
+                        if (t > hi || t < lo) {
                             ++rep.packetsLate;
                             late = true;
                         }
