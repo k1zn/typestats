@@ -20,6 +20,7 @@
 #include "VideoWindow.h"
 #include "WebcamRecorder.h"
 #endif
+#include "Retranslate.h"
 #include "Texts.h"
 #include "FilePropertiesDialog.h"
 #include "FingerZonesDialog.h"
@@ -242,13 +243,17 @@ MainWindow::MainWindow(QWidget *parent)
     m_text->setMinimumHeight(40);
 
     // Right: main statistics and the keys of the visible part of the klavogram.
-    m_stats = reportList({tr("Параметр"), tr("Значение")}, font());
+    m_stats = reportList({QString(), QString()}, font());
     m_stats->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_stats->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
     m_stats->horizontalHeader()->resizeSection(1, 92);
     QFont mono(QStringLiteral("Courier New"));
     mono.setPixelSize(15);
-    m_keys = reportList({tr("Пауза"), tr("Длительность"), tr("Клавиша")}, mono);
+    m_keys = reportList({QString(), QString(), QString()}, mono);
+    translated(this, [this] {
+        m_stats->setHorizontalHeaderLabels({tr("Параметр"), tr("Значение")});
+        m_keys->setHorizontalHeaderLabels({tr("Пауза"), tr("Длительность"), tr("Клавиша")});
+    });
     m_keys->horizontalHeader()->resizeSection(0, 80);
     m_keys->horizontalHeader()->resizeSection(1, 80);
     m_keys->horizontalHeader()->setStretchLastSection(true);
@@ -276,7 +281,8 @@ MainWindow::MainWindow(QWidget *parent)
     m_mainSplit = split;
     root->addWidget(split, 1);
 
-    m_damaged = new QLabel(tr("Внимание! Файл повреждён!"), this);
+    m_damaged = new QLabel(this);
+    translated(this, [this] { m_damaged->setText(tr("Внимание! Файл повреждён!")); });
     m_damaged->setAlignment(Qt::AlignCenter);
     m_damaged->setAutoFillBackground(true);
     m_damaged->setFrameStyle(int(QFrame::Panel) | int(QFrame::Raised));
@@ -306,13 +312,18 @@ MainWindow::MainWindow(QWidget *parent)
     connect(new QShortcut(QKeySequence(Qt::Key_F4), this), &QShortcut::activated, this, &MainWindow::showTextInput);
     m_tray = new QSystemTrayIcon(QApplication::windowIcon(), this);
     auto *trayMenu = new QMenu(this);
-    QAction *captureAction = trayMenu->addAction(tr("Вкл"));
+    QAction *captureAction = trayMenu->addAction(QString());
     captureAction->setCheckable(true);
     captureAction->setChecked(true);
     connect(captureAction, &QAction::toggled, m_capture, &QCheckBox::setChecked);
     connect(m_capture, &QCheckBox::toggled, captureAction, &QAction::setChecked);
-    trayMenu->addAction(tr("Оперативная статистика"), this, &MainWindow::showLiveStats);
-    trayMenu->addAction(tr("Выход"), this, &QWidget::close);
+    QAction *liveAction = trayMenu->addAction(QString(), this, &MainWindow::showLiveStats);
+    QAction *quitAction = trayMenu->addAction(QString(), this, &QWidget::close);
+    translated(this, [=] {
+        captureAction->setText(tr("Вкл"));
+        liveAction->setText(tr("Оперативная статистика"));
+        quitAction->setText(tr("Выход"));
+    });
     m_tray->setContextMenu(trayMenu);
     m_tray->setToolTip(QStringLiteral("Ts: ON"));
     connect(m_tray, &QSystemTrayIcon::activated, this, [this](QSystemTrayIcon::ActivationReason reason) {
@@ -334,16 +345,26 @@ MainWindow::MainWindow(QWidget *parent)
 
     resize(876, 579);
     updateThemeColors();
+    m_language = Texts::currentLanguage(); // put in place by main (or `--lang` for this run)
     loadSettings();
     applySettings();
+    // What the window writes itself, in the language of the moment.
+    translated(this, [this] {
+        m_themeButton->setToolTip(Look::isDark() ? tr("Светлая тема") : tr("Тёмная тема"));
+        updateMainStats();
+        updateProof();
+#ifdef TS_HAVE_WEBCAM
+        updateVideoMode(); // the video window's message, the camera's button
+#endif
+    });
 }
 
-QToolButton *MainWindow::toolButton(QWidget *panel, int n, int x, int y, int h, const QString &hint)
+QToolButton *MainWindow::toolButton(QWidget *panel, int n, int x, int y, int h, std::function<QString()> hint)
 {
     auto *b = new QToolButton(panel);
     b->setIcon(QIcon(QStringLiteral(":/icons/Form1_SpeedButton%1.png").arg(n)));
     b->setIconSize(QSize(16, 16));
-    b->setToolTip(hint);
+    translated(this, [b, hint = std::move(hint)] { b->setToolTip(hint()); });
     b->setFocusPolicy(Qt::NoFocus);
     b->setGeometry(x, y, 23, h);
     b->setEnabled(false); // enabled by whoever connects it
@@ -356,8 +377,8 @@ QWidget *MainWindow::createToolBar()
     bar->setFrameStyle(int(QFrame::Panel) | int(QFrame::Raised));
     bar->setFixedHeight(57);
 
-    auto action = [&](int n, int x, int y, int h, const QString &hint, void (MainWindow::*slot)(), bool enabled = false) {
-        QToolButton *b = toolButton(bar, n, x, y, h, hint);
+    auto action = [&](int n, int x, int y, int h, std::function<QString()> hint, void (MainWindow::*slot)(), bool enabled = false) {
+        QToolButton *b = toolButton(bar, n, x, y, h, std::move(hint));
         if (slot) {
             b->setEnabled(true);
             connect(b, &QToolButton::clicked, this, slot);
@@ -367,91 +388,105 @@ QWidget *MainWindow::createToolBar()
         return b;
     };
     // Upper row.
-    action(1, 6, 4, 23, tr("Очистить (%1)").arg(Hotkeys::clear()), &MainWindow::clear);
-    action(6, 30, 4, 23, tr("Прочитать"), &MainWindow::open);
-    m_saveButton = action(5, 54, 4, 23, tr("Сохранить"), &MainWindow::save);
-    m_blockButton = action(27, 78, 4, 23, tr("Сохранить блок"), nullptr);
+    action(1, 6, 4, 23, [] { return tr("Очистить (%1)").arg(Hotkeys::clear()); }, &MainWindow::clear);
+    action(6, 30, 4, 23, [] { return tr("Прочитать"); }, &MainWindow::open);
+    m_saveButton = action(5, 54, 4, 23, [] { return tr("Сохранить"); }, &MainWindow::save);
+    m_blockButton = action(27, 78, 4, 23, [] { return tr("Сохранить блок"); }, nullptr);
     connect(m_blockButton, &QToolButton::clicked, this, [this] { saveDocument(true); });
-    action(26, 102, 4, 23, tr("Открыть журнал"), &MainWindow::openJournal);
-    connect(action(7, 126, 4, 23, tr("Экспортировать в Excel"), nullptr, true), &QToolButton::clicked, this,
+    action(26, 102, 4, 23, [] { return tr("Открыть журнал"); }, &MainWindow::openJournal);
+    connect(action(7, 126, 4, 23, [] { return tr("Экспортировать в Excel"); }, nullptr, true), &QToolButton::clicked, this,
             [this] { exportTable(keyTable(), true); });
-    action(12, 150, 4, 23, tr("Дополнительная статистика"), &MainWindow::showExtraStats);
-    action(19, 174, 4, 23, tr("Статистические гистограммы"), &MainWindow::showHistograms);
+    action(12, 150, 4, 23, [] { return tr("Дополнительная статистика"); }, &MainWindow::showExtraStats);
+    action(19, 174, 4, 23, [] { return tr("Статистические гистограммы"); }, &MainWindow::showHistograms);
     // The original's attached AVI (Form5, Form6) is not ported: its buttons stay, disabled. The webcam has its own
     // button in the corner.
-    action(20, 198, 4, 23, tr("Видео"), nullptr);
-    action(22, 222, 4, 23, tr("Настройки..."), &MainWindow::showSettings);
-    action(4, 246, 4, 23, tr("Оперативная статистика"), &MainWindow::showLiveStats);
-    m_helpButton = action(3, 270, 4, 23, tr("О программе"), &MainWindow::showHelpMenu);
+    action(20, 198, 4, 23, [] { return tr("Видео"); }, nullptr);
+    action(22, 222, 4, 23, [] { return tr("Настройки..."); }, &MainWindow::showSettings);
+    action(4, 246, 4, 23, [] { return tr("Оперативная статистика"); }, &MainWindow::showLiveStats);
+    m_helpButton = action(3, 270, 4, 23, [] { return tr("О программе"); }, &MainWindow::showHelpMenu);
     bevel(bar, 3, 29, 294, 2, QFrame::HLine);
     // Lower row.
-    m_deleteButton = action(10, 6, 32, 22, tr("Удалить (%1)").arg(Hotkeys::deleteKey()), &MainWindow::deleteSelection);
+    m_deleteButton = action(10, 6, 32, 22, [] { return tr("Удалить (%1)").arg(Hotkeys::deleteKey()); }, &MainWindow::deleteSelection);
     m_deleteButton->setEnabled(false);
-    connect(action(11, 30, 32, 22, tr("Копировать (%1)").arg(Hotkeys::copy()), nullptr, true), &QToolButton::clicked, this, [this] { copy(0); });
-    connect(action(13, 54, 32, 22, tr("Копировать без ошибок"), nullptr, true), &QToolButton::clicked, this, [this] { copy(1); });
-    action(14, 78, 32, 22, tr("Отменить (%1)").arg(Hotkeys::undo()), &MainWindow::undo);
-    action(18, 102, 32, 22, tr("Удалить нетекстовые клавиши"), &MainWindow::removeNonText);
-    action(15, 126, 32, 22, tr("Пометить (%1)").arg(Hotkeys::mark()), &MainWindow::mark);
-    action(21, 150, 32, 22, tr("Свойства видео"), nullptr);
-    m_axisButton = action(16, 174, 32, 22, tr("Настройка оси Y графиков"), &MainWindow::showAxisPanel);
-    m_legendButton = action(17, 198, 32, 22, tr("Легенда"), &MainWindow::showLegend);
-    action(23, 222, 32, 22, tr("Ввод текста (%1)").arg(Hotkeys::textInput()), &MainWindow::showTextInput);
-    action(25, 246, 32, 22, tr("Преобразовать в текущую раскладку"), &MainWindow::convertLayout);
-    QToolButton *quit = toolButton(bar, 24, 270, 32, 22, tr("Выход"));
+    connect(action(11, 30, 32, 22, [] { return tr("Копировать (%1)").arg(Hotkeys::copy()); }, nullptr, true), &QToolButton::clicked, this, [this] { copy(0); });
+    connect(action(13, 54, 32, 22, [] { return tr("Копировать без ошибок"); }, nullptr, true), &QToolButton::clicked, this, [this] { copy(1); });
+    action(14, 78, 32, 22, [] { return tr("Отменить (%1)").arg(Hotkeys::undo()); }, &MainWindow::undo);
+    action(18, 102, 32, 22, [] { return tr("Удалить нетекстовые клавиши"); }, &MainWindow::removeNonText);
+    action(15, 126, 32, 22, [] { return tr("Пометить (%1)").arg(Hotkeys::mark()); }, &MainWindow::mark);
+    action(21, 150, 32, 22, [] { return tr("Свойства видео"); }, nullptr);
+    m_axisButton = action(16, 174, 32, 22, [] { return tr("Настройка оси Y графиков"); }, &MainWindow::showAxisPanel);
+    m_legendButton = action(17, 198, 32, 22, [] { return tr("Легенда"); }, &MainWindow::showLegend);
+    action(23, 222, 32, 22, [] { return tr("Ввод текста (%1)").arg(Hotkeys::textInput()); }, &MainWindow::showTextInput);
+    action(25, 246, 32, 22, [] { return tr("Преобразовать в текущую раскладку"); }, &MainWindow::convertLayout);
+    QToolButton *quit = toolButton(bar, 24, 270, 32, 22, [] { return tr("Выход"); });
     quit->setEnabled(true);
     connect(quit, &QToolButton::clicked, this, &QWidget::close);
 
     bevel(bar, 297, 2, 2, 53, QFrame::VLine);
-    m_capture = new QCheckBox(tr("Вкл"), bar);
-    m_capture->setToolTip(tr("Управление перехватом (%1)").arg(Hotkeys::onOff()));
+    m_capture = new QCheckBox(bar);
     m_capture->setChecked(true);
     m_capture->move(304, 1);
-    m_onlyText = new QCheckBox(tr("Только текст"), bar);
-    m_onlyText->setToolTip(tr("Режим отображения"));
+    m_onlyText = new QCheckBox(bar);
     m_onlyText->setChecked(true);
     m_onlyText->move(304, 17);
 
     bevel(bar, 396, 2, 2, 53, QFrame::VLine);
-    m_byPauses = new QCheckBox(tr("Разбивать по паузам"), bar);
-    m_byPauses->setToolTip(tr("Режим \"Один текст\"/\"Много текстов\""));
+    m_byPauses = new QCheckBox(bar);
     m_byPauses->move(402, 1);
-    auto *pauseLabel = new QLabel(tr("Пауза разбиения"), bar);
+    auto *pauseLabel = new QLabel(bar);
     pauseLabel->move(403, 18);
     m_pause = new QSpinBox(bar);
     m_pause->setRange(200, 10000);
     m_pause->setSingleStep(100);
     m_pause->setValue(2000);
     m_pause->setKeyboardTracking(false);
-    m_pause->setToolTip(tr("Превышение этого времени считается за паузу в наборе"));
     m_pause->setGeometry(403, 32, 62, 21);
-    auto *ms = new QLabel(tr("мс"), bar);
+    auto *ms = new QLabel(bar);
     ms->move(470, 35);
 
     bevel(bar, 537, 2, 2, 53, QFrame::VLine);
-    auto *presetLabel = new QLabel(tr("Пресет"), bar);
+    auto *presetLabel = new QLabel(bar);
     presetLabel->move(546, 9);
-    auto *fingerLabel = new QLabel(tr("Пальцы"), bar);
+    auto *fingerLabel = new QLabel(bar);
     fingerLabel->move(546, 33);
     m_presets = new QComboBox(bar);
-    m_presets->setToolTip(tr("Пресеты настроек"));
     m_presets->setGeometry(592, 4, 152, 21);
     m_fingers = new QComboBox(bar);
-    m_fingers->setToolTip(tr("Начальная позиция пальцев и расстановка по зонам"));
     m_fingers->setGeometry(592, 28, 152, 21);
+    translated(this, [=, this] {
+        // Placed by hand: each as wide as its text.
+        auto text = [](auto *w, const QString &t) {
+            w->setText(t);
+            w->adjustSize();
+        };
+        text(m_capture, tr("Вкл"));
+        m_capture->setToolTip(tr("Управление перехватом (%1)").arg(Hotkeys::onOff()));
+        text(m_onlyText, tr("Только текст"));
+        m_onlyText->setToolTip(tr("Режим отображения"));
+        text(m_byPauses, tr("Разбивать по паузам"));
+        m_byPauses->setToolTip(tr("Режим \"Один текст\"/\"Много текстов\""));
+        text(pauseLabel, tr("Пауза разбиения"));
+        m_pause->setToolTip(tr("Превышение этого времени считается за паузу в наборе"));
+        text(ms, tr("мс"));
+        text(presetLabel, tr("Пресет"));
+        text(fingerLabel, tr("Пальцы"));
+        m_presets->setToolTip(tr("Пресеты настроек"));
+        m_fingers->setToolTip(tr("Начальная позиция пальцев и расстановка по зонам"));
+    });
     m_fingers->addItems(m_schemes.names());
     connect(m_fingers, &QComboBox::currentTextChanged, this, &MainWindow::zonesChanged);
-    m_newPresetButton = toolButton(bar, 8, 744, 3, 23, tr("Создать пресет (Правой кнопкой - удалить)"));
+    m_newPresetButton = toolButton(bar, 8, 744, 3, 23, [] { return tr("Создать пресет (Правой кнопкой - удалить)"); });
     m_newPresetButton->setEnabled(true);
     m_newPresetButton->installEventFilter(this);
     connect(m_newPresetButton, &QToolButton::clicked, this, &MainWindow::createPreset);
     m_presets->addItems(Presets::names());
     m_presets->setCurrentIndex(m_presets->findText(Presets::current()));
     connect(m_presets, &QComboBox::textActivated, this, &MainWindow::selectPreset);
-    m_newZonesButton = toolButton(bar, 9, 744, 27, 23, tr("Создать расстановку (Правой кнопкой - удалить)"));
+    m_newZonesButton = toolButton(bar, 9, 744, 27, 23, [] { return tr("Создать расстановку (Правой кнопкой - удалить)"); });
     m_newZonesButton->setEnabled(true);
     m_newZonesButton->installEventFilter(this);
     connect(m_newZonesButton, &QToolButton::clicked, this, &MainWindow::createFingerZones);
-    QToolButton *editZones = toolButton(bar, 2, 768, 27, 23, tr("Редактировать расстановку"));
+    QToolButton *editZones = toolButton(bar, 2, 768, 27, 23, [] { return tr("Редактировать расстановку"); });
     editZones->setEnabled(true);
     connect(editZones, &QToolButton::clicked, this, &MainWindow::editFingerZones);
 
@@ -476,12 +511,8 @@ QWidget *MainWindow::createToolBar()
     m_proofButton->hide();
     connect(m_proofButton, &QToolButton::clicked, this, &MainWindow::showProof);
     bar->installEventFilter(this);
-    // The window is no narrower than the toolbar with the widest text of the time stamps: nothing overlaps.
-    m_proofButton->setText(QStringLiteral("✓ 100 % !"));
-    m_proofButton->setStyleSheet(proofStyle(Qt::black));
-    const int proofWidth = m_proofButton->sizeHint().width();
-    int minWidth = editZones->geometry().right() + 1 + kCornerGap + proofWidth + kCornerGap + m_themeButton->width()
-                   + kCornerMargin;
+    // The corner's buttons never go over the toolbar's controls: a narrower window cuts them off on the right.
+    m_cornerLeft = editZones->geometry().right() + 1 + kCornerGap;
 #ifdef TS_HAVE_WEBCAM
     // Under them: the webcam - its video, and the menu of what is recorded.
     m_cameraButton = new QToolButton(bar);
@@ -491,14 +522,20 @@ QWidget *MainWindow::createToolBar()
     m_cameraButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
     m_cameraButton->setPopupMode(QToolButton::MenuButtonPopup);
     auto *menu = new QMenu(m_cameraButton);
-    m_cameraVideo = menu->addAction(tr("Записывать камеру при наборе"));
+    m_cameraVideo = menu->addAction(QString());
     m_cameraVideo->setCheckable(true);
-    m_cameraAudio = menu->addAction(tr("Записывать звук с микрофона"));
+    m_cameraAudio = menu->addAction(QString());
     m_cameraAudio->setCheckable(true);
     m_cameraStop = menu->addAction(QString(), this, [this] { stopCamera(!m_cameraStopped); });
     menu->addSeparator();
-    menu->addAction(tr("Свойства камеры…"), this, &MainWindow::videoProperties);
-    m_cameraSave = menu->addAction(tr("Сохранить видео в WebM…"), this, &MainWindow::saveVideo);
+    QAction *cameraProperties = menu->addAction(QString(), this, &MainWindow::videoProperties);
+    m_cameraSave = menu->addAction(QString(), this, &MainWindow::saveVideo);
+    translated(this, [=, this] {
+        m_cameraVideo->setText(tr("Записывать камеру при наборе"));
+        m_cameraAudio->setText(tr("Записывать звук с микрофона"));
+        cameraProperties->setText(tr("Свойства камеры…"));
+        m_cameraSave->setText(tr("Сохранить видео в WebM…"));
+    });
     connect(menu, &QMenu::aboutToShow, this, [this] {
         const WebcamRecorder::Settings &s = m_webcam->settings();
         m_cameraVideo->setChecked(s.video);
@@ -524,10 +561,7 @@ QWidget *MainWindow::createToolBar()
     m_cameraButton->setText(QStringLiteral("00:00"));
     m_cameraButton->setIcon(cameraIcon(Qt::black, false));
     m_cameraButton->setStyleSheet(proofStyle(Qt::black));
-    minWidth = std::max(minWidth, editZones->geometry().right() + 1 + kCornerGap + m_cameraButton->sizeHint().width()
-                                      + kCornerMargin);
 #endif
-    bar->setMinimumWidth(minWidth);
     return bar;
 }
 
@@ -705,8 +739,6 @@ void MainWindow::showSettings()
     if (dialog.exec() != QDialog::Accepted)
         return;
     dialog.save();
-    if (dialog.languageChanged())
-        QMessageBox::warning(this, tr("Предупреждение"), tr("Для смены языка перезапустите Ts"));
     applySettings();
 }
 
@@ -714,6 +746,11 @@ void MainWindow::applySettings()
 {
     // FUN_00429bbc; the rows of the statistics list follow MainOption* in updateStats().
     const QSettings s;
+    // The language (Form8, a preset): at once, every window.
+    if (const QString language = Texts::currentLanguage(); language != m_language) {
+        m_language = language;
+        Texts::setLanguage(language);
+    }
     const int textFont = std::clamp(s.value(QStringLiteral("TextFontSize"), 12).toInt(), 8, 24);
     m_text->setFontSize(textFont);
     m_input->setFontSize(textFont);
@@ -766,7 +803,7 @@ void MainWindow::showForm(const QString &name)
 
 void MainWindow::closeEvent(QCloseEvent *e)
 {
-    if (!askToSave()) {
+    if (m_saving || !askToSave()) { // the tray's "Выход" while a save waits for its stamp: the save first
         e->ignore();
         return;
     }
@@ -811,6 +848,7 @@ void MainWindow::updateProof()
         m_proofPending = false;
         if (m_doc.stamps.isEmpty() && !m_stamps->enabled()) {
             m_proofButton->hide();
+            placeCornerButtons();
             return;
         }
         Stamps::Report r = stampReport();
@@ -1552,7 +1590,15 @@ void MainWindow::showEvent(QShowEvent *e)
 // The theme and the time stamps in the right corner of the toolbar.
 void MainWindow::placeCornerButtons()
 {
-    m_themeButton->move(m_themeButton->parentWidget()->width() - m_themeButton->width() - kCornerMargin, 4);
+    // Right-aligned in the toolbar, or as if it was as wide as they need right of its controls.
+    int width = m_themeButton->parentWidget()->width();
+    width = std::max(width, m_cornerLeft + (m_proofButton->isVisibleTo(m_themeButton->parentWidget())
+                                                ? m_proofButton->width() + kCornerGap
+                                                : 0)
+                                + m_themeButton->width() + kCornerMargin);
+    if (m_cameraButton)
+        width = std::max(width, m_cornerLeft + m_cameraButton->width() + kCornerMargin);
+    m_themeButton->move(width - m_themeButton->width() - kCornerMargin, 4);
     m_proofButton->move(m_themeButton->x() - m_proofButton->width() - kCornerGap, 4);
     if (m_cameraButton) // the lower row, right-aligned with the theme
         m_cameraButton->move(m_themeButton->geometry().right() + 1 - m_cameraButton->width(), 28);
@@ -1872,6 +1918,13 @@ void MainWindow::recalculate()
 
 void MainWindow::updateStats()
 {
+    updateMainStats();
+    updateExtraStats();
+    updateHistograms();
+}
+
+void MainWindow::updateMainStats()
+{
     const RecalcOptions opt = options();
     const QLocale loc;
     const auto [b, e] = Stats::range(m_model, m_text->selectionStart(), m_text->selectionLength(), opt.byPauses);
@@ -1890,8 +1943,6 @@ void MainWindow::updateStats()
         m_stats->setFixedHeight(height);
         updateKeyList();
     }
-    updateExtraStats();
-    updateHistograms();
 }
 
 void MainWindow::updateHistograms()
@@ -2133,8 +2184,13 @@ std::optional<StampRecorder::Cover> MainWindow::stampForSave()
     QTimer::singleShot(15000, &loop, &QEventLoop::quit);
     m_stamps->flush();
     if (!ok) {
+        // The windows wait with it (keys typed elsewhere are still recorded); clear() and closing too (m_saving).
         QApplication::setOverrideCursor(Qt::WaitCursor);
+        setEnabled(false);
+        m_saving = true;
         loop.exec();
+        m_saving = false;
+        setEnabled(true);
         QApplication::restoreOverrideCursor();
     }
     disconnect(c);
@@ -2207,6 +2263,8 @@ bool MainWindow::saveDocument(bool block)
 
 void MainWindow::clear()
 {
+    if (m_saving) // the hotkey while a save waits for its stamp
+        return;
     m_path.clear();
     m_clean = true;
     m_loaded = false;

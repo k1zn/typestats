@@ -22,6 +22,7 @@
 #include "ui/Presets.h"
 #include "ui/TextInputWindow.h"
 #include "ui/SettingsDialog.h"
+#include "ui/StringTableModel.h"
 #include "ui/TextView.h"
 #ifdef TS_HAVE_WEBCAM
 #include "media/Yuv.h"
@@ -44,6 +45,8 @@
 #include <QMenu>
 #include <QScrollBar>
 #include <QSplitter>
+#include <QSystemTrayIcon>
+#include <QTranslator>
 #include <QSettings>
 #include <QTableWidget>
 #include <QStyleHints>
@@ -445,10 +448,12 @@ private slots:
 
     void minimumSize()
     {
-        // The window is no smaller than what holds everything: the toolbar with the widest text of the time stamps,
-        // the panes at their least with the graph shown, the statistics and three keys.
+        // The window is no lower than what holds the panes at their least with the graph shown, the statistics and
+        // three keys; it may be narrower than its toolbar: the corner's buttons are cut off then, never over its
+        // controls.
         MainWindow w;
         w.show();
+        QCoreApplication::processEvents(); // the button of the time stamps hidden (there are none)
         w.m_proofButton->setText(QStringLiteral("✓ 100 % !"));
         w.m_proofButton->adjustSize();
         w.m_proofButton->show();
@@ -456,12 +461,17 @@ private slots:
         w.resize(100, 100);
         QCoreApplication::processEvents();
         QCOMPARE(w.size(), w.minimumSizeHint());
+        QVERIFY(w.width() < w.m_newZonesButton->geometry().right()); // narrower than the toolbar's controls
         QVERIFY(w.m_proofButton->x() > w.m_newZonesButton->geometry().right() + 23); // the button right of it too
         QVERIFY(w.m_proofButton->geometry().right() < w.m_themeButton->x());
-        QVERIFY(w.m_themeButton->geometry().right() < w.m_themeButton->parentWidget()->width());
         QVERIFY(w.m_graph->isVisible());
         QVERIFY(w.m_graph->height() > 50);
         QVERIFY(w.m_keys->height() >= w.m_keys->minimumHeight());
+        // Wide enough again: in the corner.
+        w.resize(1200, 600);
+        QCoreApplication::processEvents();
+        QCOMPARE(w.m_themeButton->geometry().right(), w.m_themeButton->parentWidget()->width() - 1 - MainWindow::kCornerMargin);
+        QVERIFY(w.m_proofButton->geometry().right() < w.m_themeButton->x());
     }
 
     void panelButtons()
@@ -1087,6 +1097,53 @@ private slots:
         QVERIFY(w.m_needRecalc);
         w.recalculate();
         QCOMPARE(w.m_model.text, QStringLiteral("ab"));
+    }
+
+    void languageChangesAtOnce()
+    {
+        // Another language changes the texts of every window at once, without a restart (QEvent::LanguageChange,
+        // ui/Retranslate.h). The program's translations are in its own resources: a translator that brackets
+        // every text stands for one here.
+        struct Bracketing : QTranslator
+        {
+            bool isEmpty() const override { return false; }
+            QString translate(const char *, const char *source, const char *, int) const override
+            {
+                return QLatin1Char('[') + QString::fromUtf8(source) + QLatin1Char(']');
+            }
+        };
+        MainWindow w;
+        w.resize(876, 579);
+        w.show();
+        QVERIFY(w.openFile(golden("обыка.tsf")));
+        w.showExtraStats();
+        w.showHistograms();
+        w.m_hist->setRoot(Histograms::Node::AllFingers);
+        QCOMPARE(w.m_capture->text(), QStringLiteral("Вкл"));
+        const int captureWidth = w.m_capture->width();
+        const QString histTitle = w.m_hist->m_title->text();
+        Bracketing t;
+        QCoreApplication::installTranslator(&t);
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::LanguageChange);
+        QCOMPARE(w.m_capture->text(), QStringLiteral("[Вкл]"));
+        QVERIFY(w.m_capture->width() > captureWidth); // as wide as its new text
+        QCOMPARE(w.m_saveButton->toolTip(), QStringLiteral("[Сохранить]"));
+        QCOMPARE(w.m_stats->horizontalHeaderItem(0)->text(), QStringLiteral("[Параметр]"));
+        QCOMPARE(w.m_stats->item(0, 0)->text(), QStringLiteral("[Символов]"));
+        QCOMPARE(w.m_tray->contextMenu()->actions().constFirst()->text(), QStringLiteral("[Вкл]"));
+        QCOMPARE(w.m_extra->windowTitle(), QStringLiteral("[Дополнительная статистика]"));
+        QCOMPARE(w.m_extra->m_kinds[0]->text(), QStringLiteral("[Двухсимвольные сочетания]"));
+        QCOMPARE(w.m_extra->m_listModel->headerData(0, Qt::Horizontal).toString().contains(QLatin1Char('[')), true);
+        QCOMPARE(w.m_hist->windowTitle(), QStringLiteral("[Статистические гистограммы]"));
+        QCOMPARE(w.m_hist->m_stack.constFirst().kind, Histograms::Node::AllFingers); // the page stays
+        QCOMPARE(w.m_hist->m_title->text(), QLatin1Char('[') + histTitle + QLatin1Char(']'));
+        QCOMPARE(w.m_axisPanel->findChildren<QCheckBox *>().constFirst()->text(), QStringLiteral("[Авто с округлением]"));
+        QCOMPARE(w.m_live->windowTitle(), QStringLiteral("[Оперативная статистика]"));
+        QCOMPARE(w.m_input->windowTitle(), QStringLiteral("[Ввод текста]"));
+        QCoreApplication::removeTranslator(&t);
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::LanguageChange);
+        QCOMPARE(w.m_capture->text(), QStringLiteral("Вкл"));
+        QCOMPARE(w.m_hist->m_title->text(), histTitle);
     }
 
     void editKeepsKeysNotInTheModel()

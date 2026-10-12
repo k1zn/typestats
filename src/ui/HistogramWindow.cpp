@@ -1,6 +1,7 @@
 #include "HistogramWindow.h"
 
 #include "Look.h"
+#include "Retranslate.h"
 #include "Texts.h"
 #include "core/NumberFormat.h"
 
@@ -259,15 +260,14 @@ void HistogramWidget::paintEvent(QPaintEvent *)
 
 HistogramWindow::HistogramWindow(QWidget *parent) : QWidget(parent, Qt::Window)
 {
-    setWindowTitle(tr("Статистические гистограммы"));
     m_toolBar = new QFrame;
     m_toolBar->setFrameStyle(int(QFrame::Panel) | int(QFrame::Raised));
     m_toolBar->setFixedHeight(27);
-    QToolButton *backButton = toolButton(m_toolBar, 1, 5, tr("Назад"));
-    QToolButton *keysButton = toolButton(m_toolBar, 2, 28, tr("Клавиши"));
-    QToolButton *fingersButton = toolButton(m_toolBar, 3, 51, tr("Пальцы"));
-    QToolButton *extraButton = toolButton(m_toolBar, 12, 74, tr("Дополнительная статистика"));
-    m_onTop = toolButton(m_toolBar, 4, 610, tr("Поверх всех окон"));
+    QToolButton *backButton = toolButton(m_toolBar, 1, 5, QString());
+    QToolButton *keysButton = toolButton(m_toolBar, 2, 28, QString());
+    QToolButton *fingersButton = toolButton(m_toolBar, 3, 51, QString());
+    QToolButton *extraButton = toolButton(m_toolBar, 12, 74, QString());
+    m_onTop = toolButton(m_toolBar, 4, 610, QString());
     m_onTop->setCheckable(true);
     m_title = new QLabel(m_toolBar);
     m_title->move(104, 8);
@@ -295,6 +295,19 @@ HistogramWindow::HistogramWindow(QWidget *parent) : QWidget(parent, Qt::Window)
 
     m_stack = {Histograms::Node{}};
     resize(636, 473);
+    translated(this, [=, this] {
+        setWindowTitle(tr("Статистические гистограммы"));
+        backButton->setToolTip(tr("Назад"));
+        keysButton->setToolTip(tr("Клавиши"));
+        fingersButton->setToolTip(tr("Пальцы"));
+        extraButton->setToolTip(tr("Дополнительная статистика"));
+        m_onTop->setToolTip(tr("Поверх всех окон"));
+        // The page shown, with its titles in the new language (the way down to it stays).
+        if (m_source.model) {
+            m_source.names = Texts::histogramNames();
+            showPage();
+        }
+    });
 }
 
 void HistogramWindow::setSource(const Histograms::Source &source)

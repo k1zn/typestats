@@ -1,6 +1,7 @@
 #include "LiveStatsWindow.h"
 
 #include "Look.h"
+#include "Retranslate.h"
 #include "Texts.h"
 #include "core/NumberFormat.h"
 
@@ -13,7 +14,7 @@
 
 LiveStatsWindow::LiveStatsWindow(QWidget *parent) : QWidget(parent, Qt::Tool | Qt::WindowStaysOnTopHint)
 {
-    setWindowTitle(tr("Оперативная статистика"));
+    translated(this, [this] { setWindowTitle(tr("Оперативная статистика")); });
     QFont big(QStringLiteral("Arial"));
     big.setPixelSize(37);
     big.setBold(true);

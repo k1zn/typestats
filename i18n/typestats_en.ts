@@ -721,14 +721,6 @@ Copy the command, paste it into a terminal and enter your password. This is need
         <translation>Copy with tags</translation>
     </message>
     <message>
-        <source>Предупреждение</source>
-        <translation>Warning</translation>
-    </message>
-    <message>
-        <source>Для смены языка перезапустите Ts</source>
-        <translation>Restart Ts to change the language</translation>
-    </message>
-    <message>
         <source>Создание расстановки пальцев</source>
         <translation>New finger layout</translation>
     </message>

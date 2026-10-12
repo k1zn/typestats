@@ -61,6 +61,8 @@ private:
     void compute();    // unless locked
     void computeNow();
     void showRows();
+    static QStringList upperHeaders(); // of the lists, in the language of the moment
+    static QStringList lowerHeaders();
     void rowSelected(int row);
     void occurrenceSelected(int row);
     void averagesToggled(bool on);

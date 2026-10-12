@@ -8,7 +8,6 @@
 #include <QSettings>
 #include <QFileOpenEvent>
 #include <QTimer>
-#include <QTranslator>
 
 int main(int argc, char *argv[])
 {
@@ -29,11 +28,7 @@ int main(int argc, char *argv[])
         language = args[i + 1] == QLatin1String("ru") ? QStringLiteral("Russian") : QStringLiteral("English");
         args.remove(i, 2);
     }
-    QTranslator translator;
-    if (language != QLatin1String("Russian") && translator.load(QStringLiteral(":/i18n/typestats_en.qm")))
-        app.installTranslator(&translator);
-    else if (language == QLatin1String("Russian") && translator.load(QStringLiteral(":/i18n/qtbase_ru.qm")))
-        app.installTranslator(&translator); // Qt's own buttons and dialogs
+    Texts::setLanguage(language); // changed in the settings: at once
 
     // The look of the original: a classic light window with compact controls and the 8 pt dialog font
     // its layout was made for.

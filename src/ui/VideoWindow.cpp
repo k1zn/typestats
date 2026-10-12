@@ -1,5 +1,7 @@
 #include "VideoWindow.h"
 
+#include "Retranslate.h"
+
 #include "media/AudioOut.h"
 #include "media/Av1Codec.h"
 #include "media/OpusCodec.h"
@@ -50,7 +52,6 @@ VideoWindow::VideoWindow(QWidget *parent)
     : QWidget(parent, Qt::Tool | Qt::WindowStaysOnTopHint), m_decoder(std::make_unique<Av1Decoder>()),
       m_soundOut(std::make_unique<AudioOut>()), m_soundDecoder(std::make_unique<OpusAudioDecoder>())
 {
-    setWindowTitle(tr("Видео"));
     resize(400, 270);
     setMinimumSize(200, 150);
     auto *layout = new QVBoxLayout(this);
@@ -63,7 +64,6 @@ VideoWindow::VideoWindow(QWidget *parent)
     m_play = new QToolButton;
     m_play->setCheckable(true);
     m_play->setAutoRaise(true);
-    m_play->setToolTip(tr("Воспроизвести: клавограмма прокручивается вместе с видео"));
     connect(m_play, &QToolButton::toggled, this, [this](bool on) {
         m_play->setIcon(on ? m_pauseIcon : m_playIcon);
         emit playToggled(on);
@@ -71,7 +71,6 @@ VideoWindow::VideoWindow(QWidget *parent)
     m_slider = new SeekSlider;
     m_slider->setSingleStep(1000);
     m_slider->setPageStep(5000);
-    m_slider->setToolTip(tr("Перемотка (стрелки — на секунду)"));
     connect(m_slider, &QSlider::valueChanged, this, [this](int ms) {
         updateTimeLabel(m_spanFromUs + qint64(ms) * 1000);
         emit seekRequested(m_spanFromUs + qint64(ms) * 1000);
@@ -88,12 +87,11 @@ VideoWindow::VideoWindow(QWidget *parent)
         m_resume = false;
     });
     m_time = new QLabel;
-    m_rec = new QLabel(QStringLiteral("● ") + tr("Запись"));
+    m_rec = new QLabel;
     m_rec->setStyleSheet(QStringLiteral("color: #d00000; font-weight: bold"));
     m_rec->hide();
     m_save = new QToolButton;
     m_save->setAutoRaise(true);
-    m_save->setToolTip(tr("Сохранить видео в файл WebM (открывается в браузере и проигрывателях)"));
     connect(m_save, &QToolButton::clicked, this, &VideoWindow::saveRequested);
     row->addWidget(m_play);
     row->addWidget(m_slider, 1);
@@ -104,6 +102,13 @@ VideoWindow::VideoWindow(QWidget *parent)
     layout->addWidget(bar);
     updateIcons();
     updateTimeLabel(0);
+    translated(this, [this] {
+        setWindowTitle(tr("Видео"));
+        m_play->setToolTip(tr("Воспроизвести: клавограмма прокручивается вместе с видео"));
+        m_slider->setToolTip(tr("Перемотка (стрелки — на секунду)"));
+        m_rec->setText(QStringLiteral("● ") + tr("Запись"));
+        m_save->setToolTip(tr("Сохранить видео в файл WebM (открывается в браузере и проигрывателях)"));
+    });
 }
 
 void VideoWindow::updateIcons()

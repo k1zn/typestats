@@ -1,6 +1,7 @@
 #include "ExtraStatsWindow.h"
 
 #include "AppPaths.h"
+#include "Retranslate.h"
 #include "StringTableModel.h"
 
 #include <QApplication>
@@ -64,33 +65,28 @@ ExtraStatsWindow::ExtraStatsWindow(QWidget *parent)
                           | Qt::WindowCloseButtonHint),
       m_templates(AppPaths::file(QStringLiteral("ExStats.ini")))
 {
-    setWindowTitle(tr("Дополнительная статистика"));
     setMinimumSize(216, 412); // Constraints of the form, less its frame
 
     m_toolBar = new QFrame;
     m_toolBar->setFrameStyle(int(QFrame::Panel) | int(QFrame::Raised));
     m_toolBar->setFixedHeight(36);
-    QToolButton *copyButton = toolButton(m_toolBar, 1, tr("Копировать"));
+    QToolButton *copyButton = toolButton(m_toolBar, 1, QString());
     copyButton->setGeometry(4, 6, 23, 22);
-    QToolButton *excelButton = toolButton(m_toolBar, 7, tr("Экспортировать в Excel"));
+    QToolButton *excelButton = toolButton(m_toolBar, 7, QString());
     excelButton->setGeometry(26, 6, 23, 22);
-    QToolButton *saveButton = toolButton(m_toolBar, 2, tr("Сохранить"));
+    QToolButton *saveButton = toolButton(m_toolBar, 2, QString());
     saveButton->setGeometry(50, 6, 23, 22);
-    m_averages = new QCheckBox(tr("Средние значения"), m_toolBar);
+    m_averages = new QCheckBox(m_toolBar);
     m_averages->move(80, 1);
-    m_lock = new QCheckBox(tr("Заблокировать"), m_toolBar);
+    m_lock = new QCheckBox(m_toolBar);
     m_lock->move(80, 17);
-    m_onTop = toolButton(m_toolBar, 4, tr("Поверх всех окон"));
+    m_onTop = toolButton(m_toolBar, 4, QString());
     m_onTop->setCheckable(true);
 
-    m_kindBox = new QGroupBox(tr("Тип статистики"));
+    m_kindBox = new QGroupBox;
     m_kindBox->setFixedHeight(121);
-    const QString kinds[ExtraStats::KindCount] = {tr("Двухсимвольные сочетания"),    tr("Трёхсимвольные сочетания"),
-                                                  tr("Четырёхсимвольные сочетания"), tr("Слова"),
-                                                  tr("Слова с ошибками"),            tr("Предложения"),
-                                                  tr("Шаблон")};
     for (int i = 0; i < ExtraStats::KindCount; ++i) {
-        m_kinds[i] = new QRadioButton(kinds[i], m_kindBox);
+        m_kinds[i] = new QRadioButton(m_kindBox);
         m_kinds[i]->move(8, 15 + i * 14);
         connect(m_kinds[i], &QRadioButton::toggled, this, [this](bool on) {
             if (on)
@@ -111,14 +107,13 @@ ExtraStatsWindow::ExtraStatsWindow(QWidget *parent)
     m_template->addItems(m_templates.items());
     m_template->setCurrentIndex(-1);
     m_template->clearEditText();
-    m_templateButton = toolButton(m_templatePanel, 8, tr("Записать шаблон (Правой кнопкой - удалить)"));
+    m_templateButton = toolButton(m_templatePanel, 8, QString());
     m_templateButton->installEventFilter(this);
 
-    m_filterBox = new QGroupBox(tr("Фильтр по символам"));
+    m_filterBox = new QGroupBox;
     m_filterBox->setFixedHeight(91);
-    const QString filters[3] = {tr("Только эти"), tr("Один из"), tr("Исключить")};
     for (int i = 0; i < 3; ++i) {
-        m_filterOn[i] = new QCheckBox(filters[i], m_filterBox);
+        m_filterOn[i] = new QCheckBox(m_filterBox);
         m_filterOn[i]->move(8, 18 + i * 24);
         m_filterText[i] = new QLineEdit(m_filterBox);
         m_filterText[i]->setFont(editFont);
@@ -186,6 +181,46 @@ ExtraStatsWindow::ExtraStatsWindow(QWidget *parent)
 
     resize(300, 596);
     showRows();
+    translated(this, [=, this] {
+        setWindowTitle(tr("Дополнительная статистика"));
+        copyButton->setToolTip(tr("Копировать"));
+        excelButton->setToolTip(tr("Экспортировать в Excel"));
+        saveButton->setToolTip(tr("Сохранить"));
+        m_onTop->setToolTip(tr("Поверх всех окон"));
+        m_templateButton->setToolTip(tr("Записать шаблон (Правой кнопкой - удалить)"));
+        // Placed by hand: each as wide as its text.
+        auto text = [](QAbstractButton *b, const QString &t) {
+            b->setText(t);
+            b->adjustSize();
+        };
+        text(m_averages, tr("Средние значения"));
+        text(m_lock, tr("Заблокировать"));
+        m_kindBox->setTitle(tr("Тип статистики"));
+        const QString kinds[ExtraStats::KindCount] = {tr("Двухсимвольные сочетания"),    tr("Трёхсимвольные сочетания"),
+                                                      tr("Четырёхсимвольные сочетания"), tr("Слова"),
+                                                      tr("Слова с ошибками"),            tr("Предложения"),
+                                                      tr("Шаблон")};
+        for (int i = 0; i < ExtraStats::KindCount; ++i)
+            text(m_kinds[i], kinds[i]);
+        m_filterBox->setTitle(tr("Фильтр по символам"));
+        const QString filters[3] = {tr("Только эти"), tr("Один из"), tr("Исключить")};
+        for (int i = 0; i < 3; ++i)
+            text(m_filterOn[i], filters[i]);
+        // The lists keep their rows and the one selected.
+        m_listModel->setHeaders(m_sort.headers(m_averages->isChecked(), upperHeaders()));
+        m_lowerModel->setHeaders(lowerHeaders());
+        m_status->setText(tr("Всего:") + QLatin1Char(' ') + QString::number(m_rows.size()));
+    });
+}
+
+QStringList ExtraStatsWindow::upperHeaders()
+{
+    return {tr("Скорость"), tr("Текст"), tr("Кол-во")};
+}
+
+QStringList ExtraStatsWindow::lowerHeaders()
+{
+    return {tr("Скорость"), tr("Текст")};
 }
 
 void ExtraStatsWindow::setSource(const TextModel *model, const QVector<quint8> &fingers, int b, int e)
@@ -277,7 +312,7 @@ void ExtraStatsWindow::showRows()
     }
     {
         const QSignalBlocker blocker(m_list->selectionModel());
-        m_listModel->setTable(m_sort.headers(averages, {tr("Скорость"), tr("Текст"), tr("Кол-во")}), int(m_rows.size()),
+        m_listModel->setTable(m_sort.headers(averages, upperHeaders()), int(m_rows.size()),
                               [this, point = QLocale().decimalPoint()](int row, int column) {
                                   const ExtraStats::Row &r = m_rows[row];
                                   return column == 0 ? ExtraStats::formatSpeed(r.speed, point)
@@ -288,7 +323,7 @@ void ExtraStatsWindow::showRows()
     layoutControls();
     m_status->setText(tr("Всего:") + QLatin1Char(' ') + QString::number(m_rows.size()));
     m_lower.clear();
-    m_lowerModel->setTable({tr("Скорость"), tr("Текст")}, {});
+    m_lowerModel->setTable(lowerHeaders(), {});
     emit rowsChanged();
     // The first row gets the focus, and with it the klavogram goes to its occurrence.
     if (!m_rows.isEmpty())
@@ -322,7 +357,7 @@ void ExtraStatsWindow::rowSelected(int row)
         table << QStringList{ExtraStats::formatSpeed(o.speed, point), o.text};
     {
         const QSignalBlocker blocker(m_lowerList->selectionModel());
-        m_lowerModel->setTable({tr("Скорость"), tr("Текст")}, table);
+        m_lowerModel->setTable(lowerHeaders(), table);
         m_lowerList->selectRow(0);
     }
     layoutControls();

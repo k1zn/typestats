@@ -3,6 +3,7 @@
 #include <QCoreApplication>
 #include <QLocale>
 #include <QSettings>
+#include <QTranslator>
 
 namespace Texts {
 
@@ -60,6 +61,23 @@ QString currentLanguage()
     if (languages().contains(stored))
         return stored;
     return QLocale::system().language() == QLocale::Russian ? QStringLiteral("Russian") : QStringLiteral("English");
+}
+
+void setLanguage(const QString &language)
+{
+    static QTranslator *installed = nullptr;
+    if (installed) {
+        QCoreApplication::removeTranslator(installed);
+        delete installed;
+        installed = nullptr;
+    }
+    auto *translator = new QTranslator(QCoreApplication::instance());
+    const QString file = language == QLatin1String("Russian") ? QStringLiteral(":/i18n/qtbase_ru.qm") // Qt's buttons and dialogs
+                                                              : QStringLiteral(":/i18n/typestats_en.qm");
+    if (translator->load(file) && QCoreApplication::installTranslator(translator))
+        installed = translator;
+    else
+        delete translator;
 }
 
 } // namespace Texts

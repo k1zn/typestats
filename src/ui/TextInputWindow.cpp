@@ -1,6 +1,7 @@
 #include "TextInputWindow.h"
 
 #include "Look.h"
+#include "Retranslate.h"
 
 #include <QKeyEvent>
 #include <QSettings>
@@ -9,7 +10,7 @@
 
 TextInputWindow::TextInputWindow(QWidget *parent) : QWidget(parent, Qt::Tool | Qt::WindowStaysOnTopHint)
 {
-    setWindowTitle(tr("Ввод текста"));
+    translated(this, [this] { setWindowTitle(tr("Ввод текста")); });
     m_edit = new QTextEdit;
     m_edit->setAcceptRichText(false);
     m_edit->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);

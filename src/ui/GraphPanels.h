@@ -14,6 +14,11 @@ class FloatingPanel : public QFrame
     Q_OBJECT
 public:
     FloatingPanel(const QString &title, QWidget *parent);
+    void setTitle(const QString &title)
+    {
+        m_title = title;
+        update();
+    }
 
     // Keeps the panel inside its parent (FUN_0041967c).
     void keepInside();

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #include "core/FingerZones.h"
 #include "core/Histograms.h"
 #include "core/Journal.h"
@@ -77,7 +79,8 @@ private:
     void setDarkTheme(bool on);
     // What keeps colours of its own: the "damaged" bar, the legend, live statistics, the styles of the text.
     void updateThemeColors();
-    QToolButton *toolButton(QWidget *panel, int n, int x, int y, int h, const QString &hint);
+    // `hint`: the tooltip in the language of the moment (ui/Retranslate.h).
+    QToolButton *toolButton(QWidget *panel, int n, int x, int y, int h, std::function<QString()> hint);
     void loadSettings();
     void saveSettings() const;
     void showSettings();
@@ -86,6 +89,7 @@ private:
     RecalcOptions options() const;
     void recalculate();
     void updateStats();
+    void updateMainStats(); // the list of the main statistics alone
     void updateKeyList();
     void updateExtraStats();
     void showExtraStats();
@@ -202,6 +206,7 @@ private:
     bool m_loaded = false; // the recording came from a .tsf: its author and date are kept (g_fileLoaded)
     bool m_unsaved = false; // the records changed since they were opened, saved or cleared
     bool m_opening = false; // a .tsf is being opened: switching recording off adds no releases
+    bool m_saving = false;  // a save waits for its time stamp (stampForSave)
     KeyRecords m_undo;     // the records before the last deletion
     QList<Stamp> m_undoStamps; // and their time stamps
     Editing::ToUnicode m_toUnicode = &KeyboardHook::toUnicode; // the current layout (tests put their own)
@@ -211,6 +216,7 @@ private:
     int m_keyDigits = 3;    // decimals of the times in the key list (DlitDigits)
     // Settings needed on every key and every update of the statistics; read by applySettings().
     bool m_globalOnOff = true, m_globalClear = true, m_autoComments = false, m_journalOn = false;
+    QString m_language; // the "Language" setting in effect (applySettings puts another one in place)
     QVector<bool> m_mainOptions; // MainOption0..16: rows of the statistics list
     TextModel m_model;
     Histograms::KeyLabel m_histLabels; // labelsFromRecords() of the model with this serial
@@ -226,6 +232,7 @@ private:
     AxisPanel *m_axisPanel = nullptr;
     bool m_legendPlaced = false;
     static constexpr int kCornerMargin = 4, kCornerGap = 2; // the theme and the time stamps in the toolbar's corner
+    int m_cornerLeft = 0; // the corner's buttons start no further left (right of the toolbar's controls)
     static constexpr int kCameraIdleWidth = 44; // the camera's button without a length: wider than its icon
     static constexpr int kGraphMinHeight = 100; // below it the graph folds to its scroll bar (Panel1CanResize)
     struct Panes

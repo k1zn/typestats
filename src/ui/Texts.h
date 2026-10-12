@@ -13,4 +13,7 @@ Histograms::Names histogramNames();
 QStringList languages();
 // The stored language or, without the key, the one of the system.
 QString currentLanguage();
+// Puts the translation of a language in place (and Qt's own for Russian, the language of the sources); the windows
+// change their texts at once (QEvent::LanguageChange, ui/Retranslate.h).
+void setLanguage(const QString &language);
 }

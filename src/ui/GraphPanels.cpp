@@ -1,6 +1,7 @@
 #include "GraphPanels.h"
 
 #include "Look.h"
+#include "Retranslate.h"
 #include "core/NumberFormat.h"
 
 #include <QCheckBox>
@@ -104,8 +105,9 @@ void FloatingPanel::mouseDoubleClickEvent(QMouseEvent *e)
 }
 
 LegendPanel::LegendPanel(GraphWidget *graph, QWidget *parent)
-    : FloatingPanel(tr("Легенда"), parent), m_graph(graph), m_font(QStringLiteral("Courier New"), 8)
+    : FloatingPanel(QString(), parent), m_graph(graph), m_font(QStringLiteral("Courier New"), 8)
 {
+    translated(this, [this] { setTitle(tr("Легенда")); });
     setFrameStyle(int(QFrame::Box) | int(QFrame::Plain));
     setLineWidth(1);
     updateColors();
@@ -193,28 +195,41 @@ bool LegendPanel::event(QEvent *e)
     return FloatingPanel::event(e);
 }
 
-AxisPanel::AxisPanel(QWidget *parent) : FloatingPanel(tr("Настройка оси Y"), parent)
+AxisPanel::AxisPanel(QWidget *parent) : FloatingPanel(QString(), parent)
 {
     setFrameStyle(int(QFrame::Panel) | int(QFrame::Raised));
     setFixedSize(205, 117);
-    auto header = [this](const QString &text, int x, int y, int w) {
-        auto *l = new QLabel(QLatin1Char(' ') + text, this);
+    auto header = [this](int x, int y, int w) {
+        auto *l = new QLabel(this);
         l->setFrameStyle(int(QFrame::Panel) | int(QFrame::Raised));
         l->setGeometry(x, y, w, 18);
+        return l;
     };
-    header(tr("Скорость"), 43, 23, 80);
-    header(tr("Ритмичность"), 123, 23, 79);
-    header(tr("Макс"), 3, 41, 41);
-    header(tr("Мин"), 3, 59, 41);
+    QLabel *const speed = header(43, 23, 80), *const rhythm = header(123, 23, 79), *const max = header(3, 41, 41),
+                 *const min = header(3, 59, 41);
     m_speedMax = limitBox(43, 39, QStringLiteral("100"));
     m_speedMin = limitBox(43, 58, QStringLiteral("0"));
     m_rhythmMax = limitBox(123, 39, QStringLiteral("100"));
     m_rhythmMin = limitBox(123, 58, QStringLiteral("0"));
-    m_autoRound = new QCheckBox(tr("Авто с округлением"), this);
+    m_autoRound = new QCheckBox(this);
     m_autoRound->setGeometry(8, 81, 190, 17);
     m_autoRound->setChecked(true);
-    m_lockY = new QCheckBox(tr("Зафиксировать"), this);
+    m_lockY = new QCheckBox(this);
     m_lockY->setGeometry(8, 98, 190, 17);
+    translated(this, [=, this] {
+        setTitle(tr("Настройка оси Y"));
+        speed->setText(QLatin1Char(' ') + tr("Скорость"));
+        rhythm->setText(QLatin1Char(' ') + tr("Ритмичность"));
+        max->setText(QLatin1Char(' ') + tr("Макс"));
+        min->setText(QLatin1Char(' ') + tr("Мин"));
+        m_autoRound->setText(tr("Авто с округлением"));
+        m_lockY->setText(tr("Зафиксировать"));
+        // "Авто" in the lists, and in the limits that are automatic.
+        const GraphWidget::AxisSettings s = settings();
+        for (QComboBox *box : {m_speedMin, m_speedMax, m_rhythmMin, m_rhythmMax})
+            box->setItemText(0, tr("Авто"));
+        setSettings(s);
+    });
     connect(m_autoRound, &QCheckBox::toggled, this, &AxisPanel::settingsChanged);
     connect(m_lockY, &QCheckBox::toggled, this, &AxisPanel::lockYChanged);
 }
