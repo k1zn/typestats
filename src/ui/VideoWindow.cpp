@@ -333,7 +333,8 @@ void VideoWindow::feedSound(qint64 docUs)
 {
     if (!m_sound)
         return;
-    const qint64 until = docUs - qint64(m_clip->shiftMs) * 1000 + 300000; // a little ahead
+    const qint64 now = docUs - qint64(m_clip->shiftMs) * 1000;
+    const qint64 until = now + 300000; // a little ahead
     constexpr int perMs = OpusAudioEncoder::kRate / 1000;
     while (m_soundNext < m_clip->packets.size()) {
         const MediaPacket &p = m_clip->packets[m_soundNext];
@@ -351,8 +352,13 @@ void VideoWindow::feedSound(qint64 docUs)
             continue;
         if (t < m_soundEndUs) {
             pcm.remove(0, std::min<qsizetype>(pcm.size(), (m_soundEndUs - t) * perMs / 1000));
-        } else if (t > m_soundEndUs + 5000) { // a pause in recording: silence in its place
-            m_soundOut->write(QVector<qint16>(qsizetype((t - m_soundEndUs) * perMs / 1000), 0));
+        } else if (t > m_soundEndUs + 5000) {
+            // A pause in recording: silence in its place - only what is still ahead of the playback. The sound before
+            // the pause has been played out by now: the output waits, and silence for all the pause would put the
+            // sound after it late by as much.
+            const qint64 from = std::max(m_soundEndUs, now);
+            if (t > from)
+                m_soundOut->write(QVector<qint16>(qsizetype((t - from) * perMs / 1000), 0));
         }
         m_soundOut->write(pcm);
         m_soundEndUs = end;
