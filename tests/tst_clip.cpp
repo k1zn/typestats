@@ -173,6 +173,37 @@ private slots:
         QCOMPARE(c.packets[c.videoFramesAt(2550000).second].ptsUs, 4500000);
     }
 
+    void lastUs()
+    {
+        // The largest pts, kept for the packets seen (asked with every packet while recording): the same as counting
+        // anew whatever was done to the packets.
+        const auto counted = [](const MediaClip &c) {
+            qint64 last = MediaClip::kAll;
+            for (const MediaPacket &p : c.packets)
+                last = std::max(last, p.ptsUs);
+            return last == MediaClip::kAll ? 0 : c.docTime(last);
+        };
+        MediaClip c = sample();
+        QCOMPARE(c.lastUs(), counted(c));
+        c.packets.append({0, false, 20000000, "late"}); // grown
+        QCOMPARE(c.lastUs(), 20000000);
+        c.packets.append({1, true, 15000000, "earlier"}); // pts are not in order across streams
+        QCOMPARE(c.lastUs(), 20000000);
+        c.moveOrigin(1000000);
+        QCOMPARE(c.lastUs(), 19000000);
+        const MediaClip copy = c; // shares the packets
+        QCOMPARE(copy.lastUs(), 19000000);
+        c.packets.resize(c.packets.size() - 2); // detached and shorter
+        QCOMPARE(c.lastUs(), counted(c));
+        QCOMPARE(copy.lastUs(), 19000000);
+        c.packets.removeIf([](const MediaPacket &p) { return p.ptsUs > 5000000; }); // in place, shorter
+        QCOMPARE(c.lastUs(), counted(c));
+        c.packets = {{0, true, 0, "x"}, {0, false, 61000000, "y"}}; // another list
+        QCOMPARE(c.lastUs(), counted(c));
+        c = MediaClip();
+        QCOMPARE(c.lastUs(), 0);
+    }
+
     void tsf()
     {
         TsfDocument doc;

@@ -119,7 +119,10 @@ private:
     QByteArray m_encoded;
 };
 
-Layout layOut(const Stamp &s, int recordCursor, int packetCursor, const Records &records, const MediaClip *clip)
+// `hashes`: the salts of the records and the hashes of the packets, which only the imprint needs (a record's salt is a
+// SHA-256, a packet's hash one of all its bytes: a check of a stamp already checked does without them).
+Layout layOut(const Stamp &s, int recordCursor, int packetCursor, const Records &records, const MediaClip *clip,
+              bool hashes = true)
 {
     Layout l;
     const int n = records.size();
@@ -136,8 +139,8 @@ Layout layOut(const Stamp &s, int recordCursor, int packetCursor, const Records 
             item.doc = recordCursor;
             if (kind == RecItem::Present) {
                 item.encoded = records.at(recordCursor).toByteArray();
-                if (s.version >= 2)
-                    item.salt = !salts.isEmpty() ? salts.mid(qsizetype(i) * kSaltSize, kSaltSize)
+                if (s.version >= 2 && hashes)
+                    item.salt =!salts.isEmpty() ? salts.mid(qsizetype(i) * kSaltSize, kSaltSize)
                                 : !s.key.isEmpty() ? salt(s.key, quint32(j)) : QByteArray();
                 ++l.present;
                 ++j;
@@ -155,7 +158,7 @@ Layout layOut(const Stamp &s, int recordCursor, int packetCursor, const Records 
                 l.ok = false;
                 return;
             }
-            l.packets.append({packetCursor, packetHash(clip->packets[packetCursor])});
+            l.packets.append({packetCursor, hashes ? packetHash(clip->packets[packetCursor]) : QByteArray()});
         }
     };
     if (s.parts.isEmpty()) {
@@ -578,7 +581,7 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
         bool good = false;
         Layout l;
         if (structure) {
-            l = layOut(s, recordCursor, packetCursor, records, clip);
+            l = layOut(s, recordCursor, packetCursor, records, clip, false); // hashed below if not in the cache
             if (!l.ok || (l.records.isEmpty() && l.packets.isEmpty() && !s.voided) || (s.version < 2 && !s.voided && l.present == 0 && s.parts.isEmpty()))
                 structure = false;
         }
@@ -621,7 +624,8 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
             info = e.info;
         } else {
             tokenOk = TimeStamp::verify(s.token, certificates, &info) == TimeStamp::Check::Ok && info.sha256;
-            matches = tokenOk && info.imprint == imprint(s, l, previous);
+            matches = tokenOk
+                      && info.imprint == imprint(s, layOut(s, recordCursor, packetCursor, records, clip), previous);
             if (cache) {
                 cache->entries.resize(k);
                 cache->entries.append({s.token, previous, s.end, s.mediaEnd, recordCursor, packetCursor,

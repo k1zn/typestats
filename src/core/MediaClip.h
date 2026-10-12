@@ -76,6 +76,13 @@ public:
     static QByteArray packetBytes(const MediaPacket &p);
     QByteArray serialize() const;
     static bool parse(QByteArrayView bytes, MediaClip &clip);
+
+private:
+    // lastUs() for the packets it has seen (the camera's button asks with every packet): valid while `packets` holds
+    // the same data and only grew. Another list (assigned, detached, reallocated) has other data: counted anew.
+    mutable const MediaPacket *m_maxData = nullptr;
+    mutable qsizetype m_maxCount = 0;
+    mutable qint64 m_maxPts = kAll;
 };
 
 // The document's time (re/webcam.md, "Синхронизация"): T(i) = Σ dt_j, j = 0..i.

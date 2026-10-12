@@ -76,10 +76,14 @@ qint64 MediaClip::firstUs() const
 
 qint64 MediaClip::lastUs() const
 {
-    qint64 last = kAll;
-    for (const MediaPacket &p : packets)
-        last = std::max(last, p.ptsUs);
-    return last == kAll ? 0 : docTime(last);
+    if (packets.constData() != m_maxData || packets.size() < m_maxCount) {
+        m_maxData = packets.constData();
+        m_maxCount = 0;
+        m_maxPts = kAll;
+    }
+    for (; m_maxCount < packets.size(); ++m_maxCount)
+        m_maxPts = std::max(m_maxPts, packets[m_maxCount].ptsUs);
+    return m_maxPts == kAll ? 0 : docTime(m_maxPts);
 }
 
 MediaClip MediaClip::cut(qint64 fromUs, qint64 toUs, QList<int> *kept) const
