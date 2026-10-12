@@ -8,6 +8,7 @@
 #include <QCryptographicHash>
 #include <QFile>
 #include <QMap>
+#include <QSaveFile>
 
 #include <array>
 #include <optional>
@@ -423,8 +424,13 @@ QString dataLine(const KeyRecord &r)
     p[8] = u' ';
     for (int i = 0; i < 12; ++i)
         p[9 + i] = kHex[(packed >> (44 - 4 * i)) & 0xF];
-    if (!r.comment.isEmpty())
+    if (!r.comment.isEmpty()) {
         line += QStringLiteral("\t;") + r.comment;
+        // A comment is the rest of its line (the title of a window may break lines): the file keeps it on one.
+        for (qsizetype i = 21; i < line.size(); ++i)
+            if (line[i] == u'\r' || line[i] == u'\n')
+                line[i] = u' ';
+    }
     return line;
 }
 
@@ -514,11 +520,14 @@ ReadError read(const QString &path, TsfDocument &doc)
 
 bool write(const QString &path, const TsfDocument &doc, bool sign)
 {
-    QFile f(path);
-    if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+    // Into a file next to it that takes its place when all is written: a full disk or a failure halfway leaves the old
+    // file as it was, and is told (QFile would say so of neither: its buffer is written out when closed).
+    QSaveFile f(path);
+    if (!f.open(QIODevice::WriteOnly))
         return false;
     QString text = serialize(doc, sign).join(QStringLiteral("\r\n")) + QStringLiteral("\r\n");
-    return f.write(Cp1251::encode(text)) >= 0;
+    const QByteArray bytes = Cp1251::encode(text);
+    return f.write(bytes) == bytes.size() && f.commit();
 }
 
 } // namespace Tsf

@@ -1089,6 +1089,38 @@ private slots:
         QCOMPARE(w.m_model.text, QStringLiteral("ab"));
     }
 
+    void editKeepsKeysNotInTheModel()
+    {
+        // Keys typed elsewhere wait for the window to rebuild the text (tick); an edit or a block saved before that
+        // (a click on a button as the window comes back) works on all the records, not on the model's older ones.
+        MainWindow w;
+        auto key = [&w](qint64 ms, quint8 vk, bool down, char16_t ch) {
+            HookEvent e;
+            e.timeUs = ms * 1000;
+            e.flags = quint32(vk) << 16 | (vk & 0x7f) | (down ? (ch ? KeyRecord::HasChar : KeyRecord::NoChar)
+                                                               : KeyRecord::KeyUp | KeyRecord::NoChar);
+            e.ch = ch;
+            e.chars = ch ? 1 : 0;
+            w.keyEvent(e);
+        };
+        if (QApplication::activeWindow())
+            QSKIP("the test window got the focus");
+        key(0, 'A', true, u'a');
+        key(80, 'A', false, 0);
+        w.recalculate();
+        w.m_needRecalc = false;
+        key(200, 'B', true, u'b');
+        key(290, 'B', false, 0);
+        QVERIFY(w.m_needRecalc);
+        QCOMPARE(w.m_model.records.size(), 2);
+        // "Сохранить блок" with nothing selected: all of the recording.
+        QCOMPARE(w.documentForSave(true).records.size(), 4);
+        // "Удалить нетекстовые клавиши" (there are none): nothing lost.
+        w.removeNonText();
+        QCOMPARE(w.m_doc.records.size(), 4);
+        QCOMPARE(w.m_model.text, QStringLiteral("ab"));
+    }
+
     void settings()
     {
         MainWindow w;

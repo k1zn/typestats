@@ -61,6 +61,7 @@
 #include <QGridLayout>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QSaveFile>
 #include <QStyle>
 #include <QUrl>
 #include <QToolButton>
@@ -1156,6 +1157,12 @@ void MainWindow::normalizeRecords()
 {
     // Editing works on the records the text was built from (the original normalizes them in place). The first
     // press gets 60 s: the clip's time follows (re/webcam.md).
+    // Keys recorded since the last rebuild (tick() waits for the window) are not in the model yet: it is built now, or
+    // they would be lost. The model's records only grow at the end, so the indexes the caller took from it still hold.
+    if (m_needRecalc) {
+        m_needRecalc = false;
+        recalculate();
+    }
     m_clip.moveOrigin(DocTime::modelOffset(m_doc.records));
     m_doc.records = m_model.records;
     m_docEndUs = DocTime::end(m_doc.records);
@@ -2066,7 +2073,8 @@ TsfDocument MainWindow::documentForSave(bool block, int *revealed, const StampRe
         // must find the records they hashed).
         while (to != 0 && from < to && m_model.records[from].isUp())
             ++from;
-        doc.records = to == 0 ? m_model.records : m_model.records.mid(from, to - from);
+        // Nothing selected: all of the recording, with the keys the model may not have yet.
+        doc.records = to == 0 ? Recalc::normalized(m_doc.records) : m_model.records.mid(from, to - from);
         doc.attachedVideo.clear();
         // The webcam's clip of the same time (re/webcam.md, "Сохранить блок"): the records are the normalized ones.
         QList<int> kept;
@@ -2487,8 +2495,9 @@ void MainWindow::saveVideo()
         return;
     if (QFileInfo(path).suffix().isEmpty())
         path += QStringLiteral(".webm");
-    QFile f(path);
-    if (!f.open(QIODevice::WriteOnly) || f.write(Webm::write(m_clip)) < 0)
+    QSaveFile f(path); // a failure (a full disk) is told, and leaves no part of a file
+    const QByteArray bytes = Webm::write(m_clip);
+    if (!f.open(QIODevice::WriteOnly) || f.write(bytes) != bytes.size() || !f.commit())
         QMessageBox::warning(this, appTitle(), tr("Не удалось сохранить файл %1").arg(path));
 #endif
 }

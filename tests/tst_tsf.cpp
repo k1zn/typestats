@@ -18,6 +18,31 @@ private slots:
         QCOMPARE(Tsf::dataLine(r), QStringLiteral("0001A2B3 04440D41001E"));
         r.comment = QStringLiteral("метка");
         QCOMPARE(Tsf::dataLine(r), QStringLiteral("0001A2B3 04440D41001E\t;метка"));
+        // A comment that breaks lines (a window's title) stays on its line: its rest is not read as a record.
+        r.comment = QStringLiteral("окно\r\n00000001 000000410000");
+        QCOMPARE(Tsf::dataLine(r), QStringLiteral("0001A2B3 04440D41001E\t;окно  00000001 000000410000"));
+    }
+
+    void writeFailsWhole()
+    {
+        // A file that cannot be written is told, and the one there is stays as it was.
+        TsfDocument d;
+        KeyRecord r;
+        r.dtUs = 5;
+        r.flags = 0x41 << 16 | 0x1E;
+        d.records.append(r);
+        QTemporaryDir dir;
+        const QString path = dir.filePath(QStringLiteral("w.tsf"));
+        QVERIFY(Tsf::write(path, d, false));
+        QFile f(path);
+        QVERIFY(f.open(QIODevice::ReadOnly));
+        const QByteArray before = f.readAll();
+        f.close();
+        QVERIFY(!Tsf::write(dir.filePath(QStringLiteral("no/such/dir/w.tsf")), d, false));
+        QVERIFY(QDir(dir.path()).mkdir(QStringLiteral("taken.tsf"))); // a directory in its place
+        QVERIFY(!Tsf::write(dir.filePath(QStringLiteral("taken.tsf")), d, false));
+        QVERIFY(f.open(QIODevice::ReadOnly));
+        QCOMPARE(f.readAll(), before);
     }
 
     void roundTrip()
