@@ -200,6 +200,8 @@ private slots:
         QCOMPARE(c.lastUs(), counted(c));
         c.packets = {{0, true, 0, "x"}, {0, false, 61000000, "y"}}; // another list
         QCOMPARE(c.lastUs(), counted(c));
+        c.packets = QList<MediaPacket>(c.packets.size(), {0, true, 1000000, "z"}); // another list, not shorter
+        QCOMPARE(c.lastUs(), counted(c));
         c = MediaClip();
         QCOMPARE(c.lastUs(), 0);
     }

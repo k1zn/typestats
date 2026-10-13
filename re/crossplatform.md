@@ -400,6 +400,9 @@ QSettings — 58 ключей-литералов без пар, различаю
 - Linux: V4L2 (`src/media/linux/CaptureLinux.cpp`: YUYV → NV12 → MJPEG через `QImage`, время кадра — от драйвера по
   `CLOCK_MONOTONIC`), микрофон и звук воспроизведения — простой API PulseAudio (`libpulse-simple.so.0` через `dlopen`:
   без него звука нет, программа работает). Список микрофонов не показывается — источник по умолчанию системы.
+  Воспроизведение: `prebuf` = 20 мс (умолчание — весь `tlength`, 2 с: после каждой паузы звука длиннее 300 мс
+  `VideoWindow::feedSound` пишет в пустой поток, и звук отставал бы на ~1,7 с; 0 — сервер читал бы дальше в тишину и
+  срезал начало следующего звука). **Проверить руками**: звук после пауз в записи идёт вровень с картинкой.
 - macOS: AVFoundation (`src/media/mac/CaptureMac.mm`, ARC; разрешения камеры и микрофона — `NSCameraUsageDescription`,
   `NSMicrophoneUsageDescription` в `Info.plist.in`), звук — AudioQueue.
 - **Не собрано ни разу**: Docker Desktop 2026-10-07 не поднял движок (`docker desktop start` висел), macOS здесь не

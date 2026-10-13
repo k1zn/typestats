@@ -155,7 +155,7 @@ private:
     void keepRoomForRecording();
     // "Ts: ON - Typing statistics (re-…) - file": the capture state goes first, as the original's
     // application title (Application->Title) shows it on the task bar.
-    void setTitle(const QString &document);
+    void setTitle(const QString &document, bool journal = false);
     void updateTitle();
 
     // Recording.
@@ -168,6 +168,7 @@ private:
     void beginEdit(); // before an edit of the records: the copy for "Отменить", the stamps follow the records
     void endEdit();
     void selectionChanged();
+    void updateSelectionButtons();
     void deleteSelection();
     void removeNonText();
     void convertLayout();
@@ -213,6 +214,7 @@ private:
     int m_labelRecord = -1; // the record whose label is under the mouse
     QString m_path; // empty: not saved yet
     QString m_titleDocument; // what the title names after the program: the file or the journal
+    bool m_titleJournal = false; // m_titleDocument is a journal: "Журнал %1" in the language of the moment
     int m_keyDigits = 3;    // decimals of the times in the key list (DlitDigits)
     // Settings needed on every key and every update of the statistics; read by applySettings().
     bool m_globalOnOff = true, m_globalClear = true, m_autoComments = false, m_journalOn = false;

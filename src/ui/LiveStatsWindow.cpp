@@ -14,7 +14,6 @@
 
 LiveStatsWindow::LiveStatsWindow(QWidget *parent) : QWidget(parent, Qt::Tool | Qt::WindowStaysOnTopHint)
 {
-    translated(this, [this] { setWindowTitle(tr("Оперативная статистика")); });
     QFont big(QStringLiteral("Arial"));
     big.setPixelSize(37);
     big.setBold(true);
@@ -43,6 +42,10 @@ LiveStatsWindow::LiveStatsWindow(QWidget *parent) : QWidget(parent, Qt::Tool | Q
     layout->addWidget(m_status);
     resize(160, 123);
     updateColors();
+    translated(this, [this] {
+        setWindowTitle(tr("Оперативная статистика"));
+        setStats(m_stats); // the units of the time
+    });
 }
 
 void LiveStatsWindow::updateColors()

@@ -183,7 +183,7 @@ MainWindow::MainWindow(QWidget *parent)
     // A stamp (or a failed request) and the video alone are not unsaved records: a save takes a stamp of all there
     // is (stampForSave), and video that goes on after it is not worth a question when closing.
     connect(m_stamps, &StampRecorder::changed, this, &MainWindow::updateProof);
-    updateTitle();
+    translated(this, [this] { updateTitle(); }); // "Журнал %1"
 
 #ifdef TS_HAVE_WEBCAM
     // The webcam (re/webcam.md): recording follows the capture once it starts (startCapture).
@@ -393,6 +393,7 @@ QWidget *MainWindow::createToolBar()
     m_saveButton = action(5, 54, 4, 23, [] { return tr("Сохранить"); }, &MainWindow::save);
     m_blockButton = action(27, 78, 4, 23, [] { return tr("Сохранить блок"); }, nullptr);
     connect(m_blockButton, &QToolButton::clicked, this, [this] { saveDocument(true); });
+    m_blockButton->setEnabled(false);
     action(26, 102, 4, 23, [] { return tr("Открыть журнал"); }, &MainWindow::openJournal);
     connect(action(7, 126, 4, 23, [] { return tr("Экспортировать в Excel"); }, nullptr, true), &QToolButton::clicked, this,
             [this] { exportTable(keyTable(), true); });
@@ -980,9 +981,10 @@ void MainWindow::restoreFromTray()
     activateWindow();
 }
 
-void MainWindow::setTitle(const QString &document)
+void MainWindow::setTitle(const QString &document, bool journal)
 {
     m_titleDocument = document;
+    m_titleJournal = journal;
     updateTitle();
 }
 
@@ -992,7 +994,7 @@ void MainWindow::updateTitle()
     QString title = (!m_capture || m_capture->isChecked() ? QStringLiteral("Ts: ON - ") : QStringLiteral("Ts: OFF - "))
                     + appTitle();
     if (!m_titleDocument.isEmpty())
-        title += QStringLiteral(" - ") + m_titleDocument;
+        title += QStringLiteral(" - ") + (m_titleJournal ? tr("Журнал %1").arg(m_titleDocument) : m_titleDocument);
     setWindowTitle(title);
 }
 
@@ -1199,7 +1201,9 @@ void MainWindow::normalizeRecords()
     // they would be lost. The model's records only grow at the end, so the indexes the caller took from it still hold.
     if (m_needRecalc) {
         m_needRecalc = false;
+        const int scroll = m_text->verticalScrollBar()->value(); // the text only grows at the end: the view stays
         recalculate();
+        m_text->verticalScrollBar()->setValue(scroll);
     }
     m_clip.moveOrigin(DocTime::modelOffset(m_doc.records));
     m_doc.records = m_model.records;
@@ -1252,6 +1256,12 @@ void MainWindow::selectionChanged()
     m_klav->scrollToPosition(m_text->selectionStart());
     updateStats();
     klavogramMoved();
+    updateSelectionButtons();
+}
+
+void MainWindow::updateSelectionButtons()
+{
+    // "Удалить" and "Сохранить блок" act on the selection (Enabled = False in the DFM).
     const bool selected = m_text->selectionLength() != 0;
     m_deleteButton->setEnabled(selected);
     m_blockButton->setEnabled(selected);
@@ -1912,6 +1922,7 @@ void MainWindow::recalculate()
     m_klav->setModel(&m_model);
     m_graph->setModel(&m_model);
     m_saveButton->setEnabled(!m_doc.records.isEmpty());
+    updateSelectionButtons(); // the new text has no selection, and setModel() does not signal it
     updateStats();
     klavogramMoved();
 }
@@ -2040,6 +2051,11 @@ void MainWindow::setDocument(const TsfDocument &doc, const QString &title, bool 
 
 bool MainWindow::openFile(const QString &path)
 {
+    if (m_saving) {
+        // A file from the Finder (QFileOpenEvent) while a save waits for its stamp: opened once the save is done.
+        QTimer::singleShot(200, this, [this, path] { openFile(path); });
+        return false;
+    }
     const QString name = QFileInfo(path).fileName();
     if (Journal::isJournal(path)) {
         TsfDocument doc;
@@ -2053,7 +2069,8 @@ bool MainWindow::openFile(const QString &path)
         m_undo.clear();
         m_clean = true;
         doc.platform = currentKeyPlatform(); // a journal is written here
-        setDocument(doc, tr("Журнал %1").arg(name), false);
+        setDocument(doc, name, false);
+        setTitle(name, true);
         return true;
     }
     TsfDocument doc;
@@ -2120,12 +2137,14 @@ TsfDocument MainWindow::documentForSave(bool block, int *revealed, const StampRe
     if (block) {
         // The records of the selection; nothing selected - all of them.
         auto [from, to] = Editing::recordRange(m_model, m_text->selectionStart(), m_text->selectionLength());
+        // All of the recording, with the keys the model may not have yet (the stamps taken since are on them). The
+        // normalization only grows at the end, so the model's indexes hold in it.
+        const KeyRecords records = Recalc::normalized(m_doc.records);
         // The block starts at a press: releases before it are dropped by the normalization anyway (and its stamps
         // must find the records they hashed).
-        while (to != 0 && from < to && m_model.records[from].isUp())
+        while (to != 0 && from < to && records[from].isUp())
             ++from;
-        // Nothing selected: all of the recording, with the keys the model may not have yet.
-        doc.records = to == 0 ? Recalc::normalized(m_doc.records) : m_model.records.mid(from, to - from);
+        doc.records = to == 0 ? records : records.mid(from, to - from);
         doc.attachedVideo.clear();
         // The webcam's clip of the same time (re/webcam.md, "Сохранить блок"): the records are the normalized ones.
         QList<int> kept;
@@ -2135,9 +2154,8 @@ TsfDocument MainWindow::documentForSave(bool block, int *revealed, const StampRe
             if (to == 0) {
                 clip.moveOrigin(offset);
             } else if (from < to) {
-                clip = m_clip.cut(DocTime::of(m_model.records, from) + offset, DocTime::of(m_model.records, to - 1) + offset,
-                                  &kept);
-                clip.moveOrigin(-qint64(m_model.records[from].dtUs));
+                clip = m_clip.cut(DocTime::of(records, from) + offset, DocTime::of(records, to - 1) + offset, &kept);
+                clip.moveOrigin(-qint64(records[from].dtUs));
             }
             doc.webcam = clip.isEmpty() ? QByteArray() : clip.serialize();
         }
@@ -2149,7 +2167,7 @@ TsfDocument MainWindow::documentForSave(bool block, int *revealed, const StampRe
                     firstDt = r.dtUs;
                     break;
                 }
-            doc.stamps = Stamps::extract(m_doc.stamps, m_model.records, &m_clip, from, to, kept, revealed, firstDt);
+            doc.stamps = Stamps::extract(m_doc.stamps, records, &m_clip, from, to, kept, revealed, firstDt);
             if (doc.stamps.isEmpty())
                 doc.stampCertificates.clear();
         }
@@ -2187,6 +2205,7 @@ std::optional<StampRecorder::Cover> MainWindow::stampForSave()
         // The windows wait with it (keys typed elsewhere are still recorded); clear() and closing too (m_saving).
         QApplication::setOverrideCursor(Qt::WaitCursor);
         setEnabled(false);
+        m_input->setEnabled(true); // Form9: what is typed there is recorded, so it is shown too (a window can be)
         m_saving = true;
         loop.exec();
         m_saving = false;
@@ -2554,6 +2573,7 @@ void MainWindow::saveVideo()
     if (QFileInfo(path).suffix().isEmpty())
         path += QStringLiteral(".webm");
     QSaveFile f(path); // a failure (a full disk) is told, and leaves no part of a file
+    f.setDirectWriteFallback(true); // as Tsf::write
     const QByteArray bytes = Webm::write(m_clip);
     if (!f.open(QIODevice::WriteOnly) || f.write(bytes) != bytes.size() || !f.commit())
         QMessageBox::warning(this, appTitle(), tr("Не удалось сохранить файл %1").arg(path));

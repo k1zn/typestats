@@ -21,6 +21,7 @@
 #include "ui/MainWindow.h"
 #include "ui/Presets.h"
 #include "ui/TextInputWindow.h"
+#include "ui/Texts.h"
 #include "ui/SettingsDialog.h"
 #include "ui/StringTableModel.h"
 #include "ui/TextView.h"
@@ -306,9 +307,11 @@ private slots:
         QVERIFY(w.openFile(golden("обыка.tsf")));
         const QString text = w.m_model.text;
         QVERIFY(!w.m_deleteButton->isEnabled());
+        QVERIFY(!w.m_blockButton->isEnabled());
 
         select(w, 9, 5); // "этому"
         QVERIFY(w.m_deleteButton->isEnabled());
+        QVERIFY(w.m_blockButton->isEnabled());
         w.copy(0);
         QCOMPARE(QApplication::clipboard()->text(), text.mid(9, 5));
         w.copy(2); // nothing is erased in this recording: no tags
@@ -317,6 +320,8 @@ private slots:
         w.deleteSelection();
         QCOMPARE(w.m_model.text, text.left(9) + text.mid(14));
         QCOMPARE(w.m_model.size(), 264);
+        QVERIFY(!w.m_deleteButton->isEnabled()); // the new text has nothing selected
+        QVERIFY(!w.m_blockButton->isEnabled());
         w.undo();
         QCOMPARE(w.m_model.text, text);
         w.undo(); // and back again
@@ -1119,9 +1124,21 @@ private slots:
         w.showExtraStats();
         w.showHistograms();
         w.m_hist->setRoot(Histograms::Node::AllFingers);
+        w.m_hist->drill(0); // a finger
+        QCOMPARE(w.m_hist->m_stack.size(), 2);
+        w.m_hist->m_chart->m_zoomX = 300.0f;
         QCOMPARE(w.m_capture->text(), QStringLiteral("Вкл"));
         const int captureWidth = w.m_capture->width();
         const QString histTitle = w.m_hist->m_title->text();
+        GraphWidget::AxisSettings axis;
+        axis.speedMin = 50;
+        axis.speedMax = 450;
+        axis.rhythmMax = 90;
+        axis.autoRound = false;
+        w.m_axisPanel->setSettings(axis);
+        QSignalSpy axisChanged(w.m_axisPanel, &AxisPanel::settingsChanged);
+        w.setTitle(QStringLiteral("2026_10.tsj"), true);
+        const QString liveStatus = w.m_live->m_status->text();
         Bracketing t;
         QCoreApplication::installTranslator(&t);
         QCoreApplication::sendPostedEvents(nullptr, QEvent::LanguageChange);
@@ -1135,15 +1152,64 @@ private slots:
         QCOMPARE(w.m_extra->m_kinds[0]->text(), QStringLiteral("[Двухсимвольные сочетания]"));
         QCOMPARE(w.m_extra->m_listModel->headerData(0, Qt::Horizontal).toString().contains(QLatin1Char('[')), true);
         QCOMPARE(w.m_hist->windowTitle(), QStringLiteral("[Статистические гистограммы]"));
-        QCOMPARE(w.m_hist->m_stack.constFirst().kind, Histograms::Node::AllFingers); // the page stays
-        QCOMPARE(w.m_hist->m_title->text(), QLatin1Char('[') + histTitle + QLatin1Char(']'));
+        // The page stays: the way down to it and its zoom.
+        QCOMPARE(w.m_hist->m_stack.size(), 2);
+        QCOMPARE(w.m_hist->m_stack.constFirst().kind, Histograms::Node::AllFingers);
+        QCOMPARE(w.m_hist->m_stack.constLast().kind, Histograms::Node::Finger);
+        QCOMPARE(w.m_hist->m_chart->m_zoomX, 300.0f);
+        QVERIFY(w.m_hist->m_title->text() != histTitle);
+        QVERIFY(w.m_hist->m_title->text().contains(QLatin1Char('[')));
         QCOMPARE(w.m_axisPanel->findChildren<QCheckBox *>().constFirst()->text(), QStringLiteral("[Авто с округлением]"));
+        // The values of the axis' panel stay, and are not told as changed.
+        const GraphWidget::AxisSettings kept = w.m_axisPanel->settings();
+        QCOMPARE(kept.speedMin, 50);
+        QCOMPARE(kept.speedMax, 450);
+        QCOMPARE(kept.rhythmMin, 0);
+        QCOMPARE(kept.rhythmMax, 90);
+        QCOMPARE(kept.autoRound, false);
+        QCOMPARE(axisChanged.count(), 0);
+        QVERIFY(w.windowTitle().endsWith(QStringLiteral("[Журнал %1]").arg(QStringLiteral("2026_10.tsj"))));
         QCOMPARE(w.m_live->windowTitle(), QStringLiteral("[Оперативная статистика]"));
+        QVERIFY(w.m_live->m_status->text() != liveStatus); // the units of the time
         QCOMPARE(w.m_input->windowTitle(), QStringLiteral("[Ввод текста]"));
         QCoreApplication::removeTranslator(&t);
         QCoreApplication::sendPostedEvents(nullptr, QEvent::LanguageChange);
         QCOMPARE(w.m_capture->text(), QStringLiteral("Вкл"));
         QCOMPARE(w.m_hist->m_title->text(), histTitle);
+        QVERIFY(w.windowTitle().endsWith(QStringLiteral("Журнал 2026_10.tsj")));
+        QCOMPARE(w.m_live->m_status->text(), liveStatus);
+    }
+
+    void languageSetting()
+    {
+        // The program's own translations (Texts::setLanguage). `--lang en` for this run is not undone by the
+        // "Language" setting that stays as it was; a new one (Form8) changes the texts at once.
+        QSettings().setValue(QStringLiteral("Language"), QStringLiteral("Russian"));
+        Texts::setLanguage(QStringLiteral("English")); // as main() does with `--lang en`
+        {
+            MainWindow w;
+            QCOMPARE(w.m_capture->text(), QStringLiteral("On"));
+            QCOMPARE(w.m_stats->horizontalHeaderItem(0)->text(), QStringLiteral("Parameter"));
+            w.applySettings();
+            QCoreApplication::sendPostedEvents(nullptr, QEvent::LanguageChange);
+            QCOMPARE(w.m_capture->text(), QStringLiteral("On"));
+            QSettings().setValue(QStringLiteral("Language"), QStringLiteral("English"));
+            w.applySettings();
+            QCoreApplication::sendPostedEvents(nullptr, QEvent::LanguageChange);
+            QCOMPARE(w.m_capture->text(), QStringLiteral("On"));
+            QSettings().setValue(QStringLiteral("Language"), QStringLiteral("Russian"));
+            w.applySettings();
+            QCoreApplication::sendPostedEvents(nullptr, QEvent::LanguageChange);
+            QCOMPARE(w.m_capture->text(), QStringLiteral("Вкл"));
+            QCOMPARE(w.m_stats->horizontalHeaderItem(0)->text(), QStringLiteral("Параметр"));
+            // The language is not part of a preset: switching presets leaves it.
+            Presets::store(QStringLiteral("en"));
+            QSettings().setValue(QStringLiteral("Presets/en/Language"), QStringLiteral("English"));
+            w.selectPreset(QStringLiteral("en"));
+            QCoreApplication::sendPostedEvents(nullptr, QEvent::LanguageChange);
+            QCOMPARE(w.m_capture->text(), QStringLiteral("Вкл"));
+        }
+        QSettings().clear();
     }
 
     void editKeepsKeysNotInTheModel()
@@ -1176,6 +1242,23 @@ private slots:
         w.removeNonText();
         QCOMPARE(w.m_doc.records.size(), 4);
         QCOMPARE(w.m_model.text, QStringLiteral("ab"));
+    }
+
+    void editKeepsTheScroll()
+    {
+        // The text rebuilt before an edit (the keys not in the model yet) keeps its scroll: it only grew at the end.
+        MainWindow w;
+        w.resize(876, 579);
+        w.show();
+        QVERIFY(w.openFile(golden("обыка.tsf")));
+        QScrollBar *bar = w.m_text->verticalScrollBar();
+        QVERIFY(bar->maximum() > 2);
+        bar->setValue(bar->maximum() / 2);
+        const int scroll = bar->value();
+        QVERIFY(scroll > 0);
+        w.m_needRecalc = true;
+        w.removeLabel(0);
+        QCOMPARE(bar->value(), scroll);
     }
 
     void settings()
@@ -1787,6 +1870,60 @@ private slots:
         QVERIFY(r.hiddenBeforeUs > 0 && r.hiddenAfterUs > 0);
         QVERIFY(r.packets > 0);
         QCOMPARE(r.packetsStamped, r.packets);
+
+        // Keys typed since the last rebuild are not in the model, nor the stamps taken on them: the block of a
+        // selection is cut from all of the records, and keeps its stamps.
+        const TsfDocument whole = w.documentForSave(true);
+        const int to = Editing::recordRange(w.m_model, 20, 40).second;
+        QVERIFY(to + 10 < w.m_model.records.size());
+        w.m_model = Recalc::run(w.m_model.records.mid(0, to + 10), w.options()); // the block in it, the rest not
+        const TsfDocument stale = w.documentForSave(true);
+        QCOMPARE(stale.records.size(), whole.records.size());
+        QCOMPARE(stale.stamps.size(), whole.stamps.size());
+        QVERIFY(!stale.stamps.isEmpty());
+    }
+
+    void saveWaitsForTheStamp()
+    {
+        // While a save waits for its stamp the windows wait with it, Form9 aside (what is typed there is recorded);
+        // a file the Finder gives meanwhile is opened after the save.
+        MainWindow w;
+        if (QApplication::activeWindow())
+            QSKIP("the test window got the focus");
+        QList<StampRecorder::Done> held;
+        bool fail = false;
+        w.m_stamps->setSend([&](const QByteArray &, int, StampRecorder::Done done) {
+            if (fail)
+                QTimer::singleShot(0, &w, [done] { done({}, QStringLiteral("test")); });
+            else
+                held.append(std::move(done));
+        });
+        w.m_stamps->setEnabled(true);
+        w.m_stamps->attach(&w.m_doc);
+        HookEvent e;
+        e.timeUs = 1000;
+        e.flags = quint32(0x41) << 16 | 0x1E | KeyRecord::HasChar;
+        e.ch = u'a';
+        e.chars = 1;
+        w.keyEvent(e);
+        QCOMPARE(held.size(), 1); // on its way
+        bool waited = false;
+        QTimer::singleShot(0, &w, [&] {
+            waited = w.m_saving;
+            QVERIFY(!w.isEnabled());
+            QVERIFY(!w.m_extra->isEnabled());
+            QVERIFY(w.m_input->isEnabled());
+            QVERIFY(!w.openFile(golden("обыка.tsf"))); // later
+            QVERIFY(w.m_path.isEmpty());
+            fail = true;
+            held.takeFirst()({}, QStringLiteral("test"));
+        });
+        QVERIFY(!w.stampForSave()); // no authority answered
+        QVERIFY(waited);
+        QVERIFY(!w.m_saving);
+        QVERIFY(w.isEnabled());
+        QVERIFY(w.m_extra->isEnabled());
+        QTRY_VERIFY(w.m_path.endsWith(QStringLiteral("обыка.tsf")));
     }
 
     void proofButton()

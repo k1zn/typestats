@@ -5,6 +5,11 @@
 #include <QTemporaryDir>
 #include <QTest>
 
+#ifdef Q_OS_UNIX
+#include <csignal>
+#include <sys/resource.h>
+#endif
+
 class TstTsf : public QObject
 {
     Q_OBJECT
@@ -38,11 +43,31 @@ private slots:
         QVERIFY(f.open(QIODevice::ReadOnly));
         const QByteArray before = f.readAll();
         f.close();
+        // Not even opened.
         QVERIFY(!Tsf::write(dir.filePath(QStringLiteral("no/such/dir/w.tsf")), d, false));
         QVERIFY(QDir(dir.path()).mkdir(QStringLiteral("taken.tsf"))); // a directory in its place
         QVERIFY(!Tsf::write(dir.filePath(QStringLiteral("taken.tsf")), d, false));
+#ifdef Q_OS_UNIX
+        // Failing halfway (a full disk): the limit of a file's size makes the writes past it fail (EFBIG). Writing
+        // the file in place would have cut it down.
+        TsfDocument big = d;
+        for (int i = 0; i < 2000; ++i)
+            big.records.append(r);
+        rlimit old{};
+        QVERIFY(getrlimit(RLIMIT_FSIZE, &old) == 0);
+        rlimit small = old;
+        small.rlim_cur = 4096;
+        const auto oldHandler = std::signal(SIGXFSZ, SIG_IGN); // or the process is killed
+        QVERIFY(setrlimit(RLIMIT_FSIZE, &small) == 0);
+        const bool written = Tsf::write(path, big, false);
+        setrlimit(RLIMIT_FSIZE, &old);
+        std::signal(SIGXFSZ, oldHandler);
+        QVERIFY(!written);
+#endif
         QVERIFY(f.open(QIODevice::ReadOnly));
         QCOMPARE(f.readAll(), before);
+        f.close();
+        QCOMPARE(QDir(dir.path()).entryList(QDir::Files), QStringList{QStringLiteral("w.tsf")}); // no file left behind
     }
 
     void roundTrip()

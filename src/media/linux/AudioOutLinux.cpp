@@ -24,8 +24,12 @@ bool AudioOut::open(int rate)
         return false;
     d->rate = rate;
     const Pulse::SampleSpec spec{Pulse::S16LE, quint32(rate), 1};
-    // Room for 2 s: the playback queues ~0.3 s ahead, writes do not wait.
-    const Pulse::BufferAttr attr{quint32(rate * 4), quint32(rate * 2 * 2), quint32(-1), quint32(-1), quint32(-1)};
+    // Room for 2 s: the playback queues ~0.3 s ahead, writes do not wait. Run dry (a pause in the recorded sound,
+    // VideoWindow::feedSound), the stream waits for the next write and plays it at once, as waveOut does: 20 ms
+    // to start again (the default, the whole 2 s, would make the sound after every pause late by ~1.7 s; 0 would
+    // let the server read on into the silence and drop the start of what comes next).
+    const Pulse::BufferAttr attr{quint32(rate * 4), quint32(rate * 2 * 2), quint32(rate * 2 / 50), quint32(-1),
+                                 quint32(-1)};
     int error = 0;
     d->s = pa.open(nullptr, "Typing statistics", Pulse::Playback, nullptr, "playback", &spec, nullptr, &attr, &error);
     return d->s;

@@ -140,7 +140,7 @@ Layout layOut(const Stamp &s, int recordCursor, int packetCursor, const Records 
             if (kind == RecItem::Present) {
                 item.encoded = records.at(recordCursor).toByteArray();
                 if (s.version >= 2 && hashes)
-                    item.salt =!salts.isEmpty() ? salts.mid(qsizetype(i) * kSaltSize, kSaltSize)
+                    item.salt = !salts.isEmpty() ? salts.mid(qsizetype(i) * kSaltSize, kSaltSize)
                                 : !s.key.isEmpty() ? salt(s.key, quint32(j)) : QByteArray();
                 ++l.present;
                 ++j;

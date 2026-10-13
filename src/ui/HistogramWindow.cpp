@@ -65,11 +65,11 @@ QRect HistogramWidget::plotRect() const
     return QRect(m_axisWidth, 0, std::max(1, width() - m_axisWidth), std::max(1, height() - m_stripHeight));
 }
 
-void HistogramWidget::setBars(const QVector<float> &values, const QStringList &labels)
+void HistogramWidget::setBars(const QVector<float> &values, const QStringList &labels, bool fit)
 {
     m_values = values;
     m_labels = labels;
-    if (!values.isEmpty()) {
+    if (fit && !values.isEmpty()) {
         // FormShow: everything fits, a bar is at most 100 px wide. The pan is kept.
         const QRect g = plotRect();
         float max = 1.0f;
@@ -302,10 +302,10 @@ HistogramWindow::HistogramWindow(QWidget *parent) : QWidget(parent, Qt::Window)
         fingersButton->setToolTip(tr("Пальцы"));
         extraButton->setToolTip(tr("Дополнительная статистика"));
         m_onTop->setToolTip(tr("Поверх всех окон"));
-        // The page shown, with its titles in the new language (the way down to it stays).
+        // The page shown, with its titles in the new language (the way down to it and the zoom stay).
         if (m_source.model) {
             m_source.names = Texts::histogramNames();
-            showPage();
+            showPage(false);
         }
     });
 }
@@ -340,7 +340,7 @@ void HistogramWindow::back()
     }
 }
 
-void HistogramWindow::showPage()
+void HistogramWindow::showPage(bool fit)
 {
     if (!isVisible())
         return; // filled when shown
@@ -359,7 +359,7 @@ void HistogramWindow::showPage()
         values << bar.value;
         labels << bar.label;
     }
-    m_chart->setBars(values, labels);
+    m_chart->setBars(values, labels, fit);
 }
 
 void HistogramWindow::drill(int index)

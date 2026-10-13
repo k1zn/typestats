@@ -522,7 +522,9 @@ bool write(const QString &path, const TsfDocument &doc, bool sign)
 {
     // Into a file next to it that takes its place when all is written: a full disk or a failure halfway leaves the old
     // file as it was, and is told (QFile would say so of neither: its buffer is written out when closed).
+    // A folder where no new file can be made (only the file itself may be written): into the file, as before.
     QSaveFile f(path);
+    f.setDirectWriteFallback(true);
     if (!f.open(QIODevice::WriteOnly))
         return false;
     QString text = serialize(doc, sign).join(QStringLiteral("\r\n")) + QStringLiteral("\r\n");

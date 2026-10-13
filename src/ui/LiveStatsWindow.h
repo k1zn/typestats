@@ -33,6 +33,7 @@ protected:
     void hideEvent(QHideEvent *e) override;
 
 private:
+    friend class TstUi;
     QLabel *m_speed, *m_errors, *m_status;
     QSplitter *m_split;
     int m_lo = 200, m_hi = 500;

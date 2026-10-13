@@ -17,7 +17,8 @@ public:
     explicit HistogramWidget(QWidget *parent = nullptr);
 
     // Shows another page, zoomed so that all the bars fit.
-    void setBars(const QVector<float> &values, const QStringList &labels);
+    // `fit`: the zoom shows all of the bars (a new page); otherwise the view stays (the same page, new labels).
+    void setBars(const QVector<float> &values, const QStringList &labels, bool fit = true);
     // The bar at widget coordinate x, or -1.
     int barAt(int x) const;
 
@@ -83,7 +84,7 @@ protected:
 private:
     friend class TstUi;
 
-    void showPage();
+    void showPage(bool fit = true);
     void back();
     void drill(int index);
     void showHint(int index, const QPoint &globalPos);

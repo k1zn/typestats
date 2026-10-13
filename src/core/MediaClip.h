@@ -47,6 +47,8 @@ public:
     qint64 startUs = kAll;
     // Correction of the synchronization by hand, added to the time of the pictures when shown.
     qint32 shiftMs = 0;
+    // Only appended to; any other change - by assigning another list (lastUs() keeps what it has seen of this one:
+    // cleared and filled again in place, or a packet changed in place, it would not notice).
     QList<MediaPacket> packets;
 
     bool isEmpty() const { return packets.isEmpty(); }
@@ -58,6 +60,7 @@ public:
     qint64 ptsOf(qint64 docUs) const { return docUs + originUs; }
     // The span of the visible packets in the document's time ([0, 0] when empty).
     qint64 firstUs() const;
+    // The largest time of the packets. Remembers the packets it has seen: not to be called from two threads at once.
     qint64 lastUs() const;
 
     // The clip of [fromUs, toUs] (the document's time); its time starts at fromUs. Packets are copied as they are:
