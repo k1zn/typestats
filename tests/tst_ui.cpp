@@ -1271,8 +1271,9 @@ private slots:
         w.resize(876, 579);
         w.show();
         QVERIFY(w.openFile(golden("обыка.tsf")));
+        w.m_text->setFixedHeight(50); // a few lines whatever the fonts of the system: the text scrolls
         QScrollBar *bar = w.m_text->verticalScrollBar();
-        QVERIFY(bar->maximum() > 2);
+        QTRY_VERIFY(bar->maximum() > 2);
         bar->setValue(bar->maximum() / 2);
         const int scroll = bar->value();
         QVERIFY(scroll > 0);
