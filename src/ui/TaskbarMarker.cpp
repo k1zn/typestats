@@ -10,6 +10,8 @@
 #include <QPointer>
 #include <QWidget>
 
+#include <algorithm>
+
 #ifdef Q_OS_WIN
 #include <qt_windows.h>
 #include <shobjidl.h>
@@ -30,18 +32,16 @@ QHash<const QWidget *, bool> &states()
 }
 
 #ifndef Q_OS_MACOS
-// A red dot with a darker rim, `size` px.
-QImage dot(int size)
+// A red dot with a darker rim, `diameter` px, in the bottom right corner of `img`.
+void drawDot(QImage &img, qreal diameter)
 {
-    QImage img(size, size, QImage::Format_ARGB32_Premultiplied);
-    img.fill(Qt::transparent);
     QPainter p(&img);
     p.setRenderHint(QPainter::Antialiasing);
-    const qreal rim = size / 12.0;
+    const qreal rim = std::max(1.0, diameter / 10.0);
     p.setPen(QPen(QColor(140, 0, 0), rim));
     p.setBrush(QColor(230, 20, 20));
-    p.drawEllipse(QRectF(rim / 2, rim / 2, size - rim, size - rim));
-    return img;
+    const qreal d = diameter - rim;
+    p.drawEllipse(QRectF(img.width() - rim / 2 - d, img.height() - rim / 2 - d, d, d));
 }
 #endif
 
@@ -70,7 +70,13 @@ void apply(HWND hwnd, bool on)
         list->SetOverlayIcon(hwnd, nullptr, nullptr);
         return;
     }
-    static const HICON icon = dot(32).toHICON(); // drawn at the size of a small icon
+    // The overlay covers the bottom right quarter of the button's icon: the dot takes the corner of it.
+    static const HICON icon = [] {
+        QImage img(32, 32, QImage::Format_ARGB32_Premultiplied);
+        img.fill(Qt::transparent);
+        drawDot(img, 18);
+        return img.toHICON();
+    }();
     const std::wstring text = QCoreApplication::translate("TaskbarMarker", "Идёт запись").toStdWString();
     list->SetOverlayIcon(hwnd, icon, text.c_str());
 }
@@ -130,10 +136,7 @@ void set(QWidget *window, bool on)
         QImage img = base.pixmap(size, size).toImage().convertToFormat(QImage::Format_ARGB32_Premultiplied);
         if (img.isNull())
             continue;
-        QPainter p(&img);
-        const int d = size / 2;
-        p.drawImage(size - d, size - d, dot(d));
-        p.end();
+        drawDot(img, size * 0.35);
         marked.addPixmap(QPixmap::fromImage(img));
     }
     window->setWindowIcon(marked);
