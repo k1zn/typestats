@@ -1159,6 +1159,13 @@ The camera starts recording with the first key.</translation>
     </message>
 </context>
 <context>
+    <name>TaskbarMarker</name>
+    <message>
+        <source>Идёт запись</source>
+        <translation>Recording</translation>
+    </message>
+</context>
+<context>
     <name>TextInputWindow</name>
     <message>
         <source>Ввод текста</source>

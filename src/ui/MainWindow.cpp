@@ -21,6 +21,7 @@
 #include "WebcamRecorder.h"
 #endif
 #include "Retranslate.h"
+#include "TaskbarMarker.h"
 #include "Texts.h"
 #include "FilePropertiesDialog.h"
 #include "FingerZonesDialog.h"
@@ -1072,6 +1073,7 @@ void MainWindow::captureToggled(bool on)
     }
     m_tray->setToolTip(on ? QStringLiteral("Ts: ON") : QStringLiteral("Ts: OFF"));
     updateTitle();
+    TaskbarMarker::set(this, on);
     const QIcon icon = QApplication::windowIcon();
     m_tray->setIcon(on ? icon : QIcon(icon.pixmap(32, 32, QIcon::Disabled)));
     // Switched off: the keys still held get their releases.
@@ -1587,6 +1589,7 @@ void MainWindow::fitGraph(int text, int klav)
 void MainWindow::showEvent(QShowEvent *e)
 {
     QWidget::showEvent(e);
+    TaskbarMarker::set(this, m_capture->isChecked()); // the window may have got its button only now
     if (m_panesPending)
         layOutPanes();
     if (!m_legendPlaced) {

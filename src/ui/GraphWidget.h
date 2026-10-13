@@ -83,6 +83,7 @@ protected:
 
 private:
     friend class TstPerf;
+    friend class TstUi;
 
     struct Scale
     {
@@ -131,4 +132,5 @@ private:
     bool m_hasRuler = false, m_rulerFollows = false;
     QRect m_rulerBox;
     QElapsedTimer m_rightClick;
+    QVector<int> m_labelledLines; // y of the lines whose labels were drawn in the last frame
 };

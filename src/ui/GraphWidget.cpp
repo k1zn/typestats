@@ -7,6 +7,7 @@
 #include <QPainter>
 
 #include <cmath>
+#include <limits>
 
 namespace {
 
@@ -461,6 +462,10 @@ void GraphWidget::drawGrid(QPainter &p, const QRect &g, int stripFont)
             decimals[idx] = 1;
     }
 
+    // A squeezed graph has its lines closer than their three labels are high: the labels of a line that would run
+    // into those of the line below are left out (the original draws them over each other).
+    m_labelledLines.clear();
+    int labelsTop = std::numeric_limits<int>::max(); // of the labels drawn last
     for (; a < top; a += stepUnits) {
         const float py = (m_offsetY + a) * m_zoomY;
         if (!(py > -2.0f))
@@ -471,6 +476,11 @@ void GraphWidget::drawGrid(QPainter &p, const QRect &g, int stripFont)
             p.setPen(dotted);
             p.drawLine(0, y, w - 1, y);
         }
+        const int groupTop = int(float(h) - py - float(3 * cy));
+        if (int(float(h) - py + float(cy)) + fm.height() > labelsTop)
+            continue;
+        labelsTop = groupTop;
+        m_labelledLines.append(int(float(h) - py));
         p.setClipRect(QRect(-m_axisWidth + 1, 0, m_axisWidth - 2, height()));
         for (int idx = 0; idx < 3; ++idx) {
             const Scale &s = m_scale[axis[idx]];

@@ -20,6 +20,7 @@
 #include "ui/Look.h"
 #include "ui/MainWindow.h"
 #include "ui/Presets.h"
+#include "ui/TaskbarMarker.h"
 #include "ui/TextInputWindow.h"
 #include "ui/Texts.h"
 #include "ui/SettingsDialog.h"
@@ -1244,6 +1245,25 @@ private slots:
         QCOMPARE(w.m_model.text, QStringLiteral("ab"));
     }
 
+    void axisLabelsDoNotOverlap()
+    {
+        // A squeezed graph leaves out the labels that would run into those of the line below.
+        MainWindow w;
+        QVERIFY(w.openFile(golden("824.tsf")));
+        GraphWidget g;
+        g.setModel(&w.m_model);
+        const QFontMetrics fm(g.font());
+        const int cy = fm.height() / 2;
+        const int group = 4 * cy + fm.height(); // three labels: from 3·cy above the line to a line's height below cy
+        for (int h = 40; h <= 400; h += 5) {
+            g.resize(500, h);
+            g.grab();
+            QVERIFY(!g.m_labelledLines.isEmpty());
+            for (int i = 1; i < g.m_labelledLines.size(); ++i)
+                QVERIFY2(g.m_labelledLines[i - 1] - g.m_labelledLines[i] >= group, qPrintable(QString::number(h)));
+        }
+    }
+
     void editKeepsTheScroll()
     {
         // The text rebuilt before an edit (the keys not in the model yet) keeps its scroll: it only grew at the end.
@@ -1566,6 +1586,19 @@ private slots:
         QCOMPARE(w.m_doc.records.size(), 2);
         QVERIFY(w.m_doc.records.last().isUp());
         QCOMPARE(w.m_model.text, QStringLiteral("a"));
+    }
+
+    void taskbarMarker()
+    {
+        // The red mark on the task bar's button follows "Ts: ON".
+        MainWindow w;
+        QVERIFY(w.m_capture->isChecked());
+        w.show(); // on from the start: set when shown
+        QVERIFY(TaskbarMarker::isSet(&w));
+        w.m_capture->setChecked(false);
+        QVERIFY(!TaskbarMarker::isSet(&w));
+        w.m_capture->setChecked(true);
+        QVERIFY(TaskbarMarker::isSet(&w));
     }
 
     void openingSwitchesCaptureOff()
