@@ -547,7 +547,11 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
     // the delay is held to that of a stamp after the last key.
     QVector<std::optional<qint64>> nextDtUs(stamps.size());
     QVector<bool> nextExact(stamps.size(), true);
+    // The constant between the model's time and the chain's, by the first record shown - known before the stamps are
+    // gone through: the packets of the stamps before it are timed by it too.
+    std::optional<qint64> modelMinusVirtual;
     {
+        qint64 v = 0;
         QVector<std::optional<qint64>> firstDt(stamps.size()); // of the first record of each chunk
         QVector<bool> known(stamps.size(), false);              // a chunk with records whose first dt is known
         QVector<bool> exact(stamps.size(), true);               // that dt itself, not a bound of it
@@ -560,6 +564,8 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
                     firstDt[laid] = dtOf(records.at(rc));
                     known[laid] = true;
                 }
+                for (int i = rc; i < s.end && i < records.size(); ++i)
+                    v += dtOf(records.at(i));
                 rc = std::max(rc, s.end);
                 pc = std::max(pc, s.mediaEnd);
                 continue;
@@ -567,6 +573,13 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
             const Layout l = layOut(s, rc, pc, records, clip, false);
             if (!l.ok)
                 break;
+            for (const RecItem &r : l.records) {
+                if (r.kind == RecItem::Unstamped)
+                    continue;
+                v += qint64(durationOf(r));
+                if (r.kind == RecItem::Present && !modelMinusVirtual)
+                    modelMinusVirtual = modelUs[r.doc] - v;
+            }
             qint64 sum = 0;
             for (const RecItem &r : l.records) {
                 if (r.kind == RecItem::Unstamped)
@@ -636,7 +649,6 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
         b.lastGoodEnd = end;
     };
     qint64 virtualUs = 0;    // the time of the recording by the chain's records, hidden ones too
-    std::optional<qint64> modelMinusVirtual;
     bool seenPresent = false;
     bool shownSeen = false, shownEnded = false; // records of stamps not voided: shown ones, hidden ones after them
     // The last shown packet of each stream, and how many packets were hidden by then.
@@ -717,8 +729,6 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
             virtualUs += d;
             lastUs = virtualUs;
             if (r.kind == RecItem::Present) {
-                if (!modelMinusVirtual)
-                    modelMinusVirtual = modelUs[r.doc] - virtualUs;
                 if (!seenPresent)
                     rep.hiddenBeforeUs = virtualUs - d;
                 seenPresent = true;
@@ -795,7 +805,8 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
                           + kToleranceMs * 1000;
             else if (hasRecords)
                 limitUs = (qint64(kIdleMs) + kToleranceMs) * 1000;
-            const bool delayOk = delayUs <= limitUs;
+            // No bound (video only, no key known after it): its time says nothing of the records'.
+            const bool delayOk = delayUs <= limitUs && limitUs != std::numeric_limits<qint64>::max();
             // Video timed after the stamp that holds it: it did not exist then as it says.
             bool late = false;
             if (clip && modelMinusVirtual) {

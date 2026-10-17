@@ -904,6 +904,47 @@ private slots:
             QCOMPARE(r.status, Stamps::Report::Status::Broken);
         }
     }
+
+    void earlyVideo()
+    {
+        // A block's video from stamps before its first record: timed by its own stamps too.
+        const TsfDocument doc = load("cosigned.tsf");
+        MediaClip clip;
+        QVERIFY(MediaClip::parse(doc.webcam, clip));
+        const KeyRecords normalized = Recalc::normalized(doc.records);
+        int from = 130;
+        const int to = int(normalized.size());
+        while (normalized[from].isUp())
+            ++from;
+        const qint64 offset = DocTime::modelOffset(doc.records);
+        MediaClip cut = clip.cut(DocTime::of(normalized, from) + offset, DocTime::of(normalized, to - 1) + offset);
+        cut.moveOrigin(-qint64(normalized[from].dtUs));
+        QList<int> kept;
+        cut.packets.clear();
+        for (int i = 0; i < doc.stamps[1].mediaEnd; ++i) {
+            cut.packets.append(clip.packets[i]);
+            kept.append(i);
+        }
+        TsfDocument block;
+        block.records = normalized.mid(from, to - from);
+        block.stamps = Stamps::extract(doc.stamps, normalized, &clip, from, to, kept);
+        block.stampCertificates = doc.stampCertificates;
+        const auto check = [&](qint64 shiftUs) {
+            MediaClip c = cut;
+            c.originUs -= shiftUs;
+            block.webcam = c.serialize();
+            const TsfDocument back = Tsf::parse(Tsf::serialize(block, true));
+            MediaClip backClip;
+            Q_ASSERT(MediaClip::parse(back.webcam, backClip));
+            return reportWith(back, backClip);
+        };
+        Stamps::Report r = check(0);
+        QCOMPARE(r.bad, 0);
+        QCOMPARE(r.packetsStamped, int(kept.size()));
+        r = check(clip.ptsOf(DocTime::of(normalized, from) + offset) - clip.packets.first().ptsUs);
+        QVERIFY(r.packetsLate > 0);
+        QCOMPARE(r.status, Stamps::Report::Status::Broken);
+    }
 };
 
 QTEST_GUILESS_MAIN(TstStamps)
