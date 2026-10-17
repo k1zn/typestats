@@ -45,7 +45,9 @@ public:
     qint64 originUs = 0;
     // Packets before it (pts) are only for decoding: a cut keeps the frames from the key frame before the cut.
     qint64 startUs = kAll;
-    // Correction of the synchronization by hand, added to the time of the pictures when shown.
+    // Correction of the synchronization by hand, added to the time of the pictures when shown. It is under no stamp and
+    // the stamps' check of the packets' time does not see it: no more than this (a file's is cut to it).
+    static constexpr qint32 kMaxShiftMs = 5000;
     qint32 shiftMs = 0;
     // Only appended to; any other change - by assigning another list (lastUs() keeps what it has seen of this one:
     // cleared and filled again in place, or a packet changed in place, it would not notice).

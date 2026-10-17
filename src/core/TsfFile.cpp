@@ -293,7 +293,7 @@ void readStamps(const QList<QStringView> &lines, TsfDocument &doc)
             s.mediaEnd = parts.size() >= 5 ? parts[4].toInt(&okMedia) : -1;
         if (s.version >= 3 && parts.size() == 6 && parts[5] != u"-")
             s.key = Z85::decode(parts[5], &okMedia);
-        if (okEnd && okDelay && okFlags && okMedia && s.mediaEnd >= 0 && !s.token.isEmpty())
+        if (okEnd && okDelay && okFlags && okMedia && s.end >= 0 && s.mediaEnd >= 0 && !s.token.isEmpty())
             stamps.insert(index, s);
     }
     // The hidden parts of the stamps they name (the i of their Stamp<i> line).

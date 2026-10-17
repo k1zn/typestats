@@ -150,7 +150,12 @@ const QList<QByteArray> &anchors()
 
 QMutex g_cacheMutex;
 QHash<QByteArray, bool> g_signatures; // sha256(signed bytes, signature, key) -> valid
-QHash<QByteArray, int> g_goodTokens;  // sha256(token, signer) of tokens that passed -> their root
+struct GoodToken
+{
+    int root = -1;
+    QList<QByteArray> chain;
+};
+QHash<QByteArray, GoodToken> g_goodTokens; // sha256(token, signer) of tokens that passed -> their root and chain
 
 QByteArray sha256(QByteArrayView a) { return QCryptographicHash::hash(a, QCryptographicHash::Sha256); }
 
@@ -197,42 +202,67 @@ bool signedBy(const Certificate &c, QByteArrayView issuerSpki)
 
 constexpr int kMaxDepth = 6;
 constexpr qsizetype kMaxCertificates = 64; // a token and its file carry a few
+constexpr int kMaxVisits = 32;             // certificates a chain is looked for through, for one signer
+
+struct Step
+{
+    int root = -1;                     // the pinned root it leads to, or -1
+    const Certificate *issuer = nullptr; // the next one up (none: signed by the root itself)
+};
+
+struct ChainSearch
+{
+    const QList<Certificate> &pool;
+    qint64 atMs;
+    QHash<const Certificate *, Step> memo;
+    int visits = 0;
+};
 
 // The pinned root the certificate leads to (its index in anchors(), or -1), every certificate on the way valid at
 // `atMs`. A signature is checked only with a key that is trusted already (pinned, or of a certificate shown to lead
 // to one).
-int rootOf(const Certificate &c, const QList<Certificate> &pool, qint64 atMs, int depth, QHash<const Certificate *, int> &memo)
+int rootOf(const Certificate &c, ChainSearch &search, int depth)
 {
-    if (depth >= kMaxDepth || atMs < c.notBefore || atMs > c.notAfter || (depth > 0 && !c.ca) || revoked(c.spki))
+    if (depth >= kMaxDepth || search.atMs < c.notBefore || search.atMs > c.notAfter || (depth > 0 && !c.ca)
+        || revoked(c.spki))
         return -1;
-    if (const auto it = memo.constFind(&c); it != memo.cend())
-        return *it;
-    memo.insert(&c, -1); // a loop leads nowhere
+    if (const auto it = search.memo.constFind(&c); it != search.memo.cend())
+        return it->root;
+    // Certificates of the same names as the real ones would make it check signatures without end.
+    if (++search.visits > kMaxVisits)
+        return -1;
+    search.memo.insert(&c, {}); // a loop leads nowhere
     const QList<QByteArray> &roots = anchors();
-    int root = -1;
+    Step step;
     for (qsizetype r = 0; r < roots.size(); ++r)
         if (signedBy(c, roots[r])) {
-            root = int(r);
+            step.root = int(r);
             break;
         }
-    for (qsizetype i = 0; root < 0 && i < pool.size(); ++i) {
-        const Certificate &issuer = pool[i];
+    for (qsizetype i = 0; step.root < 0 && i < search.pool.size(); ++i) {
+        const Certificate &issuer = search.pool[i];
         if (&issuer == &c || issuer.subject != c.issuer || roots.contains(issuer.spki.toByteArray()))
             continue;
-        const int up = rootOf(issuer, pool, atMs, depth + 1, memo);
+        const int up = rootOf(issuer, search, depth + 1);
         if (up >= 0 && signedBy(c, issuer.spki))
-            root = up;
+            step = {up, &issuer};
     }
-    memo.insert(&c, root);
-    return root;
+    search.memo.insert(&c, step);
+    return step.root;
 }
 
-int trustedRoot(const Certificate &leaf, const QList<Certificate> &pool, qint64 atMs)
+// The root of the signer and the certificates from it up (DER), or -1.
+int trustedRoot(const Certificate &leaf, const QList<Certificate> &pool, qint64 atMs, QList<QByteArray> &chain)
 {
     if (anchors().contains(leaf.spki.toByteArray()))
         return -1; // a root does not stamp by itself
-    QHash<const Certificate *, int> memo;
-    return rootOf(leaf, pool, atMs, 0, memo);
+    ChainSearch search{pool, atMs, {}, 0};
+    const int root = rootOf(leaf, search, 0);
+    chain.clear();
+    if (root >= 0)
+        for (const Certificate *c = &leaf; c && chain.size() <= kMaxDepth; c = search.memo.value(c).issuer)
+            chain.append(c->der);
+    return root;
 }
 
 struct SignedData
@@ -459,7 +489,6 @@ Check verify(QByteArrayView token, const QList<QByteArray> &pool, Info *out)
     if (!typeOk || !digestOk)
         return Check::BadSignature;
 
-    const Certificate *signer = nullptr;
     QByteArrayView issuerName, serial;
     if (sid) {
         Der::Reader s(sid->content);
@@ -469,43 +498,55 @@ Check verify(QByteArrayView token, const QList<QByteArray> &pool, Info *out)
         issuerName = issuer->content;
         serial = Der::unsignedInteger(*number);
     }
-    for (const Certificate &c : certs)
-        if (sid ? c.issuer == issuerName && c.serial == serial : c.subjectKeyId == keyId->content) {
-            signer = &c;
-            break;
-        }
-    if (!signer)
-        return Check::UnknownSigner;
-    if (revoked(signer->spki))
-        return Check::Revoked;
 
     // The signature is over the DER of the attributes as a SET (the [0] tag replaced).
     QByteArray signedAttrs = attrs->whole.toByteArray();
     signedAttrs[0] = char(Der::Set);
-    QCryptographicHash cacheKey(QCryptographicHash::Sha256);
-    cacheKey.addData(token);
-    cacheKey.addData(signer->der);
-    const QByteArray key = cacheKey.result();
-    int root = -1;
-    {
-        const QMutexLocker lock(&g_cacheMutex);
-        root = g_goodTokens.value(key, -1);
+    // Every certificate of the signer's name and serial (or key id): the certificates are under no signature, so one
+    // of the same name put before the real one must not hide it.
+    std::optional<Check> failed;
+    for (const Certificate &c : certs) {
+        if (!(sid ? c.issuer == issuerName && c.serial == serial : c.subjectKeyId == keyId->content))
+            continue;
+        const Check check = [&] {
+            if (revoked(c.spki))
+                return Check::Revoked;
+            QCryptographicHash cacheKey(QCryptographicHash::Sha256);
+            cacheKey.addData(token);
+            cacheKey.addData(c.der);
+            const QByteArray key = cacheKey.result();
+            {
+                const QMutexLocker lock(&g_cacheMutex);
+                if (const auto it = g_goodTokens.constFind(key); it != g_goodTokens.cend()) {
+                    tst->root = it->root;
+                    tst->chain = it->chain;
+                    return Check::Ok;
+                }
+            }
+            // The chain first: the signer's key is used once it is known to be trusted.
+            QList<QByteArray> chain;
+            const int root = c.timeStamping ? trustedRoot(c, certs, tst->timeMs, chain) : -1;
+            if (root < 0)
+                return Check::Untrusted;
+            if (!signatureValid(c.spki, *sigDigest, signedAttrs, signature->content))
+                return Check::BadSignature;
+            tst->root = root;
+            tst->chain = chain;
+            const QMutexLocker lock(&g_cacheMutex);
+            g_goodTokens.insert(key, {root, chain});
+            return Check::Ok;
+        }();
+        if (check == Check::Ok) {
+            tst->authority = c.commonName;
+            tst->signerKey = sha256(c.spki);
+            if (out)
+                *out = *tst;
+            return Check::Ok;
+        }
+        if (!failed)
+            failed = check; // the first one's, as when there is one
     }
-    if (root < 0) {
-        // The chain first: the signer's key is used once it is known to be trusted.
-        root = signer->timeStamping ? trustedRoot(*signer, certs, tst->timeMs) : -1;
-        if (root < 0)
-            return Check::Untrusted;
-        if (!signatureValid(signer->spki, *sigDigest, signedAttrs, signature->content))
-            return Check::BadSignature;
-        const QMutexLocker lock(&g_cacheMutex);
-        g_goodTokens.insert(key, root);
-    }
-    tst->authority = signer->commonName;
-    tst->root = root;
-    if (out)
-        *out = *tst;
-    return Check::Ok;
+    return failed.value_or(Check::UnknownSigner);
 }
 
 void clearCache()

@@ -1,5 +1,7 @@
 #include "VideoPropertiesDialog.h"
 
+#include "core/MediaClip.h"
+
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDialogButtonBox>
@@ -136,7 +138,7 @@ VideoPropertiesDialog::VideoPropertiesDialog(QWidget *parent) : QDialog(parent)
     auto *sync = new QGroupBox(tr("Эта запись"));
     auto *syncForm = new QFormLayout(sync);
     m_shift = new QSpinBox;
-    m_shift->setRange(-5000, 5000);
+    m_shift->setRange(-MediaClip::kMaxShiftMs, MediaClip::kMaxShiftMs);
     m_shift->setSingleStep(10);
     m_shift->setSuffix(tr(" мс"));
     m_shift->setToolTip(tr("Положительный сдвиг показывает кадры позже: если на видео клавиша нажимается раньше, "

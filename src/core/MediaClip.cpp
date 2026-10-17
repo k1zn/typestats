@@ -199,6 +199,7 @@ bool MediaClip::parse(QByteArrayView bytes, MediaClip &clip)
     }
     if (!r.get(clip.originUs) || !r.get(clip.startUs) || !r.get(clip.shiftMs))
         return false;
+    clip.shiftMs = std::clamp(clip.shiftMs, -kMaxShiftMs, kMaxShiftMs);
     while (!r.atEnd()) {
         MediaPacket p;
         quint8 flags;

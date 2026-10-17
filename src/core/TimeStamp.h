@@ -32,6 +32,9 @@ struct Info
     QString authority;       // the common name of the signer's certificate (empty if it is not known)
     int root = -1;           // verify(): the pinned root its chain leads to - one per company, so two tokens of
                              // different roots are of two authorities
+    QByteArray signerKey;    // verify(): SHA-256 of the signer's SubjectPublicKeyInfo
+    QList<QByteArray> chain; // verify(): the certificates it was checked with, the signer's first (DER) - all a file
+                             // needs of those the authority sent (the rest of them are under no signature)
 };
 
 // TSTInfo of a token, not checked.

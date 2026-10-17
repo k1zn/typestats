@@ -96,6 +96,12 @@ private slots:
         // Broken or cut short: not a clip.
         QVERIFY(!MediaClip::parse(c.serialize().chopped(1), back));
         QVERIFY(!MediaClip::parse(QByteArray("TSMX") + c.serialize().mid(4), back));
+        // The correction by hand (under no stamp): a file's no more than the dialog allows.
+        for (const qint32 shift : {600000, -600000}) {
+            c.shiftMs = shift;
+            QVERIFY(MediaClip::parse(c.serialize(), back));
+            QCOMPARE(back.shiftMs, shift > 0 ? MediaClip::kMaxShiftMs : -MediaClip::kMaxShiftMs);
+        }
         // The bytes a stamp hashes: the header of the packet and its data.
         QCOMPARE(MediaClip::packetBytes({1, true, 0x0102, "xy"}),
                  QByteArray::fromHex("0101" "0201000000000000" "02000000") + "xy");

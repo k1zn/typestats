@@ -1040,6 +1040,10 @@ The camera starts recording with the first key.</translation>
         <source>Метки ставят службы времени DigiCert, Sectigo, GlobalSign, Certum, SwissSign и Microsoft: они подтверждают, что записи были набраны в это время и не менялись позже. Каждую метку ставят две службы сразу: подделать её не поможет украденный ключ одной из них. Наружу уходят только хэши, без вашего набранного текста. Включается в настройках.</source>
         <translation>The stamps come from the time stamping services of DigiCert, Sectigo, GlobalSign, Certum, SwissSign and Microsoft: they confirm that the records were typed at that time and not changed later. Each stamp comes from two services at once: a stolen key of one of them would not forge it. Only hashes leave the computer, without the text you typed. Turned on in the settings.</translation>
     </message>
+    <message>
+        <source>Видео сдвинуто вручную: %1 мс</source>
+        <translation>Video shifted by hand: %1 ms</translation>
+    </message>
 </context>
 <context>
     <name>QObject</name>

@@ -116,6 +116,22 @@ private slots:
             QCOMPARE(TimeStamp::verify(bare, {}), TimeStamp::Check::UnknownSigner);
             QCOMPARE(TimeStamp::verify(bare, TimeStamp::certificates(s.token)), TimeStamp::Check::Ok);
             QCOMPARE(TimeStamp::info(bare)->imprint, info.imprint);
+            // The chain it was checked with: the signer first, all of them from those it came with.
+            QVERIFY(!info.chain.isEmpty());
+            QCOMPARE(info.signerKey.size(), 32);
+            for (const QByteArray &c : info.chain)
+                QVERIFY(TimeStamp::certificates(s.token).contains(c));
+            QCOMPARE(TimeStamp::verify(bare, info.chain), TimeStamp::Check::Ok);
+            // Certificates of the same issuer and serial in front of the real ones (they are under no signature):
+            // the real signer is still found.
+            QList<QByteArray> pool;
+            for (QByteArray c : TimeStamp::certificates(s.token)) {
+                c[c.size() - 1] = char(c[c.size() - 1] ^ 1);
+                pool.append(c);
+            }
+            QCOMPARE(TimeStamp::verify(bare, pool), TimeStamp::Check::Untrusted);
+            pool += TimeStamp::certificates(s.token);
+            QCOMPARE(TimeStamp::verify(bare, pool), TimeStamp::Check::Ok);
             // The signature: its last byte changed.
             QByteArray forged = s.token;
             const QByteArray sig = forged.right(16);
@@ -323,6 +339,24 @@ private slots:
         TsfDocument doc = load("stamped.tsf");
         doc.stamps[0].previous = QByteArray(31, 'x');
         QCOMPARE(report(doc).status, Stamps::Report::Status::Broken);
+    }
+
+    // Ends of stamps below 0: not read from a file, and the check does not index the records with them.
+    void negativeEnds()
+    {
+        TsfDocument doc = load("stamped.tsf");
+        QStringList lines = Tsf::serialize(doc, false);
+        for (QString &l : lines)
+            if (l.startsWith(QLatin1String("Stamp1=")))
+                l.replace(QRegularExpression(QStringLiteral("^Stamp1=[0-9]+ ")), QStringLiteral("Stamp1=-5 "));
+        QCOMPARE(Tsf::parse(lines).stamps.size(), 2);
+        // All of a version not checked (a newer program's): the cursors do not go back.
+        for (Stamp &s : doc.stamps)
+            s.version = 4;
+        doc.stamps[0].end = -100000;
+        const Stamps::Report r = report(doc);
+        QCOMPARE(r.unknown, 3);
+        QCOMPARE(r.status, Stamps::Report::Status::Partial);
     }
 
     void delayedTime()

@@ -542,10 +542,15 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
 
     // The dt of the chain's first record after each stamp, where it is known: the request left before that key came, so
     // the delay a stamp claims is not longer (the delay is under the hash, but its value is the program's word).
+    // Of a hidden record only a bound is known (its leaf or part as a whole): a pause hidden next to the record would
+    // stretch the delay as far as it goes, and a block hides records only at its edges, just where it would be. There
+    // the delay is held to that of a stamp after the last key.
     QVector<std::optional<qint64>> nextDtUs(stamps.size());
+    QVector<bool> nextExact(stamps.size(), true);
     {
         QVector<std::optional<qint64>> firstDt(stamps.size()); // of the first record of each chunk
         QVector<bool> known(stamps.size(), false);              // a chunk with records whose first dt is known
+        QVector<bool> exact(stamps.size(), true);               // that dt itself, not a bound of it
         int rc = 0, pc = 0;
         qsizetype laid = 0;
         for (; laid < stamps.size(); ++laid) {
@@ -568,6 +573,7 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
                     continue;
                 sum += qint64(durationOf(r));
                 known[laid] = true;
+                exact[laid] = r.kind == RecItem::Present || r.kind == RecItem::Hidden;
                 // A commitment carries the dt of its part on its last one only: up to there it is a bound.
                 if (r.kind != RecItem::Commitment || r.durationUs)
                     break;
@@ -578,16 +584,18 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
             pc = l.packetsEnd;
         }
         std::optional<qint64> after;
-        bool afterKnown = false;
+        bool afterKnown = false, afterExact = true;
         if (laid == stamps.size() && rc < records.size()) { // the records not under stamps yet
             after = dtOf(records.at(rc));
             afterKnown = true;
         }
         for (qsizetype k = laid; k-- > 0;) {
             nextDtUs[k] = afterKnown ? after : std::nullopt;
+            nextExact[k] = afterExact;
             if (known[k]) {
                 after = firstDt[k];
                 afterKnown = true;
+                afterExact = exact[k];
             }
         }
     }
@@ -666,8 +674,9 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
                 structure = false;
             for (int i = recordCursor; i < s.end && i < records.size(); ++i)
                 virtualUs += dtOf(records.at(i));
-            recordCursor = s.end;
-            packetCursor = s.mediaEnd;
+            // The cursors never go back (nor below 0): they index the records.
+            recordCursor = std::max(recordCursor, s.end);
+            packetCursor = std::max(packetCursor, s.mediaEnd);
             continue;
         }
         bool good = false;
@@ -754,10 +763,11 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
             tokenOk = TimeStamp::verify(s.token, certificates, &info) == TimeStamp::Check::Ok && info.sha256;
             matches = tokenOk
                       && info.imprint == imprint(s, layOut(s, recordCursor, packetCursor, records, clip), previous);
-            // The cosign: the same imprint, of another authority.
+            // The cosign: the same imprint, of another authority (another root and another key).
             cosignOk = matches && !s.cosign.isEmpty()
                        && TimeStamp::verify(s.cosign, certificates, &cosignInfo) == TimeStamp::Check::Ok
-                       && cosignInfo.sha256 && cosignInfo.imprint == info.imprint && cosignInfo.root != info.root;
+                       && cosignInfo.sha256 && cosignInfo.imprint == info.imprint && cosignInfo.root != info.root
+                       && cosignInfo.signerKey != info.signerKey; // the root is the path the certificates give
             if (cache) {
                 cache->entries.resize(k);
                 cache->entries.append({s, previous, recordCursor, packetCursor, clip != nullptr, tokenOk, matches, info,
@@ -781,7 +791,8 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
             const qint64 delayUs = qint64(s.delayMs) * 1000;
             qint64 limitUs = std::numeric_limits<qint64>::max();
             if (nextDtUs[k])
-                limitUs = *nextDtUs[k] + kToleranceMs * 1000;
+                limitUs = (nextExact[k] ? *nextDtUs[k] : std::min(*nextDtUs[k], qint64(kIdleMs) * 1000))
+                          + kToleranceMs * 1000;
             else if (hasRecords)
                 limitUs = (qint64(kIdleMs) + kToleranceMs) * 1000;
             const bool delayOk = delayUs <= limitUs;

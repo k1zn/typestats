@@ -958,6 +958,8 @@ void MainWindow::showProof()
                          .arg(r.packets)
                          .arg(r.packetsStamped)
                          .arg(qint64(r.packetsStamped) * 100 / r.packets);
+        if (r.packets && m_clip.shiftMs) // not under the stamps: whoever looks at the video should know it
+            lines << tr("Видео сдвинуто вручную: %1 мс").arg(m_clip.shiftMs);
         if (r.packetsLate)
             lines << tr("Кадры позже своей метки: %1").arg(r.packetsLate);
         if (r.packetsGaps)

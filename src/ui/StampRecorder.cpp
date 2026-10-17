@@ -22,10 +22,27 @@ const char *const kServices[] = {
 };
 constexpr int kServiceCount = int(std::size(kServices));
 constexpr int kTimeoutMs = 5000; // then the next authority
+constexpr qint64 kMaxResponse = 256 * 1024; // a token with its certificates is a few KB
 // A cosign asked for after its stamp came this much later at most: its time against the records' would be off by that.
 constexpr int kCosignLateMs = 1000;
 constexpr int kRetryMs = 5000;
 constexpr int kAfterStopMs = 1000; // the frames still on their way when recording stops
+
+// The token as the file will check it. Its certificates are under no signature: of those that came with it, only the
+// ones it was checked with go into the document (re/stamps.md).
+std::optional<TimeStamp::Info> checked(const QByteArray &token, const QList<QByteArray> &pool)
+{
+    TimeStamp::Info info;
+    if (TimeStamp::verify(token, pool, &info) != TimeStamp::Check::Ok)
+        return std::nullopt;
+    return info;
+}
+
+void addChain(QList<QByteArray> &pool, const QByteArray &token)
+{
+    if (const std::optional<TimeStamp::Info> info = checked(token, pool))
+        Stamps::addCertificates(pool, info->chain);
+}
 
 } // namespace
 
@@ -194,6 +211,12 @@ void StampRecorder::send()
     // The delay and so the imprint are taken when the request leaves: a try at another authority after a failed
     // one says how late it is.
     const int last = stampedEnd(), n = m_chain.size();
+    const int mediaFrom = stampedMediaEnd(), mediaTo = m_clip ? int(m_clip->packets.size()) : 0;
+    // Stamps of a file that do not fit its records or video: the chain cannot go on from them.
+    if (last > n || mediaFrom > mediaTo) {
+        flushDone(false);
+        return;
+    }
     QByteArray previous;
     if (!m_doc->stamps.isEmpty())
         if (const std::optional<TimeStamp::Info> info = TimeStamp::info(m_doc->stamps.last().token))
@@ -202,7 +225,6 @@ void StampRecorder::send()
     m_pending.raw = m_raw;
     m_pending.delayMs = quint32(m_sinceKept.elapsed());
     // The packets the encoders gave so far (chain v3, re/stamps.md).
-    const int mediaFrom = stampedMediaEnd(), mediaTo = m_clip ? int(m_clip->packets.size()) : 0;
     for (int i = int(m_packetHashes.size() / 32); i < mediaTo; ++i)
         m_packetHashes += Stamps::packetHash(m_clip->packets[i]);
     m_pending.mediaEnd = mediaTo;
@@ -284,7 +306,7 @@ void StampRecorder::received(quint64 generation, quint64 round, const QByteArray
     }
     m_inFlight = false;
     m_service = service;
-    Stamps::addCertificates(m_doc->stampCertificates, TimeStamp::certificates(token));
+    addChain(m_doc->stampCertificates, token);
     Stamp stamp;
     stamp.end = m_pending.end;
     stamp.delayMs = m_pending.delayMs;
@@ -352,24 +374,30 @@ bool StampRecorder::askCosign(Awaited a)
 void StampRecorder::cosignAnswered(qsizetype i, const QByteArray &token)
 {
     const Awaited a = m_awaited.takeAt(i);
-    if (token.isEmpty()) {
+    Stamp *stamp = nullptr; // its stamp, wherever it is now (an edit keeps it, maybe voided)
+    if (!token.isEmpty() && m_doc)
+        for (qsizetype k = m_doc->stamps.size(); k-- > 0;) {
+            const std::optional<TimeStamp::Info> info = TimeStamp::info(m_doc->stamps[k].token);
+            if (info && info->imprint == a.imprint) {
+                stamp = &m_doc->stamps[k];
+                break;
+            }
+        }
+    // A second authority only: another root and another key (the check of the file takes no other).
+    bool another = true;
+    if (stamp) {
+        const std::optional<TimeStamp::Info> first = checked(stamp->token, m_doc->stampCertificates),
+                                             second = checked(token, m_doc->stampCertificates);
+        another = !first || !second || (first->root != second->root && first->signerKey != second->signerKey);
+    }
+    if (token.isEmpty() || !another) {
         if (askCosign(a))
             return;
-    } else if (m_doc) {
-        // Its stamp, wherever it is now (an edit keeps it, maybe voided).
-        for (qsizetype k = m_doc->stamps.size(); k-- > 0;) {
-            Stamp &s = m_doc->stamps[k];
-            const std::optional<TimeStamp::Info> info = TimeStamp::info(s.token);
-            if (!info || info->imprint != a.imprint)
-                continue;
-            if (s.cosign.isEmpty()) {
-                Stamps::addCertificates(m_doc->stampCertificates, TimeStamp::certificates(token));
-                s.cosign = TimeStamp::withoutCertificates(token);
-                m_second = a.service;
-                emit changed();
-            }
-            break;
-        }
+    } else if (stamp && stamp->cosign.isEmpty()) {
+        addChain(m_doc->stampCertificates, token);
+        stamp->cosign = TimeStamp::withoutCertificates(token);
+        m_second = a.service;
+        emit changed();
     }
     if (!m_flushImprint.isEmpty() && m_flushImprint == a.imprint && !awaits(a.imprint))
         flushDone(true);
@@ -407,6 +435,10 @@ void StampRecorder::sendOverNetwork(const QByteArray &imprint, int service, Done
     req.setHeader(QNetworkRequest::ContentTypeHeader, QByteArrayLiteral("application/timestamp-query"));
     req.setTransferTimeout(kTimeoutMs);
     QNetworkReply *reply = m_net->post(req, body);
+    connect(reply, &QNetworkReply::downloadProgress, reply, [reply](qint64 got, qint64 total) {
+        if (got > kMaxResponse || total > kMaxResponse)
+            reply->abort(); // finished() with an error: the next authority
+    });
     const QList<QByteArray> pool = m_doc ? m_doc->stampCertificates : QList<QByteArray>();
     connect(reply, &QNetworkReply::finished, this, [reply, imprint, nonce, pool, done] {
         reply->deleteLater();
