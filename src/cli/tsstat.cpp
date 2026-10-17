@@ -10,7 +10,8 @@
 //
 //   tsstat --to-journal out.tsj file.tsf    the records of the file as a journal (re/journal.md)
 //   tsstat --verify file.tsf                the time stamps of the recording (re/stamps.md); exit code 0 - all
-//                                           the records confirmed, 1 - not all, 2 - stamps that do not check
+//                                           the records confirmed by two authorities, 1 - not all (status
+//                                           "single": all, some by one authority only), 2 - stamps that do not check
 //   tsstat --extract-video out.webm file.tsf  the webcam recording of the file as WebM (re/webcam.md); exit code 1 -
 //                                           there is none
 
@@ -118,7 +119,7 @@ int main(int argc, char *argv[])
             }
         const Stamps::Report r = Stamps::verify(Recalc::normalized(doc.records), doc.stamps, doc.stampCertificates,
                                                 video ? &clip : nullptr, DocTime::modelOffset(doc.records), firstDt);
-        static const char *const status[] = {"none", "confirmed", "partial", "broken"};
+        static const char *const status[] = {"none", "confirmed", "partial", "broken", "single"};
         const auto utc = [](qint64 ms) {
             return ms ? QDateTime::fromMSecsSinceEpoch(ms, QTimeZone::utc()).toString(Qt::ISODate) : QString();
         };
@@ -131,6 +132,7 @@ int main(int argc, char *argv[])
             {"records", QString::number(r.records)},
             {"stamped", QString::number(r.stamped)},
             {"confirmed", QString::number(r.confirmed)},
+            {"confirmed_twice", QString::number(r.confirmedTwice)},
             {"drift_ms", QString::number(r.driftMs)},
             {"first", utc(r.firstMs)},
             {"last", utc(r.lastMs)},

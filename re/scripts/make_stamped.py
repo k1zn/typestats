@@ -8,14 +8,18 @@ written independently of the program's code.
 
     python re/scripts/make_stamped.py tests/golden/stamps/video.tsf --v3 --video
     python re/scripts/make_stamped.py tests/golden/stamps/video_late.tsf --v3 --video --video-shift 5
+    python re/scripts/make_stamped.py tests/golden/stamps/cosigned.tsf --v3 --video --services DigiCert,Sectigo \
+        --cosign Certum,SwissSign
 
 --compress: the records claim a faster typing than the real one (as a modified program would): the stamps then do
 not confirm the time. --v3: the chain v3 (salted records in leaves of 8, re/stamps.md); --video: with a webcam clip
 (re/webcam.md) of made-up packets, 10 a second, a key one every 4 s, timed in the document's time; --video-shift S:
-the packets claim to be S seconds later than they are (a modified program dating video after the stamps). Needs
+the packets claim to be S seconds later than they are (a modified program dating video after the stamps);
+--cosign A,B: each imprint goes at once to the next of these too, its token the stamp's cosign (StampCosign<i>). Needs
 openssl in PATH (Git Bash has it) and the network; ~30 s.
 """
 import argparse
+import concurrent.futures
 import hashlib
 import os
 import random
@@ -127,6 +131,7 @@ def encode(dt, flags, ch):
 
 
 def request_stamp(digest, workdir, service):
+    workdir = tempfile.mkdtemp(dir=workdir)  # two at once
     query = os.path.join(workdir, "q.tsq")
     subprocess.run(["openssl", "ts", "-query", "-digest", digest.hex(), "-sha256", "-cert", "-out", query],
                    check=True, capture_output=True)
@@ -196,8 +201,11 @@ def main():
     ap.add_argument("--v3", action="store_true", help="the chain v3")
     ap.add_argument("--video", action="store_true", help="a webcam clip of made-up packets (needs --v3)")
     ap.add_argument("--video-shift", type=float, default=0.0, help="the packets claim to be this much later, s")
+    ap.add_argument("--cosign", default="", help="the authorities of the cosigns, in turn (none: no cosigns)")
     args = ap.parse_args()
     services = [s for s in SERVICES if s[0] in args.services.split(",")]
+    cosigners = [s for s in SERVICES if s[0] in args.cosign.split(",")]
+    pool = concurrent.futures.ThreadPoolExecutor(2)
     # Planned events: (time, flags, char, dt as written or None - the real one, comment).
     plan = []
     if args.replay:
@@ -225,6 +233,7 @@ def main():
     times = []    # real time of each record
     encoded = b""
     stamps = []   # (end, delay ms, token)
+    cosigns = []  # the token of another authority for the same imprint, or None
     previous = b""
     stamped_end = 0
     last_stamp_record_time = None
@@ -259,9 +268,12 @@ def main():
                                    hashes)
         else:
             digest = stamp_hash(previous, end - stamped_end, delay, encoded[stamped_end * 12:end * 12])
-        token = request_stamp(digest, workdir, services[service % len(services)])
+        main = pool.submit(request_stamp, digest, workdir, services[service % len(services)])
+        second = pool.submit(request_stamp, digest, workdir, cosigners[service % len(cosigners)]) if cosigners else None
+        token, cosign = main.result(), second.result() if second else None
         service += 1
         stamps.append((end, delay, token, media_end, key))
+        cosigns.append(cosign)
         stamped_packets = media_end
         previous, stamped_end, last_stamp_record_time = digest, end, times[-1]
         print(f"stamp {len(stamps)}: {end} records, delay {delay} ms, {services[(service - 1) % len(services)][0]}")
@@ -300,6 +312,7 @@ def main():
     else:
         lines += ["Stamp%d=%d %d 0 %s" % (i + 1, end, delay, b64(token).decode())
                   for i, (end, delay, token, _, _) in enumerate(stamps)]
+    lines += ["StampCosign%d=%s" % (i + 1, b64(c).decode()) for i, c in enumerate(cosigns) if c]
     if packets:
         clip = clip_bytes(packets)
         text = z85(clip)

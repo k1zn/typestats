@@ -10,6 +10,7 @@
 #include "core/TsfFile.h"
 
 #include <QDateTime>
+#include <QRegularExpression>
 #include <QTimeZone>
 #include <QTest>
 
@@ -139,7 +140,7 @@ private slots:
     void revokedAndEarly()
     {
         const TsfDocument doc = load("stamped.tsf");
-        QCOMPARE(report(doc).status, Stamps::Report::Status::Confirmed);
+        QCOMPARE(report(doc).status, Stamps::Report::Status::Single);
         const QByteArray &token = doc.stamps[0].token;
         TimeStamp::Info info;
         QCOMPARE(TimeStamp::verify(token, {}, &info), TimeStamp::Check::Ok);
@@ -170,7 +171,7 @@ private slots:
         QCOMPARE(report(doc).status, Stamps::Report::Status::Broken);
         TimeStamp::setRevokedKeys({});
         QCOMPARE(TimeStamp::verify(token, {}), TimeStamp::Check::Ok);
-        QCOMPARE(report(doc).status, Stamps::Report::Status::Confirmed);
+        QCOMPARE(report(doc).status, Stamps::Report::Status::Single);
 
         // A year earlier: refused before its signature is looked at.
         const QByteArray when = QDateTime::fromMSecsSinceEpoch(info.timeMs, QTimeZone::utc())
@@ -195,9 +196,12 @@ private slots:
 
     void confirmed()
     {
+        // Stamped as 1.2.3 does, one authority a stamp: the time is confirmed, by one of them.
         const TsfDocument doc = load("stamped.tsf");
         const Stamps::Report r = report(doc);
-        QCOMPARE(r.status, Stamps::Report::Status::Confirmed);
+        QCOMPARE(r.status, Stamps::Report::Status::Single);
+        QCOMPARE(r.confirmedTwice, 0);
+        QCOMPARE(r.firstSingle, 0);
         QCOMPARE(r.stamps, 3);
         QCOMPARE(r.bad, 0);
         QCOMPARE(r.records, 176);
@@ -213,10 +217,75 @@ private slots:
     {
         // The reserve: Certum, SwissSign, Microsoft (their roots pinned like the first three).
         const Stamps::Report r = report(load("more.tsf"));
-        QCOMPARE(r.status, Stamps::Report::Status::Confirmed);
+        QCOMPARE(r.status, Stamps::Report::Status::Single);
         QCOMPARE(r.bad, 0);
         QCOMPARE(r.confirmed, r.records);
         QCOMPARE(r.authorities, (QStringList{"Certum", "Microsoft", "SwissSign"}));
+    }
+
+    // Each imprint stamped by two authorities (make_stamped.py --cosign): DigiCert, its cosign by Certum.
+    void twoAuthorities()
+    {
+        const TsfDocument doc = load("cosigned.tsf");
+        MediaClip clip;
+        QVERIFY(MediaClip::parse(doc.webcam, clip));
+        for (const Stamp &s : doc.stamps)
+            QVERIFY(!s.cosign.isEmpty());
+        Stamps::Report r = reportWith(doc, clip);
+        QCOMPARE(r.status, Stamps::Report::Status::Confirmed);
+        QCOMPARE(r.confirmedTwice, 176);
+        QCOMPARE(r.firstSingle, -1);
+        QCOMPARE(r.authorities, (QStringList{"Certum", "DigiCert"}));
+        // The band of an authority goes over the stamps of others: the middle cosign missing changes nothing.
+        TsfDocument d = doc;
+        d.stamps[1].cosign.clear();
+        QCOMPARE(reportWith(d, clip).status, Stamps::Report::Status::Confirmed);
+        // The last one missing: the last part by DigiCert alone.
+        d = doc;
+        d.stamps[2].cosign.clear();
+        r = reportWith(d, clip);
+        QCOMPARE(r.status, Stamps::Report::Status::Single);
+        QCOMPARE(r.confirmed, 176);
+        QCOMPARE(r.confirmedTwice, 89);
+        QCOMPARE(r.firstSingle, 89);
+        // No cosigns at all: as a file of 1.2.3.
+        d = doc;
+        for (Stamp &s : d.stamps)
+            s.cosign.clear();
+        r = reportWith(d, clip);
+        QCOMPARE(r.status, Stamps::Report::Status::Single);
+        QCOMPARE(r.confirmedTwice, 0);
+        // A stamp of the same authority as a cosign, a cosign of another stamp, a changed one: not the program's.
+        d = doc;
+        d.stamps[0].cosign = d.stamps[0].token;
+        QCOMPARE(reportWith(d, clip).status, Stamps::Report::Status::Broken);
+        d = doc;
+        d.stamps[0].cosign = doc.stamps[1].cosign;
+        QCOMPARE(reportWith(d, clip).status, Stamps::Report::Status::Broken);
+        d = doc;
+        d.stamps[1].cosign[d.stamps[1].cosign.size() - 1] ^= 1;
+        QCOMPARE(reportWith(d, clip).status, Stamps::Report::Status::Broken);
+        // In the file: lines of their own, which the stamps of 1.2.3 do not take for stamps (Stamp<i> is a number).
+        d = doc;
+        for (Stamp &s : d.stamps) {
+            Stamps::addCertificates(d.stampCertificates, TimeStamp::certificates(s.token));
+            Stamps::addCertificates(d.stampCertificates, TimeStamp::certificates(s.cosign));
+            s.token = TimeStamp::withoutCertificates(s.token);
+            s.cosign = TimeStamp::withoutCertificates(s.cosign);
+        }
+        const QStringList lines = Tsf::serialize(d, true);
+        QCOMPARE(lines.filter(QRegularExpression(QStringLiteral("^StampCosign[0-9]+="))).size(), 3);
+        QCOMPARE(lines.filter(QRegularExpression(QStringLiteral("^Stamp[0-9]+="))).size(), 3);
+        const TsfDocument back = Tsf::parse(lines);
+        QCOMPARE(back.stamps.size(), 3);
+        for (int i = 0; i < 3; ++i)
+            QCOMPARE(back.stamps[i].cosign, d.stamps[i].cosign);
+        QCOMPARE(reportWith(back, clip).status, Stamps::Report::Status::Confirmed);
+        // The video of 1.2.3 (video.tsf: a recording like it, no cosigns).
+        const TsfDocument old = load("video.tsf");
+        MediaClip oldClip;
+        QVERIFY(MediaClip::parse(old.webcam, oldClip));
+        QCOMPARE(reportWith(old, oldClip).status, Stamps::Report::Status::Single);
     }
 
     void compressedTime()
@@ -287,7 +356,7 @@ private slots:
         QCOMPARE(back.records.size(), doc.records.size()); // the header lines are not records
         QVERIFY(back.signatureValid);
         doc.stamps[1].voided = false;
-        QCOMPARE(report(doc).status, Stamps::Report::Status::Confirmed);
+        QCOMPARE(report(doc).status, Stamps::Report::Status::Single);
     }
 
     void marksKeep()
@@ -297,7 +366,7 @@ private slots:
         doc.records[10].flags |= KeyRecord::Marked;
         doc.records[11].comment = QStringLiteral("метка");
         doc.records[12].flags |= KeyRecord::Transient | KeyRecord::SegmentStart;
-        QCOMPARE(report(doc).status, Stamps::Report::Status::Confirmed);
+        QCOMPARE(report(doc).status, Stamps::Report::Status::Single);
     }
 
     void tampering()
@@ -397,7 +466,7 @@ private slots:
     void videoChain()
     {
         // The chain v3 with a webcam clip (make_stamped.py --v3 --video): records and packets confirmed.
-        const TsfDocument doc = load("video.tsf");
+        const TsfDocument doc = load("cosigned.tsf");
         QCOMPARE(doc.stamps.first().version, 3);
         QCOMPARE(doc.stamps.first().key.size(), Stamps::kKeySize);
         MediaClip clip;
@@ -450,7 +519,7 @@ private slots:
     void cache()
     {
         // The checks kept between reports: the same report; a stamp added later is checked on its own.
-        const TsfDocument doc = load("video.tsf");
+        const TsfDocument doc = load("cosigned.tsf");
         MediaClip clip;
         QVERIFY(MediaClip::parse(doc.webcam, clip));
         const KeyRecords normalized = Recalc::normalized(doc.records);
@@ -473,7 +542,7 @@ private slots:
     {
         // A file made entirely of stamps this program does not check (the unreleased v2, a newer one): it is simply
         // from a newer program - the records are not stamped, but nothing is broken.
-        TsfDocument doc = load("video.tsf");
+        TsfDocument doc = load("cosigned.tsf");
         MediaClip clip;
         QVERIFY(MediaClip::parse(doc.webcam, clip));
         TsfDocument whole = doc;
@@ -499,7 +568,7 @@ private slots:
     void liveChainV3()
     {
         // The chain v3 record by record, with the packets of each stamp: the imprints that were stamped.
-        const TsfDocument doc = load("video.tsf");
+        const TsfDocument doc = load("cosigned.tsf");
         MediaClip clip;
         QVERIFY(MediaClip::parse(doc.webcam, clip));
         Stamps::Chain chain;
@@ -524,11 +593,11 @@ private slots:
         QTest::addColumn<QString>("file");
         QTest::addColumn<int>("from");
         QTest::addColumn<int>("to");
-        QTest::newRow("middle") << "video.tsf" << 30 << 120;
-        QTest::newRow("start") << "video.tsf" << 0 << 40;
-        QTest::newRow("end") << "video.tsf" << 130 << 176;
-        QTest::newRow("in one chunk") << "video.tsf" << 100 << 110;
-        QTest::newRow("group edges") << "video.tsf" << 8 << 96;
+        QTest::newRow("middle") << "cosigned.tsf" << 30 << 120;
+        QTest::newRow("start") << "cosigned.tsf" << 0 << 40;
+        QTest::newRow("end") << "cosigned.tsf" << 130 << 176;
+        QTest::newRow("in one chunk") << "cosigned.tsf" << 100 << 110;
+        QTest::newRow("group edges") << "cosigned.tsf" << 8 << 96;
         QTest::newRow("v1") << "stamped.tsf" << 30 << 120;
         QTest::newRow("v1 end") << "stamped.tsf" << 95 << 176;
     }
@@ -590,7 +659,8 @@ private slots:
         if (video)
             QVERIFY(MediaClip::parse(back.webcam, backClip));
         const Stamps::Report r = reportWith(back, backClip);
-        QCOMPARE(r.status, Stamps::Report::Status::Confirmed);
+        // A block of a recording with cosigns keeps them (the stamps of 1.2.3: one authority).
+        QCOMPARE(r.status, video ? Stamps::Report::Status::Confirmed : Stamps::Report::Status::Single);
         QCOMPARE(r.bad, 0);
         QCOMPARE(r.confirmed, int(back.records.size()));
         if (video)
@@ -635,7 +705,7 @@ private slots:
     void followV3()
     {
         // An edit voids the stamp of its records, which keeps them as leaves: its packets stay stamped.
-        TsfDocument doc = load("video.tsf");
+        TsfDocument doc = load("cosigned.tsf");
         MediaClip clip;
         QVERIFY(MediaClip::parse(doc.webcam, clip));
         KeyRecords recs = Recalc::normalized(doc.records);
@@ -662,7 +732,7 @@ private slots:
     {
         // Parts a stamp may have only where the program writes them: records not under a stamp only in a voided one,
         // hidden records only at the edges of a block.
-        const TsfDocument doc = load("video.tsf");
+        const TsfDocument doc = load("cosigned.tsf");
         MediaClip clip;
         QVERIFY(MediaClip::parse(doc.webcam, clip));
         const KeyRecords normalized = Recalc::normalized(doc.records);
@@ -751,7 +821,7 @@ private slots:
     {
         // A stretch taken out of the middle of the video (the packets as hidden ones): the hashes still check, but the
         // shown packets around the hole are too far apart for a block's cut.
-        const TsfDocument doc = load("video.tsf");
+        const TsfDocument doc = load("cosigned.tsf");
         MediaClip clip;
         QVERIFY(MediaClip::parse(doc.webcam, clip));
         int k = 0; // the stamp with the most packets

@@ -909,10 +909,6 @@ Copy the command, paste it into a terminal and enter your password. This is need
         <translation>Stamps</translation>
     </message>
     <message>
-        <source>Метки ставят службы времени DigiCert, Sectigo, GlobalSign, Certum, SwissSign и Microsoft: они подтверждают, что записи были набраны в это время и не менялись позже. Наружу уходят только хэши, без вашего набранного текста. Включается в настройках.</source>
-        <translation>The stamps come from the time stamping services of DigiCert, Sectigo, GlobalSign, Certum, SwissSign and Microsoft: they confirm that the records were typed at that time and not changed later. Only hashes leave the computer, without the text you typed. Turned on in the settings.</translation>
-    </message>
-    <message>
         <source>Видео: пакетов %1, под метками: %2 (%3 %)</source>
         <translation>Video: %1 packets, %2 under stamps (%3 %)</translation>
     </message>
@@ -1031,6 +1027,18 @@ The camera starts recording with the first key.</translation>
     <message>
         <source>Из видео вырезаны куски: %1</source>
         <translation>Stretches cut out of the video: %1</translation>
+    </message>
+    <message>
+        <source>Запись заверена, но время %1 % записей подтвердила только одна служба времени (нужны две)</source>
+        <translation>The recording is stamped, but the time of %1 % of the records was confirmed by one time stamping service only (two are needed)</translation>
+    </message>
+    <message>
+        <source>Время подтвердили две службы: %1 (%2 %)</source>
+        <translation>Time confirmed by two services: %1 (%2 %)</translation>
+    </message>
+    <message>
+        <source>Метки ставят службы времени DigiCert, Sectigo, GlobalSign, Certum, SwissSign и Microsoft: они подтверждают, что записи были набраны в это время и не менялись позже. Каждую метку ставят две службы сразу: подделать её не поможет украденный ключ одной из них. Наружу уходят только хэши, без вашего набранного текста. Включается в настройках.</source>
+        <translation>The stamps come from the time stamping services of DigiCert, Sectigo, GlobalSign, Certum, SwissSign and Microsoft: they confirm that the records were typed at that time and not changed later. Each stamp comes from two services at once: a stolen key of one of them would not forge it. Only hashes leave the computer, without the text you typed. Turned on in the settings.</translation>
     </message>
 </context>
 <context>

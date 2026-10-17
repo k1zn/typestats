@@ -244,8 +244,9 @@ void readStamps(const QList<QStringView> &lines, TsfDocument &doc)
     QMap<int, Stamp> stamps;
     QMap<int, QByteArray> certs;
     QMap<int, QStringView> hidden;
+    QMap<int, QByteArray> cosigns;
     static const QString stampKey = QStringLiteral("Stamp"), certKey = QStringLiteral("StampCert"),
-                         hiddenKey = QStringLiteral("StampHidden");
+                         hiddenKey = QStringLiteral("StampHidden"), cosignKey = QStringLiteral("StampCosign");
     for (QStringView l : lines) {
         if (!l.startsWith(stampKey))
             continue;
@@ -257,6 +258,14 @@ void readStamps(const QList<QStringView> &lines, TsfDocument &doc)
             const int index = l.mid(hiddenKey.size(), eq - hiddenKey.size()).toInt(&ok);
             if (ok)
                 hidden.insert(index, l.mid(eq + 1));
+            continue;
+        }
+        if (l.startsWith(cosignKey)) { // named by the i of its Stamp<i> line; 1.2.3 and before skip it
+            bool ok = false;
+            const int index = l.mid(cosignKey.size(), eq - cosignKey.size()).toInt(&ok);
+            const QByteArray token = QByteArray::fromBase64(l.mid(eq + 1).trimmed().toLatin1());
+            if (ok && !token.isEmpty())
+                cosigns.insert(index, token);
             continue;
         }
         const bool cert = l.startsWith(certKey);
@@ -303,6 +312,9 @@ void readStamps(const QList<QStringView> &lines, TsfDocument &doc)
             else
                 s.parts.append({StampPart::Leaf, -1, 0, {}}); // unreadable: the stamp will not check
     }
+    for (auto it = cosigns.cbegin(); it != cosigns.cend(); ++it)
+        if (stamps.contains(it.key()))
+            stamps[it.key()].cosign = it.value();
     doc.stamps = stamps.values();
     doc.stampCertificates = certs.values();
 }
@@ -493,6 +505,9 @@ QStringList serialize(const TsfDocument &doc, bool sign)
             line += QLatin1Char(' ') + partText(p);
         lines.append(line);
     }
+    for (int i = 0; i < doc.stamps.size(); ++i)
+        if (!doc.stamps[i].cosign.isEmpty())
+            lines.append(QStringLiteral("StampCosign%1=").arg(i + 1) + QString::fromLatin1(doc.stamps[i].cosign.toBase64()));
     for (int i = 0; i < doc.stampCertificates.size(); ++i)
         lines.append(QStringLiteral("StampCert%1=").arg(i + 1) + QString::fromLatin1(doc.stampCertificates[i].toBase64()));
     // The webcam (the port's own, re/webcam.md). The key must not start with a hexadecimal digit: the original

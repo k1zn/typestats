@@ -30,6 +30,8 @@ struct Info
     qint64 timeMs = 0;       // genTime, ms since 1970 UTC
     QByteArray nonce;        // as an unsigned big-endian number
     QString authority;       // the common name of the signer's certificate (empty if it is not known)
+    int root = -1;           // verify(): the pinned root its chain leads to - one per company, so two tokens of
+                             // different roots are of two authorities
 };
 
 // TSTInfo of a token, not checked.

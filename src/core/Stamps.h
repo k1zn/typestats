@@ -71,7 +71,9 @@ private:
 
 struct Report
 {
-    enum class Status { None, Confirmed, Partial, Broken };
+    // Confirmed: the time of every record is confirmed by two authorities; Single - by one at least (files of 1.2.3
+    // and before, a second authority that did not answer): one stolen key of an authority would do to forge it.
+    enum class Status { None, Confirmed, Partial, Broken, Single };
     Status status = Status::None;
     int stamps = 0;
     int bad = 0;             // stamps that do not match the records or whose token does not check
@@ -80,6 +82,8 @@ struct Report
     int records = 0;
     int stamped = 0;         // records under good stamps
     int confirmed = 0;       // records whose time the stamps confirm
+    int confirmedTwice = 0;  // records whose time two authorities confirm, each by its own stamps
+    int firstSingle = -1;    // the first record confirmed by one authority only
     qint64 firstMs = 0, lastMs = 0; // UTC time of the first and the last good stamp
     qint64 driftMs = 0;      // the largest spread of the stamps' time against the records' time
     int injected = 0;        // presses the system marked as synthetic (SendInput, uinput...)
@@ -108,6 +112,8 @@ struct Cache
         bool clip = false;
         bool tokenOk = false, matches = false;
         TimeStamp::Info info;
+        bool cosignOk = false;  // the cosign checks and stamps the same imprint
+        TimeStamp::Info cosignInfo;
     };
     QList<Entry> entries;
     void clear() { entries.clear(); }

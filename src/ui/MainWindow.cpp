@@ -862,9 +862,13 @@ void MainWindow::updateProof()
         const int pendingRecords = live ? r.pendingRecords : 0, pendingPackets = live ? r.pendingPackets : 0;
         r.records -= pendingRecords;
         r.packets -= pendingPackets;
-        if (r.status == Stamps::Report::Status::Partial && r.records > 0 && r.confirmed >= r.records
-            && r.packetsStamped >= r.packets && r.voided == 0 && r.unknown == 0)
-            r.status = Stamps::Report::Status::Confirmed;
+        if (r.status != Stamps::Report::Status::Broken && r.records > 0 && r.confirmed >= r.records
+            && r.packetsStamped >= r.packets && r.voided == 0 && r.unknown == 0) {
+            // A cosign on its way (a second or so) confirms the last part a second time.
+            const int awaited = live ? m_stamps->cosignAwaitedFrom() : -1;
+            const bool twice = r.confirmedTwice >= r.records || (awaited >= 0 && r.firstSingle >= awaited);
+            r.status = twice ? Stamps::Report::Status::Confirmed : Stamps::Report::Status::Single;
+        }
         // Short: the corner has room for little; the words are in the hint and the details.
         QString text, hint;
         QColor color = Look::colors().dimInk;
@@ -883,6 +887,12 @@ void MainWindow::updateProof()
             if (pendingRecords || pendingPackets)
                 hint += u'\n' + tr("Последнее набранное и снятое ждёт следующей метки");
             color = Look::colors().proofOk;
+            break;
+        case Stamps::Report::Status::Single:
+            text = QStringLiteral("✓ 100 %");
+            hint = tr("Запись заверена, но время %1 % записей подтвердила только одна служба времени (нужны две)")
+                       .arg(std::max<qint64>(1, qint64(r.records - std::min(r.records, r.confirmedTwice)) * 100 / r.records));
+            color = Look::colors().proofPartial;
             break;
         case Stamps::Report::Status::Partial:
             text = QStringLiteral("✓ %1 %").arg(std::min<qint64>(percent, 99)); // 100 % is for all of it
@@ -942,6 +952,7 @@ void MainWindow::showProof()
                      .arg(r.confirmed)
                      .arg(percent(r.confirmed))
                      .arg(loc.toString(r.driftMs / 1000.0, 'f', 1));
+        lines << tr("Время подтвердили две службы: %1 (%2 %)").arg(r.confirmedTwice).arg(percent(r.confirmedTwice));
         if (r.packets)
             lines << tr("Видео: пакетов %1, под метками: %2 (%3 %)")
                          .arg(r.packets)
@@ -967,8 +978,9 @@ void MainWindow::showProof()
     QMessageBox box(QMessageBox::Information, appTitle(), lines.join(u'\n'), QMessageBox::Ok, this);
     box.setInformativeText(
         tr("Метки ставят службы времени DigiCert, Sectigo, GlobalSign, Certum, SwissSign и Microsoft: они "
-           "подтверждают, что записи были набраны в это время и не менялись позже. Наружу уходят только хэши, без "
-           "вашего набранного текста. Включается в настройках."));
+           "подтверждают, что записи были набраны в это время и не менялись позже. Каждую метку ставят две службы "
+           "сразу: подделать её не поможет украденный ключ одной из них. Наружу уходят только хэши, без вашего "
+           "набранного текста. Включается в настройках."));
     box.exec();
 }
 

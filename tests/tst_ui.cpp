@@ -1692,6 +1692,11 @@ private slots:
         s.setSend([&](const QByteArray &imprint, int service, StampRecorder::Done done) {
             sent.append({imprint, service, std::move(done)});
         });
+        // An answer may send the next request: the list grows under the call.
+        const auto answer = [&](qsizetype i, bool ok, const QString &error = QStringLiteral("down")) {
+            const StampRecorder::Done done = sent[i].done;
+            done(ok ? fakeToken(sent[i].imprint) : QByteArray(), ok ? QString() : error);
+        };
         QSignalSpy changed(&s, &StampRecorder::changed);
         s.attach(&doc);
         const auto key = [&](char16_t c, quint32 dtUs, bool up = false) {
@@ -1706,65 +1711,95 @@ private slots:
         QVERIFY(sent.isEmpty());
         s.setEnabled(true);
         s.attach(&doc);
-        // The first key of a session is stamped at once.
+        // The first key of a session is stamped at once, by two authorities with the same imprint.
         key(u'b', 1000);
-        QCOMPARE(sent.size(), 1);
+        QCOMPARE(sent.size(), 2);
         QCOMPARE(sent[0].service, 0);
+        QCOMPARE(sent[1].service, 1);
+        QCOMPARE(sent[1].imprint, sent[0].imprint);
         Stamps::Chain chain;
         for (const KeyRecord &r : doc.records)
             chain.push(r);
         key(u'b', 1000, true); // while it is on its way: no second request
-        QCOMPARE(sent.size(), 1);
-        sent[0].done(fakeToken(sent[0].imprint), {});
+        QCOMPARE(sent.size(), 2);
+        answer(0, true);
         QCOMPARE(doc.stamps.size(), 1);
         QCOMPARE(doc.stamps[0].end, 2);
+        QVERIFY(doc.stamps[0].cosign.isEmpty());
+        QVERIFY(s.cosignsAwaited());
+        QCOMPARE(s.cosignAwaitedFrom(), 0);
         // The chain v3: the records salted with the stamp's key, in leaves; no video here.
         QCOMPARE(doc.stamps[0].version, Stamps::kVersion);
         QCOMPARE(doc.stamps[0].key.size(), Stamps::kKeySize);
         QCOMPARE(chain.hashV3({}, 0, 2, doc.stamps[0].delayMs, doc.stamps[0].key, {}, 0), sent[0].imprint);
         QCOMPARE(changed.size(), 1);
+        // The other one: the cosign.
+        answer(1, true);
+        QCOMPARE(doc.stamps[0].cosign, TimeStamp::withoutCertificates(fakeToken(sent[1].imprint)));
+        QVERIFY(!s.cosignsAwaited());
+        QCOMPARE(s.cosignAwaitedFrom(), -1);
+        QCOMPARE(changed.size(), 2);
         // Within the interval nothing; the first key after it - a stamp of everything since.
         key(u'c', 4000000);
-        QCOMPARE(sent.size(), 1);
-        key(u'c', 6000000, true);
         QCOMPARE(sent.size(), 2);
-        // An authority fails: the next one at once, with a request of its own; then every other one.
+        key(u'c', 6000000, true);
+        QCOMPARE(sent.size(), 4);
+        // Both of a pair fail: the next two at once, with a request of their own; then every other one.
         const int services = int(StampRecorder::services().size());
-        QVERIFY(services >= 3);
-        sent[1].done({}, QStringLiteral("down"));
-        QCOMPARE(sent.size(), 3);
-        QCOMPARE(sent[2].service, 1);
-        sent[2].done(QByteArray("garbage"), {});
-        for (int i = 2; i < services; ++i) {
-            QCOMPARE(sent.size(), i + 2);
-            QCOMPARE(sent.last().service, i);
-            sent.last().done({}, QStringLiteral("down"));
+        QCOMPARE(services % 2, 0);
+        answer(2, false);
+        QCOMPARE(sent.size(), 4); // the other one may answer yet
+        answer(3, false, {});      // an answer not to this request
+        sent.last().done(QByteArray("garbage"), {});
+        for (int i = 2; i < services; i += 2) {
+            QCOMPARE(sent.size(), i + 4);
+            QCOMPARE(sent[sent.size() - 2].service, i);
+            QCOMPARE(sent.last().service, i + 1);
+            answer(sent.size() - 2, false);
+            answer(sent.size() - 1, false);
         }
-        QCOMPARE(sent.size(), services + 1); // all failed: it waits
+        QCOMPARE(sent.size(), services + 2); // all failed: it waits
         QVERIFY(s.lastError().contains(QStringLiteral("down")));
         QCOMPARE(doc.stamps.size(), 1);
-        // Recording stops: what is left is stamped now (the authority that answered last goes first).
+        // Recording stops: what is left is stamped now (the authorities that answered last go first).
         s.captureChanged(false);
-        QCOMPARE(sent.size(), services + 2);
-        QCOMPARE(sent.last().service, 0);
+        QCOMPARE(sent.size(), services + 4);
+        QCOMPARE(sent[services + 2].service, 0);
+        QCOMPARE(sent[services + 3].service, 1);
         // The records replaced while it was on its way (an edit, another document): the answer is dropped.
         s.attach(&doc);
-        sent.last().done(fakeToken(sent.last().imprint), {});
+        answer(services + 2, true);
         QCOMPARE(doc.stamps.size(), 1);
-        // After the last key, the idle stamp.
+        // A new session starts with a stamp. Its second authority fails at once: another one is asked in time.
         s.captureChanged(true);
         key(u'd', 1000);
-        QCOMPARE(sent.size(), services + 3); // a new session starts with a stamp
-        sent.last().done(fakeToken(sent.last().imprint), {});
+        QCOMPARE(sent.size(), services + 6);
+        answer(services + 4, true);
         QCOMPARE(doc.stamps.size(), 2);
+        answer(services + 5, false);
+        QCOMPARE(sent.size(), services + 7);
+        QCOMPARE(sent.last().service, 2);
+        QCOMPARE(sent.last().imprint, sent[services + 4].imprint);
+        answer(services + 6, true);
+        QVERIFY(!doc.stamps[1].cosign.isEmpty());
+        // After the last key, the idle stamp: the authority that cosigned last goes second.
         key(u'd', 1000, true);
-        QCOMPARE(sent.size(), services + 3);
-        QTRY_COMPARE_WITH_TIMEOUT(sent.size(), services + 4, Stamps::kIdleMs + 2000);
+        QCOMPARE(sent.size(), services + 7);
+        QTRY_COMPARE_WITH_TIMEOUT(sent.size(), services + 9, Stamps::kIdleMs + 2000);
+        QCOMPARE(sent[services + 7].service, 0);
+        QCOMPARE(sent[services + 8].service, 2);
+        // The second one answers first: its token is the stamp, the other one's the cosign.
+        answer(services + 8, true);
+        answer(services + 7, true);
+        QCOMPARE(doc.stamps.size(), 3);
+        QCOMPARE(doc.stamps[2].token, TimeStamp::withoutCertificates(fakeToken(sent[services + 8].imprint)));
+        QVERIFY(!doc.stamps[2].cosign.isEmpty());
+        QVERIFY(!s.cosignsAwaited());
     }
 
     void stampFlush()
     {
-        // Before saving: a stamp of everything there is, video too (re/stamps.md).
+        // Before saving: a stamp of everything there is, video too, with its cosign (re/stamps.md).
         TsfDocument doc;
         MediaClip clip;
         clip.addStream(MediaStream::video(320, 240));
@@ -1772,6 +1807,10 @@ private slots:
         struct Request { QByteArray imprint; StampRecorder::Done done; };
         QList<Request> sent;
         s.setSend([&](const QByteArray &imprint, int, StampRecorder::Done done) { sent.append({imprint, std::move(done)}); });
+        const auto answer = [&](qsizetype i, bool ok) {
+            const StampRecorder::Done done = sent[i].done;
+            done(ok ? fakeToken(sent[i].imprint) : QByteArray(), ok ? QString() : QStringLiteral("down"));
+        };
         QSignalSpy flushed(&s, &StampRecorder::flushed);
         s.setClip(&clip);
         s.setEnabled(true);
@@ -1797,45 +1836,54 @@ private slots:
         QCOMPARE(flushed.size(), 2);
         QCOMPARE(flushed.last()[0].toBool(), false);
         key(u'a');
-        QCOMPARE(sent.size(), 1);
+        QCOMPARE(sent.size(), 2);
         // A flush while a stamp is on its way: after it, a stamp of all there is.
         s.flush();
-        QCOMPARE(sent.size(), 1);
-        sent[0].done(fakeToken(sent[0].imprint), {});
         QCOMPARE(sent.size(), 2);
+        answer(0, true);
+        QCOMPARE(sent.size(), 4);
         QCOMPARE(flushed.size(), 2);
         frame(100000); // came after the request: the save leaves it out
-        sent[1].done(fakeToken(sent[1].imprint), {});
+        answer(2, true);
+        QCOMPARE(flushed.size(), 2); // and waits for its cosign
+        answer(3, true);
         QCOMPARE(flushed.size(), 3);
         QCOMPARE(flushed.last()[0].toBool(), true);
         QCOMPARE(s.cover().records, 1);
         QCOMPARE(s.cover().packets, 1);
         QCOMPARE(s.cover().stamps, 2);
         QCOMPARE(doc.stamps.last().mediaEnd, 1);
+        QVERIFY(!doc.stamps.last().cosign.isEmpty());
+        answer(1, true); // the first stamp's cosign, late: still its
+        QVERIFY(!doc.stamps.first().cosign.isEmpty());
         // Another one: the frame left out, then nothing more - at once, with no request.
         s.flush();
-        QCOMPARE(sent.size(), 3);
-        sent[2].done(fakeToken(sent[2].imprint), {});
+        QCOMPARE(sent.size(), 6);
+        answer(4, true);
+        answer(5, true);
         QCOMPARE(s.cover().packets, 2);
         s.flush();
-        QCOMPARE(sent.size(), 3);
+        QCOMPARE(sent.size(), 6);
         QCOMPARE(flushed.size(), 5);
         QCOMPARE(flushed.last()[0].toBool(), true);
         // All the authorities down: false.
         key(u'a', true); // within the interval: no stamp of its own
-        QCOMPARE(sent.size(), 3);
+        QCOMPARE(sent.size(), 6);
         s.flush();
-        QCOMPARE(sent.size(), 4);
-        for (int i = 0; i < int(StampRecorder::services().size()); ++i)
-            sent.last().done({}, QStringLiteral("down"));
+        QCOMPARE(sent.size(), 8);
+        for (int i = 0; i < int(StampRecorder::services().size()) / 2; ++i) {
+            const qsizetype n = sent.size();
+            answer(n - 2, false);
+            answer(n - 1, false);
+        }
         QCOMPARE(flushed.size(), 6);
         QCOMPARE(flushed.last()[0].toBool(), false);
         // Recording stops; the frames the encoder still gives are stamped a moment later, not in 10 s.
         s.captureChanged(true);
         const qsizetype stopped = sent.size();
         s.captureChanged(false); // what is left is stamped at once
-        QCOMPARE(sent.size(), stopped + 1);
-        sent.last().done(fakeToken(sent.last().imprint), {});
+        QCOMPARE(sent.size(), stopped + 2);
+        answer(stopped, true);
         const qsizetype before = sent.size();
         frame(500000);
         QTRY_VERIFY_WITH_TIMEOUT(sent.size() > before, 2500);
@@ -1870,12 +1918,13 @@ private slots:
                     s.recordsAdded();
                 }
             }
-        QTRY_VERIFY_WITH_TIMEOUT(!doc.stamps.isEmpty() && doc.stamps.last().end == doc.records.size() && !s.busy(),
+        QTRY_VERIFY_WITH_TIMEOUT(!doc.stamps.isEmpty() && doc.stamps.last().end == doc.records.size() && !s.busy()
+                                     && !s.cosignsAwaited(),
                                  Stamps::kIdleMs + 20000);
         QVERIFY2(s.lastError().isEmpty(), qPrintable(s.lastError()));
         const Stamps::Report r = Stamps::verify(Recalc::normalized(doc.records), doc.stamps, doc.stampCertificates);
-        qInfo("stamps %d, confirmed %d of %d, drift %lld ms, %s", r.stamps, r.confirmed, r.records,
-              qint64(r.driftMs), qPrintable(r.authorities.join(u',')));
+        qInfo("stamps %d, confirmed %d (twice %d) of %d, drift %lld ms, %s", r.stamps, r.confirmed, r.confirmedTwice,
+              r.records, qint64(r.driftMs), qPrintable(r.authorities.join(u',')));
         QCOMPARE(r.bad, 0);
         QVERIFY(r.stamps >= 3);
         QCOMPARE(r.status, Stamps::Report::Status::Confirmed);
@@ -1886,7 +1935,7 @@ private slots:
         // "Сохранить блок" of a stamped recording with video: the block carries the stamps of what it holds, the
         // rest of the recording hidden (re/stamps.md, chain v2); the video is under them.
         MainWindow w;
-        QVERIFY(w.openFile(golden("stamps/video.tsf")));
+        QVERIFY(w.openFile(golden("stamps/cosigned.tsf")));
         QCOMPARE(w.stampReport().status, Stamps::Report::Status::Confirmed);
         select(w, 20, 40);
         int revealed = -1;
@@ -1940,7 +1989,7 @@ private slots:
         e.ch = u'a';
         e.chars = 1;
         w.keyEvent(e);
-        QCOMPARE(held.size(), 1); // on its way
+        QCOMPARE(held.size(), 2); // on its way, to two authorities
         bool waited = false;
         QTimer::singleShot(0, &w, [&] {
             waited = w.m_saving;
@@ -1950,7 +1999,9 @@ private slots:
             QVERIFY(!w.openFile(golden("обыка.tsf"))); // later
             QVERIFY(w.m_path.isEmpty());
             fail = true;
-            held.takeFirst()({}, QStringLiteral("test"));
+            const QList<StampRecorder::Done> pair = std::exchange(held, {});
+            for (const StampRecorder::Done &done : pair)
+                done({}, QStringLiteral("test"));
         });
         QVERIFY(!w.stampForSave()); // no authority answered
         QVERIFY(waited);
@@ -1987,7 +2038,13 @@ private slots:
         TsfDocument back;
         QCOMPARE(Tsf::read(path, back), Tsf::ReadError::None);
         QCOMPARE(Stamps::verify(Recalc::normalized(back.records), back.stamps, back.stampCertificates).status,
-                 Stamps::Report::Status::Confirmed);
+                 Stamps::Report::Status::Single);
+        // One authority a stamp (1.2.3): yellow, though all of it; with cosigns - green.
+        QVERIFY(w.m_proofButton->styleSheet().contains(Look::colors().proofPartial.name()));
+        QVERIFY(w.m_proofButton->toolTip().contains(QStringLiteral("одна служба")));
+        QVERIFY(w.openFile(golden("stamps/cosigned.tsf")));
+        QTRY_VERIFY(w.m_proofButton->styleSheet().contains(Look::colors().proofOk.name()));
+        QCOMPARE(w.m_proofButton->text(), QStringLiteral("✓ 100 %"));
     }
 
     void proofOfOpenedTail()

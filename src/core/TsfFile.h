@@ -42,6 +42,9 @@ struct Stamp
     QByteArray key;      // v3: the key of the records' salts (16 bytes); none in a block that hides some of them
     QList<StampPart> parts;  // v3 (and v1 in a block): empty - the chunk is all in the document
     QByteArray previous;     // the imprint of the stamp before when it is not in the file (the first stamp of a block)
+    // The same imprint stamped by another authority at the same time (re/stamps.md, "Две службы"), without its
+    // certificates; none in files of 1.2.3 and before, and where it did not come.
+    QByteArray cosign;
     bool operator==(const Stamp &) const = default;
 };
 

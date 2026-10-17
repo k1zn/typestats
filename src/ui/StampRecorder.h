@@ -13,13 +13,15 @@ class QNetworkAccessManager;
 // Takes the time stamps of a recording while it is typed (re/stamps.md): at the first key of a session, at the
 // first key Stamps::kIntervalMs after the last stamped record, Stamps::kIdleMs after the last key, when recording
 // stops, Stamps::kIntervalMs after video the stamps do not hold yet, and before saving (flush). Only hashes leave the computer; the stamps and the authorities' certificates go into the
-// document.
+// document. Each imprint goes to two authorities at once: the first answer is the stamp, the second its cosign
+// (re/stamps.md, "Две службы").
 class StampRecorder : public QObject
 {
     Q_OBJECT
 public:
     // Sends an imprint to authority number `service` of services(); `done` gets the token as it came (or an
-    // error). The next authority is tried with a new request, the delay of which says how late it is.
+    // error). When both of a pair fail, the next two are tried with a new request, the delay of which says how late
+    // it is.
     using Done = std::function<void(const QByteArray &token, const QString &error)>;
     using Send = std::function<void(const QByteArray &imprint, int service, Done done)>;
 
@@ -48,12 +50,15 @@ public:
         qsizetype stamps = 0;
     };
     // Before saving: a stamp of everything there is now (after the request on its way, if any); flushed() tells
-    // when it came (true, cover() holds it) or could not be had (false: nothing to stamp with, the authorities did
-    // not answer). It may come at once, from within the call.
+    // when it came with its cosign, or the second authority gave up (true, cover() holds it), or could not be had
+    // (false: nothing to stamp with, the authorities did not answer). It may come at once, from within the call.
     void flush();
     Cover cover() const { return m_cover; }
 
     bool busy() const { return m_inFlight; }
+    bool cosignsAwaited() const { return !m_awaited.isEmpty(); }
+    // The first normalized record that a cosign on its way will confirm a second time (-1: none on its way).
+    int cosignAwaitedFrom() const;
     // Records (normalized) and packets from these on came while this document was open here: while recording, those
     // after the last stamp wait for the next one; those of a file that came so do not.
     int ownRecordsFrom() const { return m_ownRecords; }
@@ -73,7 +78,20 @@ private:
     bool covered() const;
     void flushDone(bool ok);
     void send();
-    void received(quint64 generation, const QByteArray &token, const QString &error);
+    void request(const QByteArray &imprint, int service, quint64 round);
+    void received(quint64 generation, quint64 round, const QByteArray &imprint, int service, const QByteArray &token,
+                  const QString &error);
+    struct Awaited
+    {
+        QByteArray imprint; // of the stamp it is for
+        int service = -1;   // asked now
+        QList<int> tried;   // the authorities that had it (or the stamp)
+        QElapsedTimer sent; // since the stamp's request left
+    };
+    bool askCosign(Awaited a);
+    bool awaits(const QByteArray &imprint) const;
+    void cosignAnswered(qsizetype i, const QByteArray &token);
+    int nextService(const QList<int> &tried, int from) const;
     int stampedEnd() const;
     int stampedMediaEnd() const;
     void sendOverNetwork(const QByteArray &imprint, int service, Done done);
@@ -96,10 +114,16 @@ private:
         quint32 delayMs = 0;
         QByteArray imprint;
         QByteArray key;    // of the salts (chain v3)
-        int service = 0;
-        int tries = 0;     // authorities that failed this time
+        quint64 round = 0; // of the pair asked now
+        int pair[2] = {-1, -1};
+        int requests = 0, failed = 0; // of the pair
+        QElapsedTimer sent;
+        QList<int> tried;  // authorities that failed this time
         QString errors;
     } m_pending;
+    quint64 m_round = 0;
+    QList<Awaited> m_awaited;       // cosigns on their way
+    QByteArray m_flushImprint;      // the flush waits for the cosign of this stamp
     QElapsedTimer m_sinceKept;      // since the last record the normalization kept
     QTimer m_idle;
     QTimer m_videoDue;              // video the stamps do not hold yet
@@ -109,5 +133,6 @@ private:
     QString m_error;
     Send m_send;
     QNetworkAccessManager *m_net = nullptr;
-    int m_service = 0;              // the authority that answered last
+    int m_service = 0;              // the authority that answered first last time
+    int m_second = -1;              // and the one that cosigned last
 };

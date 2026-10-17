@@ -598,6 +598,35 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
     bool structure = true;   // the chunks follow each other within the document
     int lastGoodEnd = -1;    // the document's record cursor after the last good stamp of the current band
     qint64 bandLo = 0, bandHi = 0;
+    // The same, by the stamps of each authority alone (its root): a stamp of another one between them does not end
+    // its band. Two authorities confirm a record when the bands of both hold it - one stolen key does not forge that.
+    struct Band
+    {
+        int lastGoodEnd = -1;
+        qint64 lo = 0, hi = 0;
+    };
+    QHash<int, Band> rootBands;
+    QVector<quint32> confirmedBy(normalized.size(), 0); // bits of the roots
+    const auto breakBands = [&] {
+        lastGoodEnd = -1;
+        rootBands.clear();
+    };
+    const auto joinBand = [&](int root, qint64 offset, int end) {
+        if (root < 0 || root >= 32)
+            return;
+        Band &b = rootBands[root];
+        const qint64 lo = std::min(b.lo, offset), hi = std::max(b.hi, offset);
+        if (b.lastGoodEnd >= 0 && hi - lo <= kToleranceMs) {
+            for (int i = std::max(0, b.lastGoodEnd - 1); i < end; ++i)
+                confirmedBy[i] |= 1u << root;
+            b.lo = lo;
+            b.hi = hi;
+        } else {
+            b.lo = b.hi = offset;
+        }
+        rep.driftMs = std::max(rep.driftMs, b.hi - b.lo);
+        b.lastGoodEnd = end;
+    };
     qint64 virtualUs = 0;    // the time of the recording by the chain's records, hidden ones too
     std::optional<qint64> modelMinusVirtual;
     bool seenPresent = false;
@@ -628,11 +657,11 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
             if (anyChecked) {
                 ++rep.bad;
                 structure = false;
-                lastGoodEnd = -1;
+                breakBands();
                 continue;
             }
             ++rep.unknown;
-            lastGoodEnd = -1;
+            breakBands();
             if (structure && (s.end < recordCursor || s.mediaEnd < packetCursor))
                 structure = false;
             for (int i = recordCursor; i < s.end && i < records.size(); ++i)
@@ -666,7 +695,7 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
             }
         if (!structure) {
             ++rep.bad;
-            lastGoodEnd = -1;
+            breakBands();
             continue;
         }
         // The time through the chunk; the constant between the model's time and the chain's.
@@ -708,8 +737,8 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
                 }
                 last = {true, m.ptsUs, hiddenPackets};
             }
-        TimeStamp::Info info;
-        bool tokenOk = false, matches = false;
+        TimeStamp::Info info, cosignInfo;
+        bool tokenOk = false, matches = false, cosignOk = false;
         const auto same = [&](const Cache::Entry &e) {
             return e.recordCursor == recordCursor && e.packetCursor == packetCursor && e.clip == (clip != nullptr)
                    && e.previous == previous && e.stamp == s;
@@ -719,13 +748,20 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
             tokenOk = e.tokenOk;
             matches = e.matches;
             info = e.info;
+            cosignOk = e.cosignOk;
+            cosignInfo = e.cosignInfo;
         } else {
             tokenOk = TimeStamp::verify(s.token, certificates, &info) == TimeStamp::Check::Ok && info.sha256;
             matches = tokenOk
                       && info.imprint == imprint(s, layOut(s, recordCursor, packetCursor, records, clip), previous);
+            // The cosign: the same imprint, of another authority.
+            cosignOk = matches && !s.cosign.isEmpty()
+                       && TimeStamp::verify(s.cosign, certificates, &cosignInfo) == TimeStamp::Check::Ok
+                       && cosignInfo.sha256 && cosignInfo.imprint == info.imprint && cosignInfo.root != info.root;
             if (cache) {
                 cache->entries.resize(k);
-                cache->entries.append({s, previous, recordCursor, packetCursor, clip != nullptr, tokenOk, matches, info});
+                cache->entries.append({s, previous, recordCursor, packetCursor, clip != nullptr, tokenOk, matches, info,
+                                       cosignOk, cosignInfo});
             }
         }
         const bool keptLeaves = s.version >= 2 && !s.parts.isEmpty();  // v3
@@ -766,7 +802,8 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
                         }
                     }
             }
-            if (late || gap) {
+            // The program attaches a cosign only when it checks: another one is not of it.
+            if (late || gap || (!s.cosign.isEmpty() && !cosignOk)) {
                 ++rep.bad;
             } else {
                 good = true;
@@ -774,6 +811,8 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
                 for (const PacketItem &p : l.packets)
                     rep.packetsStamped += p.doc >= 0;
                 authorities.insert(shortName(info.authority));
+                if (cosignOk)
+                    authorities.insert(shortName(cosignInfo.authority));
                 if (rep.firstMs == 0)
                     rep.firstMs = info.timeMs;
                 rep.lastMs = info.timeMs;
@@ -782,8 +821,11 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
                 const qint64 offset = info.timeMs - lastUs / 1000 - qint64(s.delayMs);
                 const qint64 lo = std::min(bandLo, offset), hi = std::max(bandHi, offset);
                 if (!delayOk) {
-                    lastGoodEnd = -1; // its time is not known: the band ends here
+                    breakBands(); // its time is not known: the band ends here
                 } else {
+                    joinBand(info.root, offset, l.recordsEnd);
+                    if (cosignOk)
+                        joinBand(cosignInfo.root, cosignInfo.timeMs - lastUs / 1000 - qint64(s.delayMs), l.recordsEnd);
                     if (lastGoodEnd >= 0 && hi - lo <= kToleranceMs) {
                         std::fill(confirmed.begin() + std::max(0, lastGoodEnd - 1), confirmed.begin() + l.recordsEnd, 1);
                         bandLo = lo;
@@ -799,13 +841,24 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
             ++rep.bad;
         }
         if (!good)
-            lastGoodEnd = -1; // the time is not followed across a stamp that does not check
+            breakBands(); // the time is not followed across a stamp that does not check
         recordCursor = l.recordsEnd;
         packetCursor = l.packetsEnd;
     }
     rep.hiddenAfterUs = hiddenTail;
     rep.pendingRecords = structure ? std::max(0, rep.records - recordCursor) : 0;
     rep.pendingPackets = structure ? std::max(0, rep.packets - packetCursor) : 0;
+    for (qsizetype i = 0; i < confirmed.size(); ++i) {
+        const uint by = qPopulationCount(confirmedBy[i]);
+        if (by >= 2) {
+            ++rep.confirmedTwice;
+            confirmed[i] = 1; // a mixed band may have ended between them (the clocks of the two differ)
+        } else if (by == 1 || confirmed[i]) {
+            confirmed[i] = 1;
+            if (rep.firstSingle < 0)
+                rep.firstSingle = int(i);
+        }
+    }
     rep.confirmed = int(std::count(confirmed.begin(), confirmed.end(), 1));
     rep.authorities = QStringList(authorities.begin(), authorities.end());
     rep.authorities.sort();
@@ -814,7 +867,7 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
     if (rep.bad > 0)
         rep.status = Report::Status::Broken;
     else if (rep.voided == 0 && rep.unknown == 0 && rep.confirmed == rep.records && rep.packetsStamped == rep.packets)
-        rep.status = Report::Status::Confirmed;
+        rep.status = rep.confirmedTwice == rep.records ? Report::Status::Confirmed : Report::Status::Single;
     else
         rep.status = Report::Status::Partial;
     return rep;

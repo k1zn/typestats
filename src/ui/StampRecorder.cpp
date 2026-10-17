@@ -22,6 +22,8 @@ const char *const kServices[] = {
 };
 constexpr int kServiceCount = int(std::size(kServices));
 constexpr int kTimeoutMs = 5000; // then the next authority
+// A cosign asked for after its stamp came this much later at most: its time against the records' would be off by that.
+constexpr int kCosignLateMs = 1000;
 constexpr int kRetryMs = 5000;
 constexpr int kAfterStopMs = 1000; // the frames still on their way when recording stops
 
@@ -79,6 +81,7 @@ void StampRecorder::attach(TsfDocument *doc, bool another)
     m_cover = {};
     const int packets = m_clip ? int(m_clip->packets.size()) : 0;
     if (another) {
+        m_awaited.clear(); // the same document edited keeps them: a cosign finds its stamp by the imprint
         m_sinceKept.invalidate(); // its records were not typed now
         m_ownRecords = m_chain.size();
         m_ownPackets = packets;
@@ -147,6 +150,7 @@ void StampRecorder::flushDone(bool ok)
     if (!m_flushing)
         return;
     m_flushing = false;
+    m_flushImprint.clear();
     emit flushed(ok);
 }
 
@@ -209,40 +213,77 @@ void StampRecorder::send()
                                        QByteArrayView(m_packetHashes).sliced(qsizetype(mediaFrom) * 32,
                                                                              qsizetype(mediaTo - mediaFrom) * 32),
                                        mediaTo - mediaFrom);
-    m_pending.service = (m_service + m_pending.tries) % kServiceCount;
+    // Two authorities at once, the same imprint: the one that answers first gives the stamp, the other its cosign.
+    QList<int> pair = m_pending.tried;
+    const int a = nextService(pair, m_service);
+    pair.append(a);
+    const int b = m_second >= 0 && !pair.contains(m_second) ? m_second : nextService(pair, a);
+    m_pending.round = ++m_round;
+    m_pending.pair[0] = a;
+    m_pending.pair[1] = b;
+    m_pending.requests = b >= 0 ? 2 : 1;
+    m_pending.failed = 0;
+    m_pending.sent.start();
     m_inFlight = true;
+    // An answer may come from within the call, and a flush send the next stamp: what goes out is of this one.
+    const QByteArray imprint = m_pending.imprint;
+    const quint64 round = m_pending.round;
+    request(imprint, a, round);
+    if (b >= 0)
+        request(imprint, b, round);
+}
+
+int StampRecorder::nextService(const QList<int> &tried, int from) const
+{
+    for (int i = 0; i < kServiceCount; ++i)
+        if (const int s = (from + i) % kServiceCount; !tried.contains(s))
+            return s;
+    return -1;
+}
+
+void StampRecorder::request(const QByteArray &imprint, int service, quint64 round)
+{
     const quint64 generation = m_generation;
-    m_send(m_pending.imprint, m_pending.service, [this, generation](const QByteArray &token, const QString &error) {
-        received(generation, token, error);
+    m_send(imprint, service, [this, generation, round, imprint, service](const QByteArray &token, const QString &error) {
+        received(generation, round, imprint, service, token, error);
     });
 }
 
-void StampRecorder::received(quint64 generation, const QByteArray &token, const QString &error)
+void StampRecorder::received(quint64 generation, quint64 round, const QByteArray &imprint, int service,
+                             const QByteArray &token, const QString &error)
 {
-    if (generation != m_generation || !m_doc)
-        return;
-    m_inFlight = false;
     const std::optional<TimeStamp::Info> info = error.isEmpty() ? TimeStamp::info(token) : std::nullopt;
-    if (!info || info->imprint != m_pending.imprint) {
-        const QString line = QUrl(QLatin1String(kServices[m_pending.service])).host() + QStringLiteral(": ")
-                             + (error.isEmpty() ? tr("ответ не к этому запросу") : error);
-        m_pending.errors = m_pending.errors.isEmpty() ? line : m_pending.errors + QStringLiteral("; ") + line;
-        if (++m_pending.tries < kServiceCount) {
-            send(); // the next authority, at once
+    const bool ok = info && info->imprint == imprint;
+    // The cosign of a stamp already taken.
+    for (qsizetype i = 0; i < m_awaited.size(); ++i)
+        if (m_awaited[i].imprint == imprint && m_awaited[i].service == service) {
+            cosignAnswered(i, ok ? token : QByteArray());
             return;
         }
+    if (generation != m_generation || !m_doc || round != m_pending.round || !m_inFlight)
+        return;
+    if (!ok) {
+        const QString line = QUrl(QLatin1String(kServices[service])).host() + QStringLiteral(": ")
+                             + (error.isEmpty() ? tr("ответ не к этому запросу") : error);
+        m_pending.errors = m_pending.errors.isEmpty() ? line : m_pending.errors + QStringLiteral("; ") + line;
+        m_pending.tried.append(service);
+        if (++m_pending.failed < m_pending.requests)
+            return; // the other one may answer yet
+        if (m_pending.tried.size() < kServiceCount) {
+            send(); // the next two, at once
+            return;
+        }
+        m_inFlight = false;
         m_error = m_pending.errors;
-        m_pending.tries = 0;
+        m_pending.tried.clear();
         m_pending.errors.clear();
         emit changed();
         flushDone(false);
         m_idle.start(kRetryMs); // the records wait; the next try covers them with its own delay
         return;
     }
-    m_service = m_pending.service;
-    m_pending.tries = 0;
-    m_pending.errors.clear();
-    m_error.clear();
+    m_inFlight = false;
+    m_service = service;
     Stamps::addCertificates(m_doc->stampCertificates, TimeStamp::certificates(token));
     Stamp stamp;
     stamp.end = m_pending.end;
@@ -254,10 +295,27 @@ void StampRecorder::received(quint64 generation, const QByteArray &token, const 
     m_doc->stamps.append(stamp);
     m_cover = {m_pending.raw, m_pending.mediaEnd, m_doc->stamps.size()};
     m_sessionStamped = true;
+    // Its cosign: the other of the pair, on its way; or, when that one failed, another authority if still in time.
+    Awaited cosign{imprint, -1, m_pending.tried, m_pending.sent};
+    cosign.tried.append(service);
+    const int other = m_pending.pair[0] == service ? m_pending.pair[1] : m_pending.pair[0];
+    m_pending.tried.clear();
+    m_pending.errors.clear();
+    m_error.clear();
+    if (other >= 0 && !cosign.tried.contains(other)) {
+        cosign.service = other;
+        cosign.tried.append(other);
+        m_awaited.append(cosign);
+    } else {
+        askCosign(cosign);
+    }
     emit changed();
     if (m_flushing) {
         if (m_flushSent) {
-            flushDone(true);
+            if (awaits(imprint))
+                m_flushImprint = imprint;
+            else
+                flushDone(true);
         } else { // the request on its way was older than the flush
             m_flushSent = true;
             send();
@@ -267,6 +325,71 @@ void StampRecorder::received(quint64 generation, const QByteArray &token, const 
     // Typed on while it was on its way: the idle stamp covers the rest if nothing else does.
     if (m_chain.size() > m_pending.end && !m_idle.isActive())
         m_idle.start(Stamps::kIdleMs);
+}
+
+bool StampRecorder::awaits(const QByteArray &imprint) const
+{
+    for (const Awaited &a : m_awaited)
+        if (a.imprint == imprint)
+            return true;
+    return false;
+}
+
+bool StampRecorder::askCosign(Awaited a)
+{
+    if (a.sent.elapsed() > kCosignLateMs)
+        return false;
+    const int s = nextService(a.tried, m_second >= 0 ? m_second : m_service);
+    if (s < 0)
+        return false;
+    a.service = s;
+    a.tried.append(s);
+    m_awaited.append(a);
+    request(a.imprint, s, 0);
+    return true;
+}
+
+void StampRecorder::cosignAnswered(qsizetype i, const QByteArray &token)
+{
+    const Awaited a = m_awaited.takeAt(i);
+    if (token.isEmpty()) {
+        if (askCosign(a))
+            return;
+    } else if (m_doc) {
+        // Its stamp, wherever it is now (an edit keeps it, maybe voided).
+        for (qsizetype k = m_doc->stamps.size(); k-- > 0;) {
+            Stamp &s = m_doc->stamps[k];
+            const std::optional<TimeStamp::Info> info = TimeStamp::info(s.token);
+            if (!info || info->imprint != a.imprint)
+                continue;
+            if (s.cosign.isEmpty()) {
+                Stamps::addCertificates(m_doc->stampCertificates, TimeStamp::certificates(token));
+                s.cosign = TimeStamp::withoutCertificates(token);
+                m_second = a.service;
+                emit changed();
+            }
+            break;
+        }
+    }
+    if (!m_flushImprint.isEmpty() && m_flushImprint == a.imprint && !awaits(a.imprint))
+        flushDone(true);
+}
+
+int StampRecorder::cosignAwaitedFrom() const
+{
+    int from = -1;
+    if (!m_doc)
+        return from;
+    for (const Awaited &a : m_awaited)
+        for (qsizetype k = m_doc->stamps.size(); k-- > 0;) {
+            const std::optional<TimeStamp::Info> info = TimeStamp::info(m_doc->stamps[k].token);
+            if (!info || info->imprint != a.imprint)
+                continue;
+            const int f = k ? m_doc->stamps[k - 1].end : 0;
+            from = from < 0 ? f : std::min(from, f);
+            break;
+        }
+    return from;
 }
 
 void StampRecorder::sendOverNetwork(const QByteArray &imprint, int service, Done done)
