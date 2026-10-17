@@ -59,6 +59,7 @@ struct RecItem
     int count = 1;          // Leaf: records of the group
     quint64 durationUs = 0; // Leaf; Commitment: the dt of the hidden records up to this one (on the last of a part)
     QByteArray salt;        // Present, v3
+    bool partEnd = false;   // Commitment: the last of its part (its duration may be 0)
 };
 
 bool isVersionChecked(int version)
@@ -205,7 +206,7 @@ Layout layOut(const Stamp &s, int recordCursor, int packetCursor, const Records 
                 }
                 for (int i = 0; i < p.count; ++i)
                     l.records.append({RecItem::Commitment, -1, p.data.mid(qsizetype(i) * 32, 32), 1,
-                                      i == p.count - 1 ? p.durationUs : 0, {}});
+                                      i == p.count - 1 ? p.durationUs : 0, {}, i == p.count - 1});
                 j += p.count;
                 break;
             case StampPart::Packets:
@@ -606,8 +607,9 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
                 sum += qint64(durationOf(r));
                 known[laid] = true;
                 exact[laid] = r.kind == RecItem::Present || r.kind == RecItem::Hidden;
-                // A commitment carries the dt of its part on its last one only: up to there it is a bound.
-                if (r.kind != RecItem::Commitment || r.durationUs)
+                // A commitment carries the dt of its part on its last one only: up to there it is a bound. The part
+                // ends there even when its duration is 0 (two parts of one group share its duration as they like).
+                if (r.kind != RecItem::Commitment || r.partEnd)
                     break;
             }
             if (known[laid] && !s.voided) // a voided chunk's records were edited: no bound from them
@@ -625,8 +627,10 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
         std::optional<qint64> after;
         bool afterKnown = false, afterExact = true;
         if (laid == stamps.size() && rc < records.size()) { // the records not under stamps yet
+            // Under no hash: anyone may write its dt, so it only bounds as a hidden one does (not above kIdleMs).
             after = dtOf(records.at(rc));
             afterKnown = true;
+            afterExact = false;
         }
         for (qsizetype k = laid; k-- > 0;) {
             nextDtUs[k] = afterKnown ? after : std::nullopt;

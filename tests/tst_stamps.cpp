@@ -399,6 +399,66 @@ private slots:
         QCOMPARE(r.confirmed, 0);
     }
 
+    // What bounds the delay of a stamp only as a hidden record does: a record after the last stamp (under no hash) and a
+    // part of hidden records whose duration is 0 (two parts of one group share its duration as they like).
+    void delayBounds()
+    {
+        const auto withTail = [](TsfDocument doc, quint32 dtUs) {
+            KeyRecord r = doc.records.last();
+            r.dtUs = dtUs;
+            r.flags &= ~quint32(KeyRecord::KeyUp);
+            doc.records.append(r);
+            return doc;
+        };
+        // An honest recording with a key typed after its last stamp: all of it still timed but the key.
+        for (const quint32 dt : {300000u, 60000000u}) {
+            const Stamps::Report r = report(withTail(load("stamped.tsf"), dt));
+            QCOMPARE(r.bad, 0);
+            QCOMPARE(r.confirmed, 176);
+            QCOMPARE(r.pendingRecords, 1);
+            QCOMPARE(r.status, Stamps::Report::Status::Partial);
+        }
+        // The long delays of a faked recording: a long pause written after its last stamp does not let them time it.
+        const Stamps::Report delayed = report(withTail(load("delayed.tsf"), 60000000u));
+        QCOMPARE(delayed.bad, 0);
+        QCOMPARE(delayed.confirmed, 0);
+
+        // A block inside one group: the hidden records before and after it are two parts of that group.
+        const TsfDocument doc = load("cosigned.tsf");
+        MediaClip clip;
+        QVERIFY(MediaClip::parse(doc.webcam, clip));
+        const KeyRecords normalized = Recalc::normalized(doc.records);
+        int from = 11;
+        while (normalized[from].isUp())
+            ++from;
+        const int to = 16;
+        QVERIFY(from + 1 < to);
+        TsfDocument block;
+        block.records = normalized.mid(from, to - from);
+        block.stamps = Stamps::extract(doc.stamps, normalized, &clip, from, to, {});
+        block.stampCertificates = doc.stampCertificates;
+        QCOMPARE(block.stamps.size(), 2);
+        QList<int> cuts;
+        for (int i = 0; i < block.stamps[1].parts.size(); ++i)
+            if (block.stamps[1].parts[i].kind == StampPart::Commitments)
+                cuts.append(i);
+        QCOMPARE(cuts.size(), 2);
+        const auto check = [&](const TsfDocument &b) {
+            return Stamps::verify(Recalc::normalized(b.records), b.stamps, b.stampCertificates, nullptr, 0,
+                                  b.records.first().dtUs);
+        };
+        Stamps::Report r = check(block);
+        QCOMPARE(r.bad, 0);
+        QCOMPARE(r.status, Stamps::Report::Status::Confirmed);
+        // All of the group's hidden time after the block: the hashes still match, the bound is the part's 0.
+        QList<StampPart> &parts = block.stamps[1].parts;
+        parts[cuts[1]].durationUs += parts[cuts[0]].durationUs;
+        parts[cuts[0]].durationUs = 0;
+        r = check(Tsf::parse(Tsf::serialize(block, true)));
+        QCOMPARE(r.bad, 0);
+        QCOMPARE(r.status, Stamps::Report::Status::Confirmed);
+    }
+
     void fileRoundTrip()
     {
         TsfDocument doc = load("stamped.tsf");
