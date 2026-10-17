@@ -729,6 +729,12 @@ private slots:
         if (video)
             QCOMPARE(r.packetsStamped, int(backClip.packets.size()));
         QCOMPARE(r.hiddenBeforeUs > 0, from > 0);
+        if (back.stamps.first().previous.isEmpty()) { // from the recording's first key, without its 60 s
+            qint64 before = 0;
+            for (int i = 1; i < from; ++i)
+                before += normalized[i].dtUs;
+            QCOMPARE(r.hiddenBeforeUs, before);
+        }
         QCOMPARE(r.hiddenAfterUs > 0, to < normalized.size());
 
         // A hidden group's duration or a hidden record changed: broken.

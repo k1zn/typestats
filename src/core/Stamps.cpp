@@ -675,6 +675,9 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
         b.lastGoodEnd = end;
     };
     qint64 virtualUs = 0;    // the time of the recording by the chain's records, hidden ones too
+    // A chain from the recording's start (no imprint before it) gives its first record the normalization's 60 s: not
+    // time of the recording, which the block's hidden time before it is told in.
+    const qint64 chainStartUs = stamps.first().previous.isEmpty() ? 60000000 : 0;
     bool seenPresent = false;
     bool shownSeen = false, shownEnded = false; // records of stamps not voided: shown ones, hidden ones after them
     // The last shown packet of each stream, and how many packets were hidden by then.
@@ -756,7 +759,7 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
             lastUs = virtualUs;
             if (r.kind == RecItem::Present) {
                 if (!seenPresent)
-                    rep.hiddenBeforeUs = virtualUs - d;
+                    rep.hiddenBeforeUs = std::max<qint64>(0, virtualUs - d - chainStartUs);
                 seenPresent = true;
                 hiddenTail = 0;
             } else if (seenPresent) {
