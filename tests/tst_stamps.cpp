@@ -906,6 +906,45 @@ private slots:
         }
     }
 
+    void thinnedVideo()
+    {
+        // Most frames hidden all over the video: the shown ones are far apart everywhere, which does not make such
+        // gaps the stream's usual ones (a slow camera's are, with nothing hidden between).
+        const TsfDocument doc = load("cosigned.tsf");
+        MediaClip clip;
+        QVERIFY(MediaClip::parse(doc.webcam, clip));
+        TsfDocument forged = doc;
+        forged.records = Recalc::normalized(doc.records);
+        MediaClip cut = clip;
+        cut.packets.clear();
+        int r0 = 0, m0 = 0, hidden = 0, video = 0;
+        for (Stamp &s : forged.stamps) {
+            const int m1 = s.mediaEnd;
+            s.parts = {{StampPart::Records, s.end - r0, 0, {}}};
+            for (int i = m0; i < m1; ++i) {
+                const MediaPacket &p = clip.packets[i];
+                if (clip.streams[p.stream].kind == MediaStream::Video && video++ % 30 != 0) {
+                    s.parts.append({StampPart::HiddenPacket, 0, 0, Stamps::packetHash(p)});
+                    ++hidden;
+                } else {
+                    s.parts.append({StampPart::Packets, 1, 0, {}});
+                    cut.packets.append(p);
+                }
+            }
+            r0 = s.end;
+            m0 = m1;
+            s.mediaEnd = m1 - hidden;
+        }
+        QVERIFY(hidden > 100);
+        forged.webcam = cut.serialize();
+        const TsfDocument back = Tsf::parse(Tsf::serialize(forged, true));
+        MediaClip backClip;
+        QVERIFY(MediaClip::parse(back.webcam, backClip));
+        const Stamps::Report r = reportWith(back, backClip);
+        QVERIFY(r.packetsGaps > 0);
+        QCOMPARE(r.status, Stamps::Report::Status::Broken);
+    }
+
     void earlyVideo()
     {
         // A block's video from stamps before its first record: timed by its own stamps too.

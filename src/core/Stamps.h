@@ -24,7 +24,9 @@ constexpr qint64 kToleranceMs = 2500;  // how far the time of the stamps may wan
 // Packets hidden between two shown packets of a stream: those two this close in time at most. A block hides packets
 // between shown ones only where the streams' cuts overlap (the audio before its preroll inside the video's run from
 // its key frame, the video after the block's end among the audio's last packets): the neighbours are a frame apart.
+// A slow stream (the camera's rate goes down to 1 frame a second) - kHiddenGapFrames of its usual intervals.
 constexpr qint64 kMaxHiddenGapMs = 500;
+constexpr int kHiddenGapFrames = 3;
 constexpr int kGroup = 8;              // records per leaf (v3)
 constexpr int kVersion = 3;            // of the chain the stamps are taken with
 constexpr int kKeySize = 16, kSaltSize = 16;

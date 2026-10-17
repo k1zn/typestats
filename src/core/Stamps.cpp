@@ -550,6 +550,11 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
     // The constant between the model's time and the chain's, by the first record shown - known before the stamps are
     // gone through: the packets of the stamps before it are timed by it too.
     std::optional<qint64> modelMinusVirtual;
+    // The gap allowed between shown packets of a stream with hidden ones between (below): by the median of its
+    // intervals with nothing hidden between - a camera's rate may be 1 frame a second, and packets hidden all over
+    // the stream (to make its intervals long) do not count.
+    std::array<qint64, 256> maxGapUs;
+    maxGapUs.fill(kMaxHiddenGapMs * 1000);
     {
         qint64 v = 0;
         QVector<std::optional<qint64>> firstDt(stamps.size()); // of the first record of each chunk
@@ -557,6 +562,9 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
         QVector<bool> exact(stamps.size(), true);               // that dt itself, not a bound of it
         int rc = 0, pc = 0;
         qsizetype laid = 0;
+        std::array<QList<qint64>, 256> intervals;
+        std::array<std::optional<std::pair<qint64, int>>, 256> lastShown; // pts, packets hidden by then
+        int hidden = 0;
         for (; laid < stamps.size(); ++laid) {
             const Stamp &s = stamps[laid];
             if (!isVersionChecked(s.version)) {
@@ -573,6 +581,17 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
             const Layout l = layOut(s, rc, pc, records, clip, false);
             if (!l.ok)
                 break;
+            if (clip)
+                for (const PacketItem &p : l.packets) {
+                    if (p.doc < 0) {
+                        ++hidden;
+                        continue;
+                    }
+                    const MediaPacket &m = clip->packets[p.doc];
+                    if (lastShown[m.stream] && lastShown[m.stream]->second == hidden)
+                        intervals[m.stream].append(m.ptsUs - lastShown[m.stream]->first);
+                    lastShown[m.stream] = std::pair{m.ptsUs, hidden};
+                }
             for (const RecItem &r : l.records) {
                 if (r.kind == RecItem::Unstamped)
                     continue;
@@ -595,6 +614,13 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
                 firstDt[laid] = sum;
             rc = l.recordsEnd;
             pc = l.packetsEnd;
+        }
+        for (std::size_t i = 0; i < intervals.size(); ++i) {
+            QList<qint64> &v = intervals[i];
+            if (v.isEmpty())
+                continue;
+            std::nth_element(v.begin(), v.begin() + v.size() / 2, v.end());
+            maxGapUs[i] = std::max(maxGapUs[i], kHiddenGapFrames * v[v.size() / 2]);
         }
         std::optional<qint64> after;
         bool afterKnown = false, afterExact = true;
@@ -750,7 +776,7 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
                 }
                 const MediaPacket &m = clip->packets[p.doc];
                 Shown &last = shownPackets[m.stream];
-                if (last.seen && last.hiddenBefore < hiddenPackets && m.ptsUs - last.ptsUs > kMaxHiddenGapMs * 1000) {
+                if (last.seen && last.hiddenBefore < hiddenPackets && m.ptsUs - last.ptsUs > maxGapUs[m.stream]) {
                     ++rep.packetsGaps;
                     gap = true;
                 }
