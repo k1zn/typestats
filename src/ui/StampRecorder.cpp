@@ -148,6 +148,15 @@ void StampRecorder::flush()
 {
     recordsAdded();
     if (covered()) {
+        // The stamp may have come a moment ago, its cosign still on its way: the file waits for it.
+        const std::optional<TimeStamp::Info> last =
+            !m_doc->stamps.isEmpty() ? TimeStamp::info(m_doc->stamps.last().token) : std::nullopt;
+        if (m_enabled && last && awaits(last->imprint)) {
+            m_flushing = true;
+            m_flushSent = true;
+            m_flushImprint = last->imprint;
+            return;
+        }
         emit flushed(true);
         return;
     }
@@ -413,7 +422,8 @@ int StampRecorder::cosignAwaitedFrom() const
             const std::optional<TimeStamp::Info> info = TimeStamp::info(m_doc->stamps[k].token);
             if (!info || info->imprint != a.imprint)
                 continue;
-            const int f = k ? m_doc->stamps[k - 1].end : 0;
+            // A stamp confirms the last record of the one before it too (Stamps::verify).
+            const int f = k ? std::max(0, m_doc->stamps[k - 1].end - 1) : 0;
             from = from < 0 ? f : std::min(from, f);
             break;
         }

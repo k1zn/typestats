@@ -1776,6 +1776,7 @@ private slots:
         QCOMPARE(sent.size(), services + 6);
         answer(services + 4, true);
         QCOMPARE(doc.stamps.size(), 2);
+        QCOMPARE(s.cosignAwaitedFrom(), doc.stamps[0].end - 1); // the stamp confirms the last record before it too
         answer(services + 5, false);
         QCOMPARE(sent.size(), services + 7);
         QCOMPARE(sent.last().service, 2);
@@ -1884,6 +1885,16 @@ private slots:
         s.captureChanged(false); // what is left is stamped at once
         QCOMPARE(sent.size(), stopped + 2);
         answer(stopped, true);
+        // A flush right after a stamp, its cosign on its way: nothing more to stamp, but it waits for the cosign.
+        QVERIFY(s.cosignsAwaited());
+        const qsizetype flushes = flushed.size();
+        s.flush();
+        QCOMPARE(sent.size(), stopped + 2);
+        QCOMPARE(flushed.size(), flushes);
+        answer(stopped + 1, true);
+        QCOMPARE(flushed.size(), flushes + 1);
+        QCOMPARE(flushed.last()[0].toBool(), true);
+        QVERIFY(!doc.stamps.last().cosign.isEmpty());
         const qsizetype before = sent.size();
         frame(500000);
         QTRY_VERIFY_WITH_TIMEOUT(sent.size() > before, 2500);
