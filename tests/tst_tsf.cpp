@@ -61,7 +61,7 @@ private slots:
         QVERIFY(setrlimit(RLIMIT_FSIZE, &small) == 0);
         const bool written = Tsf::write(path, big, false);
         setrlimit(RLIMIT_FSIZE, &old);
-        std::signal(SIGXFSZ, oldHandler);
+        (void)std::signal(SIGXFSZ, oldHandler);
         QVERIFY(!written);
 #endif
         QVERIFY(f.open(QIODevice::ReadOnly));

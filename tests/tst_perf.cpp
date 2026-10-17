@@ -383,8 +383,9 @@ private slots:
 
             const float endMs = float(w.m_model.klav.last().tDraw / 1000);
             for (const auto &[name, ms] : {std::pair{"start", 0.0f}, {"middle", endMs / 2}, {"end", endMs - 2000}}) {
+                const float at = ms; // a structured binding in a lambda: the analyser loses it
                 measure(QStringLiteral("scroll klavogram to %1").arg(QLatin1String(name)), n, [&] {
-                    w.m_klav->setScrollMs(ms);
+                    w.m_klav->setScrollMs(at);
                     w.klavogramMoved();
                 });
                 measure(QStringLiteral("paint klavogram at %1").arg(QLatin1String(name)), n, [&] { w.m_klav->grab(); });
@@ -531,8 +532,9 @@ private slots:
         };
         for (const auto &[label, n] : {std::pair{"us", names("us")}, {"us,ru grp:alt_shift", names("us,ru", ",", "grp:alt_shift_toggle")},
                                        {"us intl", names("us", "intl")}}) {
+            const Desktop::XkbNames keymap = n; // a structured binding in a lambda: the analyser loses it
             measure(QStringLiteral("xkb compile keymap %1").arg(QLatin1String(label)), 0, [&] {
-                xkb_keymap_unref(XkbKeyboard::compile(n));
+                xkb_keymap_unref(XkbKeyboard::compile(keymap));
             }, 5);
         }
         measure(QStringLiteral("XkbKeyboard() (compose table)"), 0, [&] { XkbKeyboard k; }, 5);
