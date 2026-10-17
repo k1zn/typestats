@@ -154,6 +154,20 @@ QSet<QByteArray> g_goodTokens;       // sha256(token, certificate pool) of token
 
 QByteArray sha256(QByteArrayView a) { return QCryptographicHash::hash(a, QCryptographicHash::Sha256); }
 
+QSet<QByteArray> g_revokedForTests; // hex, under g_cacheMutex
+
+bool revoked(QByteArrayView spki)
+{
+    static const QSet<QByteArray> builtIn = {
+#include "StampRevoked.inc"
+    };
+    const QByteArray hex = sha256(spki).toHex();
+    if (builtIn.contains(hex))
+        return true;
+    const QMutexLocker lock(&g_cacheMutex);
+    return g_revokedForTests.contains(hex);
+}
+
 bool signatureValid(QByteArrayView spki, QCryptographicHash::Algorithm alg, QByteArrayView signedBytes,
                     QByteArrayView signature)
 {
@@ -189,7 +203,7 @@ constexpr qsizetype kMaxCertificates = 64; // a token and its file carry a few
 bool leadsToRoot(const Certificate &c, const QList<Certificate> &pool, qint64 atMs, int depth,
                  QHash<const Certificate *, bool> &memo)
 {
-    if (depth >= kMaxDepth || atMs < c.notBefore || atMs > c.notAfter || (depth > 0 && !c.ca))
+    if (depth >= kMaxDepth || atMs < c.notBefore || atMs > c.notAfter || (depth > 0 && !c.ca) || revoked(c.spki))
         return false;
     if (const auto it = memo.constFind(&c); it != memo.cend())
         return *it;
@@ -387,6 +401,8 @@ Check verify(QByteArrayView token, const QList<QByteArray> &pool, Info *out)
     std::optional<Info> tst = parseTstInfo(sd->tstInfo);
     if (!tst)
         return Check::Malformed;
+    if (tst->timeMs < kEarliestMs)
+        return Check::TooEarly;
 
     QList<Certificate> certs;
     QSet<QByteArray> seen;
@@ -457,6 +473,8 @@ Check verify(QByteArrayView token, const QList<QByteArray> &pool, Info *out)
         }
     if (!signer)
         return Check::UnknownSigner;
+    if (revoked(signer->spki))
+        return Check::Revoked;
 
     // The signature is over the DER of the attributes as a SET (the [0] tag replaced).
     QByteArray signedAttrs = attrs->whole.toByteArray();
@@ -488,6 +506,16 @@ Check verify(QByteArrayView token, const QList<QByteArray> &pool, Info *out)
 void clearCache()
 {
     const QMutexLocker lock(&g_cacheMutex);
+    g_signatures.clear();
+    g_goodTokens.clear();
+}
+
+void setRevokedKeys(const QList<QByteArray> &spkiSha256)
+{
+    const QMutexLocker lock(&g_cacheMutex);
+    g_revokedForTests.clear();
+    for (const QByteArray &h : spkiSha256)
+        g_revokedForTests.insert(h.toHex());
     g_signatures.clear();
     g_goodTokens.clear();
 }

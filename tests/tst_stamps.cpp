@@ -48,7 +48,7 @@ class TstStamps : public QObject
     Q_OBJECT
 
 private slots:
-    void init() { TimeStamp::clearCache(); }
+    void init() { TimeStamp::setRevokedKeys({}); } // and clears the cache
 
     void derTime()
     {
@@ -133,6 +133,54 @@ private slots:
         authorities.sort();
         QCOMPARE(authorities, (QStringList{"DigiCert", "Globalsign", "Sectigo"}));
         QCOMPARE(TimeStamp::verify(QByteArray("not a token"), {}), TimeStamp::Check::Malformed);
+    }
+
+    // A key of an authority known to be stolen, and a time before the program stamped anything.
+    void revokedAndEarly()
+    {
+        const TsfDocument doc = load("stamped.tsf");
+        QCOMPARE(report(doc).status, Stamps::Report::Status::Confirmed);
+        const QByteArray &token = doc.stamps[0].token;
+        TimeStamp::Info info;
+        QCOMPARE(TimeStamp::verify(token, {}, &info), TimeStamp::Check::Ok);
+
+        // The SubjectPublicKeyInfo of a certificate: the 7th field of its TBSCertificate (with the version).
+        const auto spkiOf = [](const QByteArray &der) {
+            Der::Reader cert(Der::parse(der)->content);
+            Der::Reader tbs(cert.next(Der::Sequence)->content);
+            tbs.next(Der::context(0));
+            for (int i = 0; i < 5; ++i)
+                tbs.next();
+            return QCryptographicHash::hash(tbs.next(Der::Sequence)->whole, QCryptographicHash::Sha256);
+        };
+        int revoked = 0;
+        QByteArray signerKey;
+        for (const QByteArray &cert : TimeStamp::certificates(token)) {
+            TimeStamp::setRevokedKeys({spkiOf(cert)});
+            const TimeStamp::Check c = TimeStamp::verify(token, {});
+            // The signer is revoked; a stolen intermediate untrusts the chain; a root in the token is not used.
+            QVERIFY(c == TimeStamp::Check::Revoked || c == TimeStamp::Check::Untrusted || c == TimeStamp::Check::Ok);
+            if (c == TimeStamp::Check::Revoked) {
+                ++revoked;
+                signerKey = spkiOf(cert);
+            }
+        }
+        QCOMPARE(revoked, 1);
+        TimeStamp::setRevokedKeys({signerKey});
+        QCOMPARE(report(doc).status, Stamps::Report::Status::Broken);
+        TimeStamp::setRevokedKeys({});
+        QCOMPARE(TimeStamp::verify(token, {}), TimeStamp::Check::Ok);
+        QCOMPARE(report(doc).status, Stamps::Report::Status::Confirmed);
+
+        // A year earlier: refused before its signature is looked at.
+        const QByteArray when = QDateTime::fromMSecsSinceEpoch(info.timeMs, QTimeZone::utc())
+                                    .toString(QStringLiteral("yyyyMMddHHmmss")).toLatin1();
+        QVERIFY(when.startsWith("2026"));
+        QByteArray early = token;
+        const qsizetype t = early.indexOf(when);
+        QVERIFY(t > 0);
+        early[t + 3] = '5';
+        QCOMPARE(TimeStamp::verify(early, {}), TimeStamp::Check::TooEarly);
     }
 
     void rsaRejects()

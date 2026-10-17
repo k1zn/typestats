@@ -39,17 +39,27 @@ QList<QByteArray> certificates(QByteArrayView token);
 // The same token without its certificates (they are not signed; kept once per file instead).
 QByteArray withoutCertificates(QByteArrayView token);
 
+// The program stamps since October 2026: an earlier time is not of a stamp it took. The validity of a certificate is
+// checked at the time the token claims, so this keeps the keys of certificates that expired before then (if one leaks
+// later) from stamping anything.
+constexpr qint64 kEarliestMs = 1790812800000; // 2026-10-01 00:00 UTC
+
 enum class Check {
     Ok,
     Malformed,      // not a time stamp token
     BadSignature,   // the content does not match the signature
     UnknownSigner,  // the signer's certificate is not among those given
     Untrusted,      // its chain does not lead to a pinned root, or a certificate in it is not valid at that time
+    TooEarly,       // its time is before kEarliestMs
+    Revoked,        // the signer's key is known to be compromised (StampRevoked.inc)
 };
 // Checks the token with the given certificates (from the token itself and from the file); fills `out` on Ok.
 Check verify(QByteArrayView token, const QList<QByteArray> &certificates, Info *out = nullptr);
 
 // Checks of certificates and signatures are cached: the stamps of a recording share them.
 void clearCache();
+
+// For tests: keys (SHA-256 of SubjectPublicKeyInfo) treated as compromised besides the built-in ones. Clears the cache.
+void setRevokedKeys(const QList<QByteArray> &spkiSha256);
 
 } // namespace TimeStamp
