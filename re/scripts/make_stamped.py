@@ -15,8 +15,9 @@ written independently of the program's code.
 not confirm the time. --v3: the chain v3 (salted records in leaves of 8, re/stamps.md); --video: with a webcam clip
 (re/webcam.md) of made-up packets, 10 a second, a key one every 4 s, timed in the document's time; --video-shift S:
 the packets claim to be S seconds later than they are (a modified program dating video after the stamps);
---cosign A,B: each imprint goes at once to the next of these too, its token the stamp's cosign (StampCosign<i>). Needs
-openssl in PATH (Git Bash has it) and the network; ~30 s.
+--cosign A,B: each imprint goes at once to the next of these too, its token the stamp's cosign (StampCosign<i>);
+--cosign-late S: the cosigns are asked for S seconds after their stamps (not as the program does). Needs openssl in
+PATH (Git Bash has it) and the network; ~30 s.
 """
 import argparse
 import concurrent.futures
@@ -202,10 +203,11 @@ def main():
     ap.add_argument("--video", action="store_true", help="a webcam clip of made-up packets (needs --v3)")
     ap.add_argument("--video-shift", type=float, default=0.0, help="the packets claim to be this much later, s")
     ap.add_argument("--cosign", default="", help="the authorities of the cosigns, in turn (none: no cosigns)")
+    ap.add_argument("--cosign-late", type=float, default=0.0, help="the cosigns asked for this much later, s")
     args = ap.parse_args()
     services = [s for s in SERVICES if s[0] in args.services.split(",")]
     cosigners = [s for s in SERVICES if s[0] in args.cosign.split(",")]
-    pool = concurrent.futures.ThreadPoolExecutor(2)
+    pool = concurrent.futures.ThreadPoolExecutor(16)
     # Planned events: (time, flags, char, dt as written or None - the real one, comment).
     plan = []
     if args.replay:
@@ -269,11 +271,18 @@ def main():
         else:
             digest = stamp_hash(previous, end - stamped_end, delay, encoded[stamped_end * 12:end * 12])
         main = pool.submit(request_stamp, digest, workdir, services[service % len(services)])
-        second = pool.submit(request_stamp, digest, workdir, cosigners[service % len(cosigners)]) if cosigners else None
-        token, cosign = main.result(), second.result() if second else None
+        cosigner = cosigners[service % len(cosigners)] if cosigners else None
+        if cosigner and args.cosign_late:
+            def late(digest=digest, cosigner=cosigner):
+                time.sleep(args.cosign_late)
+                return request_stamp(digest, workdir, cosigner)
+            second = pool.submit(late)
+        else:
+            second = pool.submit(request_stamp, digest, workdir, cosigner) if cosigner else None
+        token = main.result()
         service += 1
         stamps.append((end, delay, token, media_end, key))
-        cosigns.append(cosign)
+        cosigns.append(second)  # resolved at the end: a late one must not hold the typing up
         stamped_packets = media_end
         previous, stamped_end, last_stamp_record_time = digest, end, times[-1]
         print(f"stamp {len(stamps)}: {end} records, delay {delay} ms, {services[(service - 1) % len(services)][0]}")
@@ -312,6 +321,7 @@ def main():
     else:
         lines += ["Stamp%d=%d %d 0 %s" % (i + 1, end, delay, b64(token).decode())
                   for i, (end, delay, token, _, _) in enumerate(stamps)]
+    cosigns = [c.result() if c else None for c in cosigns]
     lines += ["StampCosign%d=%s" % (i + 1, b64(c).decode()) for i, c in enumerate(cosigns) if c]
     if packets:
         clip = clip_bytes(packets)

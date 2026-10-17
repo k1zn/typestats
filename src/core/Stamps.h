@@ -21,6 +21,9 @@ namespace Stamps {
 constexpr int kIntervalMs = 10000;     // a stamp at the first key this long after the last stamped one
 constexpr int kIdleMs = 2000;          // and this long after the last key
 constexpr qint64 kToleranceMs = 2500;  // how far the time of the stamps may wander from the time of the records
+// The cosign of a stamp is asked for together with it (or at once from the next authority when the first fails): its
+// time is that of the stamp give or take the wait for an answer, the clocks of the two and their dropped fractions.
+constexpr qint64 kCosignSkewMs = 10000;
 // Packets hidden between two shown packets of a stream: those two this close in time at most. A block hides packets
 // between shown ones only where the streams' cuts overlap (the audio before its preroll inside the video's run from
 // its key frame, the video after the block's end among the audio's last packets): the neighbours are a frame apart.

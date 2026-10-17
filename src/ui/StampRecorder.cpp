@@ -234,7 +234,7 @@ void StampRecorder::send()
     m_pending.raw = m_raw;
     m_pending.delayMs = quint32(m_sinceKept.elapsed());
     // The packets the encoders gave so far (chain v3, re/stamps.md).
-    for (int i = int(m_packetHashes.size() / 32); i < mediaTo; ++i)
+    for (int i = int(m_packetHashes.size() / 32); m_clip && i < mediaTo; ++i)
         m_packetHashes += Stamps::packetHash(m_clip->packets[i]);
     m_pending.mediaEnd = mediaTo;
     // The key of the records' salts (chain v3): a block may then show some of them, and the others stay hashes.
@@ -392,12 +392,15 @@ void StampRecorder::cosignAnswered(qsizetype i, const QByteArray &token)
                 break;
             }
         }
-    // A second authority only: another root and another key (the check of the file takes no other).
+    // A second authority only: another root and another key, at the time of the stamp (the check of the file takes no
+    // other).
     bool another = true;
     if (stamp) {
         const std::optional<TimeStamp::Info> first = checked(stamp->token, m_doc->stampCertificates),
                                              second = checked(token, m_doc->stampCertificates);
-        another = !first || !second || (first->root != second->root && first->signerKey != second->signerKey);
+        another = !first || !second
+                  || (first->root != second->root && first->signerKey != second->signerKey
+                      && qAbs(first->timeMs - second->timeMs) <= Stamps::kCosignSkewMs);
     }
     if (token.isEmpty() || !another) {
         if (askCosign(a))

@@ -19,8 +19,8 @@ namespace {
 TsfDocument load(const char *name)
 {
     TsfDocument doc;
-    const Tsf::ReadError err = Tsf::read(QStringLiteral(TS_GOLDEN_DIR "/stamps/") + QLatin1String(name), doc);
-    Q_ASSERT(err == Tsf::ReadError::None);
+    if (Tsf::read(QStringLiteral(TS_GOLDEN_DIR "/stamps/") + QLatin1String(name), doc) != Tsf::ReadError::None)
+        qFatal("cannot read %s", name); // not Q_ASSERT: a Release build would drop the read
     return doc;
 }
 
@@ -302,6 +302,35 @@ private slots:
         MediaClip oldClip;
         QVERIFY(MediaClip::parse(old.webcam, oldClip));
         QCOMPARE(reportWith(old, oldClip).status, Stamps::Report::Status::Single);
+    }
+
+    // The cosigns asked for 30 s after their stamps (make_stamped.py --cosign-late 30): each checks by itself, the band
+    // of its authority holds, but the program asks for a cosign together with its stamp - another one is not of it.
+    void lateCosign()
+    {
+        const TsfDocument doc = load("cosigned_late.tsf");
+        QVERIFY(doc.stamps.size() >= 3);
+        for (const Stamp &s : doc.stamps) {
+            TimeStamp::Info token, cosign;
+            QCOMPARE(TimeStamp::verify(s.token, {}, &token), TimeStamp::Check::Ok);
+            QCOMPARE(TimeStamp::verify(s.cosign, {}, &cosign), TimeStamp::Check::Ok);
+            QCOMPARE(cosign.imprint, token.imprint);
+            QVERIFY(cosign.root != token.root);
+            QVERIFY(cosign.timeMs - token.timeMs > Stamps::kCosignSkewMs);
+        }
+        Stamps::Report r = report(doc);
+        QCOMPARE(r.status, Stamps::Report::Status::Broken);
+        QCOMPARE(r.bad, int(doc.stamps.size()));
+        QCOMPARE(r.confirmedTwice, 0);
+        // The stamps themselves are honest: without the cosigns, as a file of 1.2.3.
+        TsfDocument d = doc;
+        for (Stamp &s : d.stamps)
+            s.cosign.clear();
+        r = report(d);
+        QCOMPARE(r.status, Stamps::Report::Status::Single);
+        QCOMPARE(r.confirmed, r.records);
+        // Through the file, as tsstat --verify reads it.
+        QCOMPARE(report(Tsf::parse(Tsf::serialize(doc, true))).status, Stamps::Report::Status::Broken);
     }
 
     void compressedTime()

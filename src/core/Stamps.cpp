@@ -553,7 +553,7 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
     // The gap allowed between shown packets of a stream with hidden ones between (below): by the median of its
     // intervals with nothing hidden between - a camera's rate may be 1 frame a second, and packets hidden all over
     // the stream (to make its intervals long) do not count.
-    std::array<qint64, 256> maxGapUs;
+    std::array<qint64, 256> maxGapUs{};
     maxGapUs.fill(kMaxHiddenGapMs * 1000);
     {
         qint64 v = 0;
@@ -799,11 +799,12 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
             tokenOk = TimeStamp::verify(s.token, certificates, &info) == TimeStamp::Check::Ok && info.sha256;
             matches = tokenOk
                       && info.imprint == imprint(s, layOut(s, recordCursor, packetCursor, records, clip), previous);
-            // The cosign: the same imprint, of another authority (another root and another key).
+            // The cosign: the same imprint, of another authority (another root and another key), at the same time.
             cosignOk = matches && !s.cosign.isEmpty()
                        && TimeStamp::verify(s.cosign, certificates, &cosignInfo) == TimeStamp::Check::Ok
                        && cosignInfo.sha256 && cosignInfo.imprint == info.imprint && cosignInfo.root != info.root
-                       && cosignInfo.signerKey != info.signerKey; // the root is the path the certificates give
+                       && cosignInfo.signerKey != info.signerKey // the root is the path the certificates give
+                       && qAbs(cosignInfo.timeMs - info.timeMs) <= kCosignSkewMs;
             if (cache) {
                 cache->entries.resize(k);
                 cache->entries.append({s, previous, recordCursor, packetCursor, clip != nullptr, tokenOk, matches, info,
