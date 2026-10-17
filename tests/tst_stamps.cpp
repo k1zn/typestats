@@ -698,6 +698,60 @@ private slots:
         QCOMPARE(r.voided, 1);
         QCOMPARE(r.status, Stamps::Report::Status::Partial);
     }
+
+    void videoHoles()
+    {
+        // A stretch taken out of the middle of the video (the packets as hidden ones): the hashes still check, but the
+        // shown packets around the hole are too far apart for a block's cut.
+        const TsfDocument doc = load("video.tsf");
+        MediaClip clip;
+        QVERIFY(MediaClip::parse(doc.webcam, clip));
+        int k = 0; // the stamp with the most packets
+        for (int i = 1; i < doc.stamps.size(); ++i)
+            if (doc.stamps[i].mediaEnd - doc.stamps[i - 1].mediaEnd > doc.stamps[k].mediaEnd - (k ? doc.stamps[k - 1].mediaEnd : 0))
+                k = i;
+        const int m0 = k ? doc.stamps[k - 1].mediaEnd : 0, m1 = doc.stamps[k].mediaEnd;
+        const int r0 = k ? doc.stamps[k - 1].end : 0;
+        const auto isVideo = [&clip](int i) { return clip.streams[clip.packets[i].stream].kind == MediaStream::Video; };
+        // A second of the chunk's middle.
+        const qint64 mid = (clip.packets[m0].ptsUs + clip.packets[m1 - 1].ptsUs) / 2;
+        const auto hide = [&](bool videoOnly) {
+            TsfDocument forged = doc;
+            forged.records = Recalc::normalized(doc.records);
+            MediaClip cut = clip;
+            cut.packets.clear();
+            Stamp &s = forged.stamps[k];
+            s.parts = {{StampPart::Records, s.end - r0, 0, {}}};
+            int hidden = 0;
+            for (int i = 0; i < clip.packets.size(); ++i) {
+                const MediaPacket &p = clip.packets[i];
+                const bool inHole = i >= m0 && i < m1 && p.ptsUs >= mid && p.ptsUs < mid + 1000000 && (!videoOnly || isVideo(i));
+                if (i >= m0 && i < m1) {
+                    if (inHole)
+                        s.parts.append({StampPart::HiddenPacket, 0, 0, Stamps::packetHash(p)});
+                    else
+                        s.parts.append({StampPart::Packets, 1, 0, {}});
+                }
+                if (inHole)
+                    ++hidden;
+                else
+                    cut.packets.append(p);
+            }
+            for (int i = k; i < forged.stamps.size(); ++i)
+                forged.stamps[i].mediaEnd -= hidden;
+            forged.webcam = cut.serialize();
+            const TsfDocument back = Tsf::parse(Tsf::serialize(forged, true));
+            MediaClip backClip;
+            Q_ASSERT(MediaClip::parse(back.webcam, backClip));
+            return std::pair{hidden, reportWith(back, backClip)};
+        };
+        for (const bool videoOnly : {true, false}) {
+            const auto [hidden, r] = hide(videoOnly);
+            QVERIFY(hidden > 5);
+            QVERIFY(r.packetsGaps > 0);
+            QCOMPARE(r.status, Stamps::Report::Status::Broken);
+        }
+    }
 };
 
 QTEST_GUILESS_MAIN(TstStamps)

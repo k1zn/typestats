@@ -21,6 +21,10 @@ namespace Stamps {
 constexpr int kIntervalMs = 10000;     // a stamp at the first key this long after the last stamped one
 constexpr int kIdleMs = 2000;          // and this long after the last key
 constexpr qint64 kToleranceMs = 2500;  // how far the time of the stamps may wander from the time of the records
+// Packets hidden between two shown packets of a stream: those two this close in time at most. A block hides packets
+// between shown ones only where the streams' cuts overlap (the audio before its preroll inside the video's run from
+// its key frame, the video after the block's end among the audio's last packets): the neighbours are a frame apart.
+constexpr qint64 kMaxHiddenGapMs = 500;
 constexpr int kGroup = 8;              // records per leaf (v3)
 constexpr int kVersion = 3;            // of the chain the stamps are taken with
 constexpr int kKeySize = 16, kSaltSize = 16;
@@ -84,6 +88,7 @@ struct Report
     int packets = 0;         // of the clip
     int packetsStamped = 0;  // under good stamps
     int packetsLate = 0;     // timed after the stamp that holds them (such stamps are bad)
+    int packetsGaps = 0;     // holes: shown packets of a stream with hidden ones between, far apart (such stamps are bad)
     // After the last stamp: while recording they wait for the next one (not missing yet).
     int pendingRecords = 0, pendingPackets = 0;
     // A block: time of the recording outside it, as its stamps tell.

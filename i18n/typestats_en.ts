@@ -1028,6 +1028,10 @@ The camera starts recording with the first key.</translation>
         <source>Щелчок — что записывать</source>
         <translation>Click: what to record</translation>
     </message>
+    <message>
+        <source>Из видео вырезаны куски: %1</source>
+        <translation>Stretches cut out of the video: %1</translation>
+    </message>
 </context>
 <context>
     <name>QObject</name>

@@ -139,6 +139,7 @@ int main(int argc, char *argv[])
             {"packets", QString::number(r.packets)},
             {"packets_stamped", QString::number(r.packetsStamped)},
             {"packets_late", QString::number(r.packetsLate)},
+            {"packets_gaps", QString::number(r.packetsGaps)},
             {"hidden_before_ms", QString::number(r.hiddenBeforeUs / 1000)},
             {"hidden_after_ms", QString::number(r.hiddenAfterUs / 1000)},
         };

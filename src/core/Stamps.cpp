@@ -8,6 +8,7 @@
 #include <QtEndian>
 
 #include <algorithm>
+#include <array>
 #include <functional>
 #include <limits>
 
@@ -601,6 +602,15 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
     std::optional<qint64> modelMinusVirtual;
     bool seenPresent = false;
     bool shownSeen = false, shownEnded = false; // records of stamps not voided: shown ones, hidden ones after them
+    // The last shown packet of each stream, and how many packets were hidden by then.
+    struct Shown
+    {
+        bool seen = false;
+        qint64 ptsUs = 0;
+        int hiddenBefore = 0;
+    };
+    std::array<Shown, 256> shownPackets;
+    int hiddenPackets = 0;
     qint64 hiddenTail = 0;
     bool anyChecked = false;
     for (const Stamp &s : stamps)
@@ -679,6 +689,25 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
                 hiddenTail += d;
             }
         }
+        // A hole in the video: packets hidden between two shown ones of a stream that are far apart in time. The hash of
+        // a hidden packet does not tell its stream (nor would a label next to it: it is under no hash), but the times of
+        // the shown ones are: a block's cut keeps a run of each stream, so taking a stretch out of the middle of the
+        // video (or the sound) leaves such a gap.
+        bool gap = false;
+        if (clip)
+            for (const PacketItem &p : l.packets) {
+                if (p.doc < 0) {
+                    ++hiddenPackets;
+                    continue;
+                }
+                const MediaPacket &m = clip->packets[p.doc];
+                Shown &last = shownPackets[m.stream];
+                if (last.seen && last.hiddenBefore < hiddenPackets && m.ptsUs - last.ptsUs > kMaxHiddenGapMs * 1000) {
+                    ++rep.packetsGaps;
+                    gap = true;
+                }
+                last = {true, m.ptsUs, hiddenPackets};
+            }
         TimeStamp::Info info;
         bool tokenOk = false, matches = false;
         const auto same = [&](const Cache::Entry &e) {
@@ -703,7 +732,7 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
         if (s.voided) {
             ++rep.voided;
             // A voided stamp v2 with its records as leaves still stamps its packets.
-            if (keptLeaves ? !matches : !tokenOk)
+            if ((keptLeaves ? !matches : !tokenOk) || gap)
                 ++rep.bad;
             else if (keptLeaves)
                 for (const PacketItem &p : l.packets)
@@ -737,7 +766,7 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
                         }
                     }
             }
-            if (late) {
+            if (late || gap) {
                 ++rep.bad;
             } else {
                 good = true;

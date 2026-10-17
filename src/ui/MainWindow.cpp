@@ -949,6 +949,8 @@ void MainWindow::showProof()
                          .arg(qint64(r.packetsStamped) * 100 / r.packets);
         if (r.packetsLate)
             lines << tr("Кадры позже своей метки: %1").arg(r.packetsLate);
+        if (r.packetsGaps)
+            lines << tr("Из видео вырезаны куски: %1").arg(r.packetsGaps);
         if (r.hiddenBeforeUs || r.hiddenAfterUs)
             lines << tr("Блок из записи, заверенной метками: до него скрыто %1 с, после — %2 с")
                          .arg(loc.toString(r.hiddenBeforeUs / 1e6, 'f', 1), loc.toString(r.hiddenAfterUs / 1e6, 'f', 1));
