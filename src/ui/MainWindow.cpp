@@ -855,7 +855,10 @@ void MainWindow::updateProof()
         }
         Stamps::Report r = stampReport();
         // While recording, what came after the last stamp waits for the next one (in 10 s at most): not missing.
-        const bool live = m_stamps->enabled() && m_capture->isChecked();
+        // Only what was typed and filmed here: the unstamped tail of a file that was opened is not waiting for anything.
+        const bool live = m_stamps->enabled() && m_capture->isChecked()
+                          && r.records - r.pendingRecords >= m_stamps->ownRecordsFrom()
+                          && r.packets - r.pendingPackets >= m_stamps->ownPacketsFrom();
         const int pendingRecords = live ? r.pendingRecords : 0, pendingPackets = live ? r.pendingPackets : 0;
         r.records -= pendingRecords;
         r.packets -= pendingPackets;

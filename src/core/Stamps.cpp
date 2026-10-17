@@ -539,6 +539,58 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
     for (qsizetype i = 0; i < normalized.size(); ++i)
         modelUs[i] = (i ? modelUs[i - 1] : 0) + normalized[i].dtUs;
 
+    // The dt of the chain's first record after each stamp, where it is known: the request left before that key came, so
+    // the delay a stamp claims is not longer (the delay is under the hash, but its value is the program's word).
+    QVector<std::optional<qint64>> nextDtUs(stamps.size());
+    {
+        QVector<std::optional<qint64>> firstDt(stamps.size()); // of the first record of each chunk
+        QVector<bool> known(stamps.size(), false);              // a chunk with records whose first dt is known
+        int rc = 0, pc = 0;
+        qsizetype laid = 0;
+        for (; laid < stamps.size(); ++laid) {
+            const Stamp &s = stamps[laid];
+            if (!isVersionChecked(s.version)) {
+                if (s.end > rc && rc < records.size()) {
+                    firstDt[laid] = dtOf(records.at(rc));
+                    known[laid] = true;
+                }
+                rc = std::max(rc, s.end);
+                pc = std::max(pc, s.mediaEnd);
+                continue;
+            }
+            const Layout l = layOut(s, rc, pc, records, clip, false);
+            if (!l.ok)
+                break;
+            qint64 sum = 0;
+            for (const RecItem &r : l.records) {
+                if (r.kind == RecItem::Unstamped)
+                    continue;
+                sum += qint64(durationOf(r));
+                known[laid] = true;
+                // A commitment carries the dt of its part on its last one only: up to there it is a bound.
+                if (r.kind != RecItem::Commitment || r.durationUs)
+                    break;
+            }
+            if (known[laid] && !s.voided) // a voided chunk's records were edited: no bound from them
+                firstDt[laid] = sum;
+            rc = l.recordsEnd;
+            pc = l.packetsEnd;
+        }
+        std::optional<qint64> after;
+        bool afterKnown = false;
+        if (laid == stamps.size() && rc < records.size()) { // the records not under stamps yet
+            after = dtOf(records.at(rc));
+            afterKnown = true;
+        }
+        for (qsizetype k = laid; k-- > 0;) {
+            nextDtUs[k] = afterKnown ? after : std::nullopt;
+            if (known[k]) {
+                after = firstDt[k];
+                afterKnown = true;
+            }
+        }
+    }
+
     QVector<char> confirmed(normalized.size(), 0);
     QSet<QString> authorities;
     int recordCursor = 0, packetCursor = 0;
@@ -580,6 +632,8 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
         }
         bool good = false;
         Layout l;
+        if (k == 0 && !previous.isEmpty() && previous.size() != 32) // an imprint is a SHA-256
+            structure = false;
         if (structure) {
             l = layOut(s, recordCursor, packetCursor, records, clip, false); // hashed below if not in the cache
             if (!l.ok || (l.records.isEmpty() && l.packets.isEmpty() && !s.voided) || (s.version < 2 && !s.voided && l.present == 0 && s.parts.isEmpty()))
@@ -642,10 +696,21 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
                 for (const PacketItem &p : l.packets)
                     rep.packetsStamped += p.doc >= 0;
         } else if (matches) {
+            // The delay against the key after the chunk; after the last key, a stamp of records comes when typing
+            // goes idle.
+            const bool hasRecords = std::any_of(l.records.cbegin(), l.records.cend(),
+                                                [](const RecItem &r) { return r.kind != RecItem::Unstamped; });
+            const qint64 delayUs = qint64(s.delayMs) * 1000;
+            qint64 limitUs = std::numeric_limits<qint64>::max();
+            if (nextDtUs[k])
+                limitUs = *nextDtUs[k] + kToleranceMs * 1000;
+            else if (hasRecords)
+                limitUs = (qint64(kIdleMs) + kToleranceMs) * 1000;
+            const bool delayOk = delayUs <= limitUs;
             // Video timed after the stamp that holds it: it did not exist then as it says.
             bool late = false;
             if (clip && modelMinusVirtual) {
-                const qint64 stampModelUs = lastUs + *modelMinusVirtual + qint64(s.delayMs) * 1000;
+                const qint64 stampModelUs = lastUs + *modelMinusVirtual + (nextDtUs[k] ? std::min(delayUs, limitUs) : delayUs);
                 // A chunk's packets were recorded between its start and the request. A packet far outside that window -
                 // the clip's origin (not under any hash) slid against the records - is as bad as one from the future.
                 const qint64 lo = chunkStartVirtual + *modelMinusVirtual - kToleranceMs * 1000;
@@ -674,15 +739,19 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
                 // the same (the delay of the network), whatever the pauses.
                 const qint64 offset = info.timeMs - lastUs / 1000 - qint64(s.delayMs);
                 const qint64 lo = std::min(bandLo, offset), hi = std::max(bandHi, offset);
-                if (lastGoodEnd >= 0 && hi - lo <= kToleranceMs) {
-                    std::fill(confirmed.begin() + std::max(0, lastGoodEnd - 1), confirmed.begin() + l.recordsEnd, 1);
-                    bandLo = lo;
-                    bandHi = hi;
+                if (!delayOk) {
+                    lastGoodEnd = -1; // its time is not known: the band ends here
                 } else {
-                    bandLo = bandHi = offset;
+                    if (lastGoodEnd >= 0 && hi - lo <= kToleranceMs) {
+                        std::fill(confirmed.begin() + std::max(0, lastGoodEnd - 1), confirmed.begin() + l.recordsEnd, 1);
+                        bandLo = lo;
+                        bandHi = hi;
+                    } else {
+                        bandLo = bandHi = offset;
+                    }
+                    rep.driftMs = std::max(rep.driftMs, bandHi - bandLo);
+                    lastGoodEnd = l.recordsEnd;
                 }
-                rep.driftMs = std::max(rep.driftMs, bandHi - bandLo);
-                lastGoodEnd = l.recordsEnd;
             }
         } else {
             ++rep.bad;

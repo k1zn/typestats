@@ -1157,6 +1157,10 @@ The camera starts recording with the first key.</translation>
         <source>ответ не к этому запросу</source>
         <translation>the answer is not to this request</translation>
     </message>
+    <message>
+        <source>ответ не проверяется</source>
+        <translation>the answer does not check</translation>
+    </message>
 </context>
 <context>
     <name>TaskbarMarker</name>

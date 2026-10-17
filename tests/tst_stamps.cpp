@@ -181,6 +181,44 @@ private slots:
         QVERIFY(r.confirmed < 100);
     }
 
+    void keyLimits()
+    {
+        using namespace Der;
+        const auto spki = [](const QByteArray &n, const QByteArray &e) {
+            const QByteArray key = tlv(Sequence, tlv(Integer, n) + tlv(Integer, e));
+            return tlv(Sequence, tlv(Sequence, tlv(Oid, oid("1.2.840.113549.1.1.1")) + tlv(Null, {}))
+                                     + tlv(BitString, QByteArray(1, '\0') + key));
+        };
+        QByteArray n(256, char(0xC3));
+        n[0] = 0x43;
+        n[255] = char(0xC5);
+        QVERIFY(Rsa::fromSpki(spki(n, QByteArray::fromHex("010001"))));
+        QVERIFY(Rsa::fromSpki(spki(n, QByteArray::fromHex("03"))));
+        QVERIFY(!Rsa::fromSpki(spki(n, QByteArray::fromHex("01"))));
+        QVERIFY(!Rsa::fromSpki(spki(n, QByteArray::fromHex("7FFFFFFFFF"))));
+        QByteArray big(1024, char(0x43));
+        big[1023] = char(0xC5);
+        QVERIFY(!Rsa::fromSpki(spki(big, QByteArray::fromHex("010001"))));
+    }
+
+    void previousImprint()
+    {
+        TsfDocument doc = load("stamped.tsf");
+        doc.stamps[0].previous = QByteArray(31, 'x');
+        QCOMPARE(report(doc).status, Stamps::Report::Status::Broken);
+    }
+
+    void delayedTime()
+    {
+        // Twice as fast as the real typing, the difference in the delays of the requests: longer than the gap to the
+        // next key, they do not time the records.
+        const Stamps::Report r = report(load("delayed.tsf"));
+        QCOMPARE(r.bad, 0);
+        QCOMPARE(r.stamped, 176);
+        QCOMPARE(r.status, Stamps::Report::Status::Partial);
+        QCOMPARE(r.confirmed, 0);
+    }
+
     void fileRoundTrip()
     {
         TsfDocument doc = load("stamped.tsf");

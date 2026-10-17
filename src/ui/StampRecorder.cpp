@@ -77,8 +77,15 @@ void StampRecorder::attach(TsfDocument *doc, bool another)
     m_pending = {};
     m_error.clear();
     m_cover = {};
-    if (another)
+    const int packets = m_clip ? int(m_clip->packets.size()) : 0;
+    if (another) {
         m_sinceKept.invalidate(); // its records were not typed now
+        m_ownRecords = m_chain.size();
+        m_ownPackets = packets;
+    } else { // the same document edited (records dropped) or put back
+        m_ownRecords = std::min(m_ownRecords, m_chain.size());
+        m_ownPackets = std::min(m_ownPackets, packets);
+    }
     if (m_doc && !m_doc->stamps.isEmpty() && stampedEnd() == m_chain.size())
         m_cover = {m_raw, stampedMediaEnd(), m_doc->stamps.size()};
 }
@@ -277,17 +284,22 @@ void StampRecorder::sendOverNetwork(const QByteArray &imprint, int service, Done
     req.setHeader(QNetworkRequest::ContentTypeHeader, QByteArrayLiteral("application/timestamp-query"));
     req.setTransferTimeout(kTimeoutMs);
     QNetworkReply *reply = m_net->post(req, body);
-    connect(reply, &QNetworkReply::finished, this, [reply, imprint, nonce, done] {
+    const QList<QByteArray> pool = m_doc ? m_doc->stampCertificates : QList<QByteArray>();
+    connect(reply, &QNetworkReply::finished, this, [reply, imprint, nonce, pool, done] {
         reply->deleteLater();
         if (reply->error() != QNetworkReply::NoError) {
             done({}, reply->errorString());
             return;
         }
         const TimeStamp::Response r = TimeStamp::parseResponse(reply->readAll());
-        const std::optional<TimeStamp::Info> info = r.granted ? TimeStamp::info(r.token) : std::nullopt;
+        TimeStamp::Info info;
+        // Plain HTTP: the answer counts only if it checks as the file will.
+        const bool checks = r.granted && TimeStamp::verify(r.token, pool, &info) == TimeStamp::Check::Ok && info.sha256;
         if (!r.granted)
             done({}, r.error);
-        else if (!info || info->imprint != imprint || info->nonce != nonce)
+        else if (!checks)
+            done({}, tr("ответ не проверяется"));
+        else if (info.imprint != imprint || info.nonce != nonce)
             done({}, tr("ответ не к этому запросу"));
         else
             done(r.token, {});

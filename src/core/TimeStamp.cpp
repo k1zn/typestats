@@ -181,32 +181,41 @@ bool signedBy(const Certificate &c, QByteArrayView issuerSpki)
     return alg && signatureValid(issuerSpki, *alg, c.tbs, c.signature);
 }
 
-// From the signer's certificate up to a pinned root, every certificate valid at `atMs`.
+constexpr int kMaxDepth = 6;
+constexpr qsizetype kMaxCertificates = 64; // a token and its file carry a few
+
+// The certificate leads to a pinned root, every certificate on the way valid at `atMs`. A signature is checked only
+// with a key that is trusted already (pinned, or of a certificate shown to lead to one).
+bool leadsToRoot(const Certificate &c, const QList<Certificate> &pool, qint64 atMs, int depth,
+                 QHash<const Certificate *, bool> &memo)
+{
+    if (depth >= kMaxDepth || atMs < c.notBefore || atMs > c.notAfter || (depth > 0 && !c.ca))
+        return false;
+    if (const auto it = memo.constFind(&c); it != memo.cend())
+        return *it;
+    memo.insert(&c, false); // a loop leads nowhere
+    const QList<QByteArray> &roots = anchors();
+    bool ok = false;
+    for (const QByteArray &root : roots)
+        if (signedBy(c, root)) {
+            ok = true;
+            break;
+        }
+    for (qsizetype i = 0; !ok && i < pool.size(); ++i) {
+        const Certificate &issuer = pool[i];
+        ok = &issuer != &c && issuer.subject == c.issuer && !roots.contains(issuer.spki.toByteArray())
+             && leadsToRoot(issuer, pool, atMs, depth + 1, memo) && signedBy(c, issuer.spki);
+    }
+    memo.insert(&c, ok);
+    return ok;
+}
+
 bool trusted(const Certificate &leaf, const QList<Certificate> &pool, qint64 atMs)
 {
-    const QList<QByteArray> &roots = anchors();
-    const Certificate *c = &leaf;
-    for (int depth = 0; depth < 6; ++depth) {
-        if (roots.contains(c->spki.toByteArray()))
-            return depth > 0; // a root does not stamp by itself
-        if (atMs < c->notBefore || atMs > c->notAfter)
-            return false;
-        if (depth > 0 && !c->ca)
-            return false;
-        for (const QByteArray &root : roots)
-            if (signedBy(*c, root))
-                return true;
-        const Certificate *issuer = nullptr;
-        for (const Certificate &candidate : pool)
-            if (candidate.subject == c->issuer && candidate.der != c->der && signedBy(*c, candidate.spki)) {
-                issuer = &candidate;
-                break;
-            }
-        if (!issuer)
-            return false;
-        c = issuer;
-    }
-    return false;
+    if (anchors().contains(leaf.spki.toByteArray()))
+        return false; // a root does not stamp by itself
+    QHash<const Certificate *, bool> memo;
+    return leadsToRoot(leaf, pool, atMs, 0, memo);
 }
 
 struct SignedData
@@ -313,8 +322,8 @@ Response parseResponse(QByteArrayView der)
     Der::Reader s(status->content);
     const std::optional<Der::Node> code = s.next(Der::Integer);
     const QByteArrayView value = code ? Der::unsignedInteger(*code) : QByteArrayView();
-    if (value.size() != 1 || value[0] > 1) { // granted (0) or grantedWithMods (1)
-        out.error = QStringLiteral("refused (status %1)").arg(value.size() == 1 ? int(value[0]) : -1);
+    if (value.size() != 1 || quint8(value[0]) > 1) { // granted (0) or grantedWithMods (1)
+        out.error = QStringLiteral("refused (status %1)").arg(value.size() == 1 ? int(quint8(value[0])) : -1);
         if (const std::optional<Der::Node> text = s.next(Der::Sequence)) {
             Der::Reader texts(text->content);
             if (const std::optional<Der::Node> t = texts.next())
@@ -382,7 +391,7 @@ Check verify(QByteArrayView token, const QList<QByteArray> &pool, Info *out)
     QList<Certificate> certs;
     QSet<QByteArray> seen;
     const auto add = [&](const QByteArray &der) {
-        if (seen.contains(der))
+        if (seen.contains(der) || certs.size() >= kMaxCertificates)
             return;
         seen.insert(der);
         if (std::optional<Certificate> c = parseCertificate(der))
@@ -462,10 +471,11 @@ Check verify(QByteArrayView token, const QList<QByteArray> &pool, Info *out)
         known = g_goodTokens.contains(key);
     }
     if (!known) {
-        if (!signatureValid(signer->spki, *sigDigest, signedAttrs, signature->content))
-            return Check::BadSignature;
+        // The chain first: the signer's key is used once it is known to be trusted.
         if (!signer->timeStamping || !trusted(*signer, certs, tst->timeMs))
             return Check::Untrusted;
+        if (!signatureValid(signer->spki, *sigDigest, signedAttrs, signature->content))
+            return Check::BadSignature;
         const QMutexLocker lock(&g_cacheMutex);
         g_goodTokens.insert(key);
     }

@@ -224,6 +224,7 @@
   "Последняя ошибка: %1": "Last error: %1",
   "Заверять запись метками времени (нужен интернет)": "Time-stamp the recording (needs the Internet)",
   "ответ не к этому запросу": "the answer is not to this request",
+  "ответ не проверяется": "the answer does not check",
   "Запись будет заверена метками времени": "The recording will be time-stamped",
   "Запись заверена метками времени": "The recording is time-stamped",
   "Время подтверждено для %1 % записей": "Time confirmed for %1 % of the records",

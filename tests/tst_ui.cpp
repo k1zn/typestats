@@ -1990,6 +1990,35 @@ private slots:
                  Stamps::Report::Status::Confirmed);
     }
 
+    void proofOfOpenedTail()
+    {
+        // Records after the last stamp of a file that was opened are not "waiting for the next stamp".
+        TsfDocument doc;
+        QCOMPARE(Tsf::read(golden("stamps/stamped.tsf"), doc), Tsf::ReadError::None);
+        const qsizetype n = doc.records.size();
+        for (int i = 0; i < 40; ++i) {
+            KeyRecord r = doc.records[n - 2 + (i % 2)];
+            r.dtUs = 15000;
+            doc.records.append(r);
+        }
+        QTemporaryDir dir;
+        const QString path = dir.filePath(QStringLiteral("tail.tsf"));
+        QVERIFY(Tsf::write(path, doc, true));
+        QSettings().setValue(QStringLiteral("StampRecording"), true);
+        {
+            MainWindow w;
+            w.m_stamps->setSend([](const QByteArray &, int, StampRecorder::Done) {});
+            QVERIFY(w.openFile(path));
+            w.m_capture->setChecked(true);
+            w.updateProof();
+            QTRY_VERIFY(!w.m_proofButton->isHidden());
+            QTest::qWait(20);
+            QVERIFY(w.m_proofButton->text().startsWith(QStringLiteral("✓ ")));
+            QVERIFY(w.m_proofButton->text() != QStringLiteral("✓ 100 %"));
+        }
+        QSettings().remove(QStringLiteral("StampRecording"));
+    }
+
     void exportTables()
     {
         MainWindow w;

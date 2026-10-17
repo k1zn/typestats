@@ -54,6 +54,10 @@ public:
     Cover cover() const { return m_cover; }
 
     bool busy() const { return m_inFlight; }
+    // Records (normalized) and packets from these on came while this document was open here: while recording, those
+    // after the last stamp wait for the next one; those of a file that came so do not.
+    int ownRecordsFrom() const { return m_ownRecords; }
+    int ownPacketsFrom() const { return m_ownPackets; }
     QString lastError() const { return m_error; }
     // The authorities, in the order they are tried.
     static QStringList services();
@@ -79,6 +83,7 @@ private:
     QByteArray m_packetHashes;      // SHA-256 of the clip's packets so far, 32 bytes each
     Stamps::Chain m_chain;
     qsizetype m_raw = 0;            // records of the document the chain has seen
+    int m_ownRecords = 0, m_ownPackets = 0;
     bool m_enabled = false;
     bool m_sessionStamped = false;  // this session of recording has a stamp
     bool m_inFlight = false;
