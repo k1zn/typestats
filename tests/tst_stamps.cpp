@@ -894,7 +894,8 @@ private slots:
             forged.webcam = cut.serialize();
             const TsfDocument back = Tsf::parse(Tsf::serialize(forged, true));
             MediaClip backClip;
-            Q_ASSERT(MediaClip::parse(back.webcam, backClip));
+            if (!MediaClip::parse(back.webcam, backClip)) // not in Q_ASSERT: a Release build drops it
+                qFatal("the clip does not parse");
             return std::pair{hidden, reportWith(back, backClip)};
         };
         for (const bool videoOnly : {true, false}) {
@@ -935,7 +936,8 @@ private slots:
             block.webcam = c.serialize();
             const TsfDocument back = Tsf::parse(Tsf::serialize(block, true));
             MediaClip backClip;
-            Q_ASSERT(MediaClip::parse(back.webcam, backClip));
+            if (!MediaClip::parse(back.webcam, backClip)) // not in Q_ASSERT: a Release build drops it
+                qFatal("the clip does not parse");
             return reportWith(back, backClip);
         };
         Stamps::Report r = check(0);
