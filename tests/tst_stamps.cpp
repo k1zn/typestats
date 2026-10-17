@@ -609,6 +609,95 @@ private slots:
         const TsfDocument back = Tsf::parse(Tsf::serialize(doc, true));
         QCOMPARE(reportWith(back, clip).packetsStamped, 206);
     }
+
+    void forgedParts()
+    {
+        // Parts a stamp may have only where the program writes them: records not under a stamp only in a voided one,
+        // hidden records only at the edges of a block.
+        const TsfDocument doc = load("video.tsf");
+        MediaClip clip;
+        QVERIFY(MediaClip::parse(doc.webcam, clip));
+        const KeyRecords normalized = Recalc::normalized(doc.records);
+        QVERIFY(doc.stamps.size() >= 3);
+        const int from = doc.stamps[0].end, len = doc.stamps[1].end - from, a = len / 2;
+        const int packets = doc.stamps[1].mediaEnd - doc.stamps[0].mediaEnd;
+        QVERIFY(len > 4);
+
+        // Records slipped into a stamp that is not voided as "not under it".
+        TsfDocument inserted = doc;
+        inserted.records = normalized;
+        KeyRecord fake;
+        fake.dtUs = 1000;
+        fake.flags = 0x58u << 16;
+        fake.ch = u'x';
+        for (int i = 0; i < 3; ++i)
+            inserted.records.insert(from + a, fake);
+        inserted.stamps[1].parts = {{StampPart::Records, a, 0, {}},
+                                    {StampPart::Unstamped, 3, 0, {}},
+                                    {StampPart::Records, len - a, 0, {}},
+                                    {StampPart::Packets, packets, 0, {}}};
+        for (int k = 1; k < inserted.stamps.size(); ++k)
+            inserted.stamps[k].end += 3;
+        Stamps::Report r = reportWith(inserted, clip);
+        QCOMPARE(r.status, Stamps::Report::Status::Broken);
+        // The same at the end of the last stamp.
+        TsfDocument appended = doc;
+        appended.records = normalized;
+        for (int i = 0; i < 3; ++i)
+            appended.records.append(fake);
+        Stamp &final = appended.stamps.last();
+        final.parts = {{StampPart::Records, final.end - appended.stamps[appended.stamps.size() - 2].end, 0, {}},
+                       {StampPart::Unstamped, 3, 0, {}},
+                       {StampPart::Packets, final.mediaEnd - appended.stamps[appended.stamps.size() - 2].mediaEnd, 0, {}}};
+        final.end += 3;
+        r = reportWith(appended, clip);
+        QCOMPARE(r.status, Stamps::Report::Status::Broken);
+
+        // A record in the middle hidden (a typo and its BackSpace taken out): the stamp still checks, but such a chain
+        // is not a block of the recording.
+        TsfDocument hidden = doc;
+        hidden.records = normalized;
+        const KeyRecord gone = hidden.records.takeAt(from + a);
+        const QByteArray c = Stamps::commitment(Stamps::salt(doc.stamps[1].key, quint32(a)), Stamps::encode(gone));
+        hidden.stamps[1].parts = {{StampPart::Records, a, 0, {}},
+                                  {StampPart::Commitments, 1, gone.dtUs, c},
+                                  {StampPart::Records, len - a - 1, 0, {}},
+                                  {StampPart::Packets, packets, 0, {}}};
+        for (int k = 1; k < hidden.stamps.size(); ++k)
+            hidden.stamps[k].end -= 1;
+        r = reportWith(hidden, clip);
+        QCOMPARE(r.status, Stamps::Report::Status::Broken);
+        // The same hidden record at the end of the last stamp is a block's edge: fine.
+        TsfDocument tail = doc;
+        tail.records = normalized;
+        const int last = int(tail.stamps.size()) - 1, lastFrom = tail.stamps[last - 1].end;
+        const int lastLen = tail.stamps[last].end - lastFrom;
+        const KeyRecord end = tail.records.takeLast();
+        tail.stamps[last].parts = {{StampPart::Records, lastLen - 1, 0, {}},
+                                   {StampPart::Commitments, 1, end.dtUs,
+                                    Stamps::commitment(Stamps::salt(doc.stamps[last].key, quint32(lastLen - 1)),
+                                                       Stamps::encode(end))},
+                                   {StampPart::Packets, tail.stamps[last].mediaEnd - tail.stamps[last - 1].mediaEnd, 0, {}}};
+        tail.stamps[last].end -= 1;
+        r = reportWith(tail, clip);
+        QCOMPARE(r.bad, 0);
+        QCOMPARE(r.status, Stamps::Report::Status::Confirmed);
+
+        // A voided stamp that leaves no records in the document: not all of the recording is confirmed.
+        TsfDocument voided = doc;
+        KeyRecords recs = normalized;
+        for (int i = 0; i < recs.size(); ++i)
+            recs[i].tag = quint32(i + 1);
+        const KeyRecords before = recs;
+        recs.remove(doc.stamps[last - 1].end, doc.stamps[last].end - doc.stamps[last - 1].end);
+        Stamps::follow(voided.stamps, before, recs);
+        QVERIFY(voided.stamps[last].voided);
+        voided.records = recs;
+        r = reportWith(voided, clip);
+        QCOMPARE(r.bad, 0);
+        QCOMPARE(r.voided, 1);
+        QCOMPARE(r.status, Stamps::Report::Status::Partial);
+    }
 };
 
 QTEST_GUILESS_MAIN(TstStamps)

@@ -179,7 +179,7 @@ std::optional<PublicKey> fromSpki(QByteArrayView spki)
     PublicKey out{Der::unsignedInteger(*n).toByteArray(), Der::unsignedInteger(*e).toByteArray()};
     // An odd modulus of 1024..4096 bits, a small odd exponent of 3 or more.
     if (out.modulus.size() < 128 || out.modulus.size() > 512 || !(quint8(out.modulus.back()) & 1)
-        || out.exponent.size() > 4 || !(quint8(out.exponent.back()) & 1)
+        || out.exponent.isEmpty() || out.exponent.size() > 4 || !(quint8(out.exponent.back()) & 1)
         || (out.exponent.size() == 1 && quint8(out.exponent[0]) < 3))
         return std::nullopt;
     return out;

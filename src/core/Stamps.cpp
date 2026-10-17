@@ -600,6 +600,7 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
     qint64 virtualUs = 0;    // the time of the recording by the chain's records, hidden ones too
     std::optional<qint64> modelMinusVirtual;
     bool seenPresent = false;
+    bool shownSeen = false, shownEnded = false; // records of stamps not voided: shown ones, hidden ones after them
     qint64 hiddenTail = 0;
     bool anyChecked = false;
     for (const Stamp &s : stamps)
@@ -639,6 +640,20 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
             if (!l.ok || (l.records.isEmpty() && l.packets.isEmpty() && !s.voided) || (s.version < 2 && !s.voided && l.present == 0 && s.parts.isEmpty()))
                 structure = false;
         }
+        // Parts only where the program writes them. Records of the document not under the stamp - only in a voided one
+        // (an edit); records hidden - only at the edges of a block, which is a run of the records: hidden ones between
+        // shown ones would take records out of the recording (typos, slow bits) with their stamps still checking.
+        if (structure && !s.voided)
+            for (const RecItem &r : l.records) {
+                if (r.kind == RecItem::Unstamped || (r.kind == RecItem::Present && shownEnded)) {
+                    structure = false;
+                    break;
+                }
+                if (r.kind == RecItem::Present)
+                    shownSeen = true;
+                else if (shownSeen)
+                    shownEnded = true;
+            }
         if (!structure) {
             ++rep.bad;
             lastGoodEnd = -1;
@@ -667,9 +682,8 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
         TimeStamp::Info info;
         bool tokenOk = false, matches = false;
         const auto same = [&](const Cache::Entry &e) {
-            return e.end == s.end && e.mediaEnd == s.mediaEnd && e.recordCursor == recordCursor
-                   && e.packetCursor == packetCursor && e.parts == s.parts.size() && e.clip == (clip != nullptr)
-                   && e.token == s.token && e.previous == previous;
+            return e.recordCursor == recordCursor && e.packetCursor == packetCursor && e.clip == (clip != nullptr)
+                   && e.previous == previous && e.stamp == s;
         };
         if (cache && k < cache->entries.size() && same(cache->entries[k])) {
             const Cache::Entry &e = cache->entries[k];
@@ -682,8 +696,7 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
                       && info.imprint == imprint(s, layOut(s, recordCursor, packetCursor, records, clip), previous);
             if (cache) {
                 cache->entries.resize(k);
-                cache->entries.append({s.token, previous, s.end, s.mediaEnd, recordCursor, packetCursor,
-                                       s.parts.size(), clip != nullptr, tokenOk, matches, info});
+                cache->entries.append({s, previous, recordCursor, packetCursor, clip != nullptr, tokenOk, matches, info});
             }
         }
         const bool keptLeaves = s.version >= 2 && !s.parts.isEmpty();  // v3
@@ -767,9 +780,11 @@ Report verify(const KeyRecords &normalized, const QList<Stamp> &stamps, const QL
     rep.confirmed = int(std::count(confirmed.begin(), confirmed.end(), 1));
     rep.authorities = QStringList(authorities.begin(), authorities.end());
     rep.authorities.sort();
+    // A voided stamp is an edit: even when it left no records in the document (all of its chunk deleted) and the time
+    // of the rest is confirmed, the recording is not all there.
     if (rep.bad > 0)
         rep.status = Report::Status::Broken;
-    else if (rep.confirmed == rep.records && rep.packetsStamped == rep.packets)
+    else if (rep.voided == 0 && rep.unknown == 0 && rep.confirmed == rep.records && rep.packetsStamped == rep.packets)
         rep.status = Report::Status::Confirmed;
     else
         rep.status = Report::Status::Partial;

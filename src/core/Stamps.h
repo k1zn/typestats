@@ -97,9 +97,9 @@ struct Cache
 {
     struct Entry
     {
-        QByteArray token, previous;
-        int end = 0, mediaEnd = 0, recordCursor = 0, packetCursor = 0;
-        qsizetype parts = 0;
+        Stamp stamp;         // all of it: a stamp voided or with other parts is checked anew
+        QByteArray previous;
+        int recordCursor = 0, packetCursor = 0;
         bool clip = false;
         bool tokenOk = false, matches = false;
         TimeStamp::Info info;

@@ -42,6 +42,7 @@ struct Stamp
     QByteArray key;      // v3: the key of the records' salts (16 bytes); none in a block that hides some of them
     QList<StampPart> parts;  // v3 (and v1 in a block): empty - the chunk is all in the document
     QByteArray previous;     // the imprint of the stamp before when it is not in the file (the first stamp of a block)
+    bool operator==(const Stamp &) const = default;
 };
 
 // Contents of a .tsf file (see re/tsf_format.md).
