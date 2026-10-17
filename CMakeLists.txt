@@ -10,6 +10,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
+# For clang-tidy (ci/tidy.py, the target `tidy`) and editors with clangd.
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # The core computes in the 80-bit x87 format (src/core/Ext80.h): long double where it is that format,
 # the software Ext80 elsewhere. TS_SOFT_EXT80=ON uses the software one everywhere (to test it).
@@ -296,3 +298,15 @@ foreach(src ${TEST_SOURCES})
         set_tests_properties(${name} PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
     endif()
 endforeach()
+
+# --- static analysis ---
+# `cmake --build <build> --target tidy`: clang-tidy with the checks of .clang-tidy over src/ and tests/
+# (ci/tidy.py; clang-tidy from PATH, CLANG_TIDY or `pip install clang-tidy`). Build first: the moc files
+# are needed. The report also goes to <build>/tidy.txt.
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if(Python3_Interpreter_FOUND)
+    add_custom_target(tidy
+        COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/ci/tidy.py ${CMAKE_BINARY_DIR} --out ${CMAKE_BINARY_DIR}/tidy.txt
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        USES_TERMINAL VERBATIM)
+endif()

@@ -1,0 +1,41 @@
+---
+# Static analysis: what can crash or silently go wrong (null and dangling pointers, out-of-range indices,
+# use after move, uninitialised values, leaks, wrong Qt and std idioms). Style checks are off.
+# Run: python ci/tidy.py <build> (or the target `tidy`); the build needs compile_commands.json, which
+# CMakeLists always writes. Off on purpose:
+#   integer-division, float-loop-counter - the formulas and axes of the original are like that;
+#   throwing-static-initialization - QString constants (throw only when out of memory at start);
+#   misplaced-const, multi-level-implicit-pointer-conversion - WinAPI handle typedefs, CoTaskMemFree.
+Checks: >
+  -*,
+  clang-analyzer-*,
+  -clang-analyzer-optin.performance.Padding,
+  -clang-analyzer-security.insecureAPI.*,
+  -clang-analyzer-security.FloatLoopCounter,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-narrowing-conversions,
+  -bugprone-implicit-widening-of-multiplication-result,
+  -bugprone-branch-clone,
+  -bugprone-reserved-identifier,
+  -bugprone-switch-missing-default-case,
+  -bugprone-unchecked-optional-access,
+  -bugprone-integer-division,
+  -bugprone-float-loop-counter,
+  -bugprone-throwing-static-initialization,
+  -bugprone-multi-level-implicit-pointer-conversion,
+  cert-err33-c,
+  cppcoreguidelines-pro-type-member-init,
+  cppcoreguidelines-slicing,
+  misc-dangling-handle,
+  misc-redundant-expression,
+  misc-uniqueptr-reset-release,
+  performance-move-const-arg,
+  readability-misleading-indentation
+WarningsAsErrors: ''
+HeaderFilterRegex: '.*[/\\]src[/\\].*'
+SystemHeaders: false
+CheckOptions:
+  bugprone-assert-side-effect.AssertMacros: 'assert,Q_ASSERT,Q_ASSERT_X'
+  bugprone-unused-return-value.AllowCastToVoid: true
+...

@@ -47,7 +47,7 @@ private:
     void add(int finger, int scan);
 
     std::array<QVector<quint8>, kFingers> m_keys;
-    std::array<quint8, 128> m_table;
+    std::array<quint8, 128> m_table{};
     bool m_readOnly = false;
 };
 

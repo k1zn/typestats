@@ -12,7 +12,7 @@ constexpr std::array<qint8, 128> decodeTable()
     for (auto &v : t)
         v = -1;
     for (int i = 0; i < 85; ++i)
-        t[size_t(kAlphabet[i])] = qint8(i);
+        t[size_t(quint8(kAlphabet[i]))] = qint8(i);
     return t;
 }
 

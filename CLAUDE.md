@@ -70,6 +70,13 @@ ad-hoc, без нотаризации). AppImage проверяется лока
 QXlsx требует `Qt6::GuiPrivate`: на дистрибутивах нужен пакет приватных заголовков (`qt6-base-private-dev` в
 Debian/Ubuntu, `qt6-qtbase-private-devel` в Fedora). `lrelease` ищется и в `bin`/`libexec` Qt (у Debian — вне PATH).
 
+**Статический анализ** (2026-10-17): clang-tidy 22 (`pip`-пакет `clang-tidy`, здесь распакован в
+`D:\Qt\Tools\clang-tidy-22`, в PATH из `env.sh`), проверки — `.clang-tidy` (падения: нулевые/висячие указатели,
+выход за границы, use-after-move, неинициализированное; стиль выключен), раннер — `ci/tidy.py` (только `src/` и
+`tests/`, MinGW — `--target=x86_64-w64-mingw32`, дубли из заголовков схлопывает). `cmake --build build --target tidy`
+(~2 мин, отчёт — `build/tidy.txt`). CI: шаг в Linux/Clang, предупреждения — аннотации, сборку не роняет. Известное
+ложное: `StampRecorder::send` — «null m_clip» (при нём `mediaTo = 0`, цикл не идёт).
+
 Нюансы:
 - В Git Bash тесты ничего не печатают в консоль. Чтобы увидеть результат по кейсам:
   `./build/tst_tsf.exe -o /c/Users/kizn/AppData/Local/Temp/tst.txt,txt`.

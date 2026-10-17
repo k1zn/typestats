@@ -16,7 +16,7 @@ QString formatFixed(double v, int decimals, QStringView point)
     if (!std::isfinite(v)) // as FloatToStrF writes them
         return std::isnan(v) ? QStringLiteral("NAN") : v < 0 ? QStringLiteral("-INF") : QStringLiteral("INF");
     static const std::array<Ext, 19> powers = [] {
-        std::array<Ext, 19> p;
+        std::array<Ext, 19> p{};
         p[0] = Ext(1);
         for (std::size_t i = 1; i < p.size(); ++i)
             p[i] = p[i - 1] * Ext(10); // exact

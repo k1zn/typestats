@@ -123,12 +123,12 @@ private:
     QToolButton *m_onTop;
     QCheckBox *m_averages, *m_lock;
     QGroupBox *m_kindBox, *m_filterBox;
-    QRadioButton *m_kinds[ExtraStats::KindCount];
+    QRadioButton *m_kinds[ExtraStats::KindCount] = {};
     QWidget *m_templatePanel;
     QComboBox *m_template;
     QToolButton *m_templateButton;
-    QCheckBox *m_filterOn[3];
-    QLineEdit *m_filterText[3];
+    QCheckBox *m_filterOn[3] = {};
+    QLineEdit *m_filterText[3] = {};
     QSplitter *m_split;
     QTableView *m_list, *m_lowerList;
     StringTableModel *m_listModel, *m_lowerModel;

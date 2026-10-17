@@ -132,6 +132,16 @@ jobs:
         run: cmake --build build
       - name: Test
         run: QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure
+      # clang-tidy (.clang-tidy, ci/tidy.py) of the version used locally; the warnings become annotations of the
+      # commit; a failed step does not fail the job (the analyser has false positives). Only one job: the sources
+      # are the same, here the Linux backends are among them.
+      - name: clang-tidy
+        if: matrix.name == 'clang-soft-ext80'
+        continue-on-error: true
+        run: |
+          python3 -m venv /tmp/tidy
+          /tmp/tidy/bin/pip install --quiet clang-tidy==22.1.8
+          /tmp/tidy/bin/python ci/tidy.py build --strict --github --out build/tidy.txt
       - name: AppImage
         if: matrix.package
         run: bash ci/linux/appimage.sh build

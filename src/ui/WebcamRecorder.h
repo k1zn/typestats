@@ -85,7 +85,7 @@ private:
     class Worker;
     struct Pending
     {
-        int kind;
+        int kind = 0;
         EncodedFrame frame;
         QSize size; // of a video frame
     };
@@ -115,8 +115,8 @@ private:
     struct WarmAudio
     {
         QVector<float> pcm;
-        int channels, rate;
-        qint64 steadyUs;
+        int channels = 0, rate = 0;
+        qint64 steadyUs = 0;
     };
     static constexpr qint64 kWarmAudioUs = 300000;
     QList<WarmAudio> m_warmAudio;        // armed: the last 0.3 s of sound before the session (the microphone's thread)
