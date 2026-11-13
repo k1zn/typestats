@@ -948,10 +948,16 @@ void MainWindow::showProof()
         lines << tr("Меток времени пока нет: они ставятся во время набора.");
     } else {
         lines << tr("Меток времени: %1 (%2)").arg(r.stamps).arg(r.authorities.join(QStringLiteral(", ")));
-        if (r.firstMs)
+        if (r.firstMs) {
+            const QDateTime first = QDateTime::fromMSecsSinceEpoch(r.firstMs);
+            const QDateTime last = QDateTime::fromMSecsSinceEpoch(r.lastMs);
+            const auto time = [](const QDateTime &dt) { return dt.time().toString(QStringLiteral("HH:mm:ss")); };
+            const auto dateTime = [&](const QDateTime &dt) {
+                return loc.toString(dt.date(), QLocale::ShortFormat) + QLatin1Char(' ') + time(dt);
+            };
             lines << tr("Набрано: %1 — %2")
-                         .arg(loc.toString(QDateTime::fromMSecsSinceEpoch(r.firstMs), QLocale::ShortFormat),
-                              loc.toString(QDateTime::fromMSecsSinceEpoch(r.lastMs).time(), QLocale::ShortFormat));
+                         .arg(dateTime(first), first.date() == last.date() ? time(last) : dateTime(last));
+        }
         lines << tr("Записей: %1, под метками: %2").arg(r.records).arg(r.stamped);
         lines << tr("Время подтверждено: %1 (%2 %), расхождение до %3 с")
                      .arg(r.confirmed)
