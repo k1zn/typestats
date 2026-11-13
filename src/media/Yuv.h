@@ -14,7 +14,11 @@ struct I420Frame
     I420Frame() = default;
     I420Frame(int w, int h) { resize(w, h); }
     void resize(int w, int h);
-    bool isNull() const { return width <= 0 || height <= 0; }
+    bool isNull() const
+    {
+        return width <= 0 || height <= 0 || (width & 1) || (height & 1)
+               || data.size() != qint64(width) * height * 3 / 2;
+    }
 
     uchar *y() { return reinterpret_cast<uchar *>(data.data()); }
     uchar *u() { return y() + width * height; }

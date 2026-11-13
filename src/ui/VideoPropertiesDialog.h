@@ -24,7 +24,7 @@ public:
     void setShiftMs(int ms, bool enabled);
     int shiftMs() const;
     // The picture of the camera, or why there is none.
-    void setPicture(const QImage &image);
+    void setPicture(const QImage &image, QSize sourceSize = {});
     void setPreviewMessage(const QString &text);
 
 signals:

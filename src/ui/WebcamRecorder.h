@@ -76,10 +76,11 @@ public:
     void drain();
 
 signals:
-    void picture(const QImage &image);  // the camera, for the preview (at most 15 a second)
+    void picture(const QImage &image, QSize sourceSize); // small preview (at most 15/s), native size separately
     void packetsAdded();
     void recordingChanged(bool recording);
     void failed(const QString &reason);
+    void resolutionReduced(QSize size); // encoder overload: the actual size, without changing the saved preset
 
 private:
     class Worker;
@@ -102,8 +103,11 @@ private:
     Camera *m_camera = nullptr;
     Microphone *m_mic = nullptr;
     QThread m_thread;
+    QThread m_audioThread;
     Worker *m_worker = nullptr;
-    bool m_capture = false, m_preview = false, m_armed = false, m_recording = false, m_devices = true;
+    Worker *m_audioWorker = nullptr;
+    bool m_capture = false, m_armed = false, m_recording = false, m_devices = true;
+    std::atomic<bool> m_preview{false};
     std::atomic<int> m_generation{0};
     std::atomic<bool> m_accepting{false};
     std::atomic<qint64> m_lastFrameUs{0};
@@ -122,6 +126,7 @@ private:
     QList<WarmAudio> m_warmAudio;        // armed: the last 0.3 s of sound before the session (the microphone's thread)
     int m_videoStream = -1, m_audioStream = -1;
     bool m_withVideo = false; // the session records the camera (its stream comes with the first frame)
+    bool m_streamLimitReported = false;
     qint64 m_docEndUs = 0;
     std::optional<qint64> m_timerUs;
     qint64 m_lastPts[2] = {MediaClip::kAll, MediaClip::kAll};

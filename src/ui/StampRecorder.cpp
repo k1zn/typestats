@@ -24,7 +24,10 @@ constexpr int kServiceCount = int(std::size(kServices));
 constexpr int kTimeoutMs = 5000; // then the next authority
 constexpr qint64 kMaxResponse = 256 * 1024; // a token with its certificates is a few KB
 // A cosign asked for after its stamp came this much later at most: its time against the records' would be off by that.
-constexpr int kCosignLateMs = 1000;
+// A failed request can take kTimeoutMs. Leave time to try a reserve after that timeout;
+// the signed times are still checked against kCosignSkewMs before a cosign is kept.
+constexpr int kCosignLateMs = int(Stamps::kCosignSkewMs) - 1000;
+constexpr int kCosignHedgeMs = 1000; // try a reserve before a slow service exhausts the timing tolerance
 constexpr int kRetryMs = 5000;
 constexpr int kAfterStopMs = 1000; // the frames still on their way when recording stops
 
@@ -340,6 +343,19 @@ void StampRecorder::received(quint64 generation, quint64 round, const QByteArray
     } else {
         askCosign(cosign);
     }
+    // Do not wait five seconds for a dead second service before asking a reserve: that delay
+    // can itself break its clock band against subsequent stamps. The original may still win.
+    const quint64 currentGeneration = m_generation;
+    QTimer::singleShot(std::max(0, kCosignHedgeMs - int(cosign.sent.elapsed())), this,
+                      [this, currentGeneration, imprint] {
+        if (currentGeneration != m_generation || !m_enabled)
+            return;
+        for (const Awaited &a : std::as_const(m_awaited))
+            if (a.imprint == imprint) {
+                askCosign(a);
+                return;
+            }
+    });
     emit changed();
     if (m_flushing) {
         if (m_flushSent) {
@@ -375,6 +391,14 @@ bool StampRecorder::askCosign(Awaited a)
         return false;
     a.service = s;
     a.tried.append(s);
+    // A hedged request shares the same retry history with the original one.
+    for (Awaited &pending : m_awaited)
+        if (pending.imprint == a.imprint) {
+            for (int service : pending.tried)
+                if (!a.tried.contains(service))
+                    a.tried.append(service);
+            pending.tried = a.tried;
+        }
     m_awaited.append(a);
     request(a.imprint, s, 0);
     return true;
@@ -403,14 +427,20 @@ void StampRecorder::cosignAnswered(qsizetype i, const QByteArray &token)
                       && qAbs(first->timeMs - second->timeMs) <= Stamps::kCosignSkewMs);
     }
     if (token.isEmpty() || !another) {
+        if (awaits(a.imprint))
+            return; // the original request or its reserve may still answer
         if (askCosign(a))
             return;
     } else if (stamp && stamp->cosign.isEmpty()) {
         addChain(m_doc->stampCertificates, token);
         stamp->cosign = TimeStamp::withoutCertificates(token);
         m_second = a.service;
+        m_awaited.removeIf([&](const Awaited &pending) { return pending.imprint == a.imprint; });
         emit changed();
     }
+    // The UI must stop treating this cosign as pending even when no reserve answered.
+    if (token.isEmpty() || !another)
+        emit changed();
     if (!m_flushImprint.isEmpty() && m_flushImprint == a.imprint && !awaits(a.imprint))
         flushDone(true);
 }
@@ -448,6 +478,14 @@ void StampRecorder::sendOverNetwork(const QByteArray &imprint, int service, Done
     req.setHeader(QNetworkRequest::ContentTypeHeader, QByteArrayLiteral("application/timestamp-query"));
     req.setTransferTimeout(kTimeoutMs);
     QNetworkReply *reply = m_net->post(req, body);
+    // Qt's transfer timeout measures inactivity. A trickling peer must not keep the request
+    // (and a save waiting for it) alive indefinitely or buffer an oversized response first.
+    reply->setReadBufferSize(kMaxResponse + 1);
+    QTimer::singleShot(kTimeoutMs, reply, [reply] { reply->abort(); });
+    connect(reply, &QIODevice::readyRead, reply, [reply] {
+        if (reply->bytesAvailable() > kMaxResponse)
+            reply->abort();
+    });
     connect(reply, &QNetworkReply::downloadProgress, reply, [reply](qint64 got, qint64 total) {
         if (got > kMaxResponse || total > kMaxResponse)
             reply->abort(); // finished() with an error: the next authority

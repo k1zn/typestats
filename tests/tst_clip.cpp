@@ -45,6 +45,19 @@ class TstClip : public QObject
     Q_OBJECT
 
 private slots:
+    void streamLimit()
+    {
+        MediaClip clip;
+        for (int i = 0; i < 255; ++i)
+            QCOMPARE(clip.addStream(MediaStream::video(160 + 2 * i, 120)), i);
+        QCOMPARE(clip.addStream(clip.streams.last()), 254); // the current stream is reusable
+        QCOMPARE(clip.addStream(MediaStream::video(1920, 1080)), -1);
+        QCOMPARE(clip.streams.size(), 255);
+        MediaClip back;
+        QVERIFY(MediaClip::parse(clip.serialize(), back));
+        QCOMPARE(back.streams, clip.streams);
+    }
+
     void z85()
     {
         // The test vector of RFC 32.
@@ -286,6 +299,24 @@ private slots:
         QCOMPARE(quint8(config[0]), quint8(0x81));
         QCOMPARE(quint8(config[1]), quint8(8));
         QVERIFY(Webm::av1Config(QByteArray::fromHex("1200")).isEmpty());
+    }
+
+    void webmResolutionChanges()
+    {
+        MediaClip clip;
+        const int hd = clip.addStream(MediaStream::video(1920, 1080));
+        const int small = clip.addStream(MediaStream::video(640, 360));
+        clip.packets = {{quint8(hd), true, 0, "hd"}, {quint8(small), true, 1000000, "small"}};
+        const QByteArray webm = Webm::write(clip);
+        // PixelWidth / PixelHeight must cover the HD frames even after a downgrade.
+        QVERIFY(webm.contains(QByteArray::fromHex("b0820780")));
+        QVERIFY(webm.contains(QByteArray::fromHex("ba820438")));
+        QCOMPARE(clip.videoFramesAt(1000000), (std::pair<int, int>{1, 1}));
+        MediaClip back;
+        QVERIFY(MediaClip::parse(clip.serialize(), back));
+        QCOMPARE(back.streams.size(), 2);
+        QCOMPARE(back.videoFramesAt(0), (std::pair<int, int>{0, 0}));
+        QCOMPARE(back.videoFramesAt(1000000), (std::pair<int, int>{1, 1}));
     }
 };
 

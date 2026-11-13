@@ -227,14 +227,16 @@ void VideoPropertiesDialog::suggestKbps()
         setKbps(WebcamRecorder::Preset::suggestedKbps(m_width->value(), m_height->value(), m_fps->value()));
 }
 
-void VideoPropertiesDialog::setPicture(const QImage &image)
+void VideoPropertiesDialog::setPicture(const QImage &image, QSize sourceSize)
 {
     QPixmap pm = QPixmap::fromImage(
         image.scaled(m_preview->size() * devicePixelRatioF(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
     pm.setDevicePixelRatio(devicePixelRatioF());
     m_preview->setPixmap(pm);
-    if (image.size() != m_cameraSize) {
-        m_cameraSize = image.size();
+    if (sourceSize.isEmpty())
+        sourceSize = image.size();
+    if (sourceSize != m_cameraSize) {
+        m_cameraSize = sourceSize;
         updateSizes();
         updateEstimate();
     }
@@ -243,7 +245,9 @@ void VideoPropertiesDialog::setPicture(const QImage &image)
 QSize VideoPropertiesDialog::recordedSize(const WebcamRecorder::Preset &p) const
 {
     // The quality's size is a frame: the camera's picture goes into it whole (WebcamRecorder::fit).
-    return WebcamRecorder::fit(m_cameraSize, QSize(p.width, p.height));
+    const QSize limit = m_cameraSize.isEmpty() ? QSize(p.width, p.height)
+                                              : QSize(p.width, p.height).boundedTo(m_cameraSize);
+    return WebcamRecorder::fit(m_cameraSize, limit);
 }
 
 void VideoPropertiesDialog::updateSizes()
@@ -278,5 +282,6 @@ void VideoPropertiesDialog::updateEstimate()
         text = tr("запишется %1×%2").arg(recorded.width()).arg(recorded.height()) + QStringLiteral(", ") + text;
     if (bitsPerPixel < 0.01)
         text += QStringLiteral(" · ") + tr("мало для такого кадра: картинка будет размытой");
+    text += u'\n' + tr("При перегрузке кодера разрешение записи снижается автоматически для сохранения плавности.");
     m_estimate->setText(text);
 }

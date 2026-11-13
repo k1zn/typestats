@@ -55,7 +55,7 @@ public:
 
     bool isEmpty() const { return packets.isEmpty(); }
     int streamOf(MediaStream::Kind kind) const;
-    // The stream index for this kind of stream, added when missing or when its parameters changed.
+    // The stream index for this kind, added when missing or changed; -1 at the format's 255-stream limit.
     int addStream(const MediaStream &s);
 
     qint64 docTime(qint64 ptsUs) const { return ptsUs - originUs; }

@@ -34,6 +34,12 @@ bool Av1Encoder::open(const Av1Settings &s, QString *error)
     m_settings = s;
     m_settings.width &= ~1;
     m_settings.height &= ~1;
+    if (m_settings.width < 16 || m_settings.width > 1920 || m_settings.height < 16 || m_settings.height > 1080
+        || s.fps < 1 || s.fps > 30 || s.kbps < 10 || s.kbps > 4000 || s.threads < 1 || s.threads > 16) {
+        if (error)
+            *error = QStringLiteral("Invalid AV1 recording settings");
+        return false;
+    }
     aom_codec_iface_t *iface = aom_codec_av1_cx();
     aom_codec_enc_cfg_t cfg;
     if (aom_codec_enc_config_default(iface, &cfg, AOM_USAGE_REALTIME) != AOM_CODEC_OK) {
@@ -69,6 +75,8 @@ bool Av1Encoder::open(const Av1Settings &s, QString *error)
     aom_codec_control(&d->ctx, AOME_SET_CPUUSED, 10);
     aom_codec_control(&d->ctx, AV1E_SET_AQ_MODE, 3);
     aom_codec_control(&d->ctx, AV1E_SET_ROW_MT, 1);
+    // Row multithreading alone leaves some work serial at HD sizes.
+    aom_codec_control(&d->ctx, AV1E_SET_TILE_COLUMNS, m_settings.width >= 960 && m_settings.threads > 1 ? 1u : 0u);
     aom_codec_control(&d->ctx, AV1E_SET_ENABLE_CDEF, 1);
     aom_codec_control(&d->ctx, AV1E_SET_ENABLE_TPL_MODEL, 0);
     aom_codec_control(&d->ctx, AV1E_SET_DELTAQ_MODE, 0);
@@ -91,7 +99,7 @@ bool Av1Encoder::open(const Av1Settings &s, QString *error)
 QList<EncodedFrame> Av1Encoder::encode(const I420Frame &frame, qint64 ptsUs, bool key)
 {
     QList<EncodedFrame> out;
-    if (!d->open || frame.width != m_settings.width || frame.height != m_settings.height)
+    if (!d->open || frame.isNull() || frame.width != m_settings.width || frame.height != m_settings.height)
         return out;
     if (d->started && ptsUs <= d->lastPts)
         ptsUs = d->lastPts + 1; // the encoder needs growing time
@@ -149,13 +157,26 @@ void Av1Decoder::reset()
 
 I420Frame Av1Decoder::decode(QByteArrayView packet)
 {
+    aom_codec_stream_info_t stream{};
+    if (aom_codec_peek_stream_info(aom_codec_av1_dx(), reinterpret_cast<const uint8_t *>(packet.data()),
+                                   size_t(packet.size()), &stream) == AOM_CODEC_OK
+        && quint64(stream.w) * stream.h > 4096u * 2160u)
+        return {}; // also protects builds linked to older system codecs without the control below
     if (!d->open) {
         aom_codec_dec_cfg_t cfg{};
-        cfg.threads = 1;
+        cfg.threads = 2;
         cfg.allow_lowbitdepth = 1;
         if (aom_codec_dec_init(&d->ctx, aom_codec_av1_dx(), &cfg, 0) != AOM_CODEC_OK)
             return {};
         d->open = true;
+#ifdef AOM_CTRL_AOMD_SET_FRAME_SIZE_LIMIT
+        // A TSF may contain arbitrary AV1, regardless of its declared stream dimensions.
+        // Enforce the limit inside the decoder, before it allocates reference frames.
+        if (aom_codec_control(&d->ctx, AOMD_SET_FRAME_SIZE_LIMIT, 4096u * 2160u) != AOM_CODEC_OK) {
+            reset();
+            return {};
+        }
+#endif
     }
     if (aom_codec_decode(&d->ctx, reinterpret_cast<const uint8_t *>(packet.data()), size_t(packet.size()), nullptr)
         != AOM_CODEC_OK)

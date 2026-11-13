@@ -5,6 +5,8 @@
 #include "core/WebmWriter.h"
 #include "media/Av1Codec.h"
 #include "media/Capture.h"
+#include "media/CaptureMode.h"
+#include "media/VideoEncodeBudget.h"
 #include "media/OpusCodec.h"
 #include "media/Yuv.h"
 
@@ -54,6 +56,91 @@ class TstMedia : public QObject
     Q_OBJECT
 
 private slots:
+    void cameraModeRateFirst()
+    {
+        const QSize want(1920, 1080);
+        const auto score = [&](QSize size, double rate) { return CaptureMode::score(size, rate, want, 30); };
+        QVERIFY(score(QSize(1280, 720), 30) < score(want, 3));
+        QVERIFY(score(QSize(1280, 720), 29.97) < score(want, 5));
+        QVERIFY(score(want, 30) < score(QSize(1280, 720), 30));
+        QVERIFY(score(QSize(1280, 720), 25) < score(want, 10));
+        QVERIFY(score(QSize(640, 480), 30) < score(QSize(), 30));
+    }
+
+    void encoderOverload()
+    {
+        VideoEncodeBudget budget;
+        const QSize hd(1920, 1080);
+        // A costly key frame or a brief burst does not reduce resolution.
+        QCOMPARE(budget.observe(hd, 30, 900000, true), hd);
+        for (int i = 0; i < 16; ++i)
+            QCOMPARE(budget.observe(hd, 30, 15000, false), hd);
+        // Sustained 3 fps encoding at a requested 30 fps must reduce spatial cost.
+        for (int i = 0; i < 7; ++i)
+            QCOMPARE(budget.observe(hd, 30, 330000, false), hd);
+        QSize size = budget.observe(hd, 30, 330000, false);
+        QVERIFY(size.width() < hd.width());
+        QVERIFY(size.height() < hd.height());
+        for (int i = 0; i < 128; ++i) {
+            const QSize next = budget.observe(size, 30, 330000, false);
+            QVERIFY(next.width() <= size.width());
+            QVERIFY(next.height() <= size.height());
+            QVERIFY(next.width() >= 160 && next.height() >= 120);
+            QVERIFY(!(next.width() & 1) && !(next.height() & 1));
+            size = next;
+        }
+        QCOMPARE(budget.observe(size, 30, 1000, false), size); // no oscillation back up
+    }
+
+    void invalidFrames()
+    {
+        QVERIFY(I420Frame(-2, -2).isNull());
+        QVERIFY(I420Frame(65536, 65536).isNull());
+        I420Frame frame(64, 48);
+        frame.data.chop(1);
+        QVERIFY(frame.isNull());
+        QVERIFY(Yuv::toImage(frame).isNull());
+        Av1Encoder enc;
+        Av1Settings settings;
+        settings.width = -1;
+        QVERIFY(!enc.open(settings));
+    }
+
+    void av1FullHd()
+    {
+        Av1Encoder enc;
+        Av1Decoder dec;
+        Av1Settings settings;
+        settings.width = 1920;
+        settings.height = 1080;
+        settings.fps = 30;
+        settings.kbps = 4000;
+        settings.threads = 4;
+        QVERIFY(enc.open(settings));
+        const I420Frame frame = Yuv::fromImage(scene(1920, 1080, 1));
+        QElapsedTimer timer;
+        timer.start();
+        for (int i = 0; i < 12; ++i) {
+            const auto packets = enc.encode(frame, qint64(i) * 33333);
+            QCOMPARE(packets.size(), 1);
+            const I420Frame decoded = dec.decode(packets.first().data);
+            QCOMPARE(decoded.width, 1920);
+            QCOMPARE(decoded.height, 1080);
+        }
+        qInfo("AV1 1080p30 at 4000 kbps: encode + decode %.1f ms/frame", timer.elapsed() / 12.0);
+        // Resolution switches must restart with a decodable key frame, preserving PTS.
+        settings.width = 960;
+        settings.height = 540;
+        QVERIFY(enc.open(settings));
+        const auto packets = enc.encode(Yuv::scaled(frame, 960, 540), 400000);
+        QCOMPARE(packets.size(), 1);
+        QVERIFY(packets.first().key);
+        QCOMPARE(packets.first().ptsUs, 400000);
+        const I420Frame decoded = dec.decode(packets.first().data);
+        QCOMPARE(decoded.width, 960);
+        QCOMPARE(decoded.height, 540);
+    }
+
     void yuvRoundTrip()
     {
         const QImage img = scene(64, 48, 0);

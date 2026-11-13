@@ -1,4 +1,7 @@
 {
+  "Достигнут предел видеопотоков: сохраните запись и начните новую": "Video stream limit reached: save the recording and start a new one",
+  "Для плавной записи разрешение видео снижено до %1×%2: кодер не успевает": "Video resolution reduced to %1×%2 for smooth recording: the encoder cannot keep up",
+  "При перегрузке кодера разрешение записи снижается автоматически для сохранения плавности.": "If the encoder is overloaded, recording resolution is reduced automatically to keep the video smooth.",
   "Настройка оси Y": "Y axis settings",
   "Скорость": "Speed",
   "Ритмичность": "Rhythm",

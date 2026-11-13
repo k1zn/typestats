@@ -202,6 +202,11 @@ MainWindow::MainWindow(QWidget *parent)
         m_video->setMessage(reason);
         updateCameraButton();
     });
+    connect(m_webcam, &WebcamRecorder::resolutionReduced, this, [this](QSize size) {
+        m_cameraError = tr("Для плавной записи разрешение видео снижено до %1×%2: кодер не успевает")
+                            .arg(size.width()).arg(size.height());
+        updateCameraButton();
+    });
     connect(m_video, &VideoWindow::visibilityChanged, this, &MainWindow::updateVideoMode);
     connect(m_video, &VideoWindow::playToggled, this, &MainWindow::playVideo);
     connect(m_video, &VideoWindow::seekRequested, this, &MainWindow::seekVideo);

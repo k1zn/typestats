@@ -62,6 +62,10 @@ int MediaClip::addStream(const MediaStream &s)
     const int i = streamOf(s.kind);
     if (i >= 0 && streams[i] == s)
         return i;
+    // The on-disk stream count is one byte. Never wrap packet indexes or serialize
+    // a zero count after many recording sessions / resolution changes.
+    if (streams.size() >= 255)
+        return -1;
     streams.append(s);
     return int(streams.size()) - 1;
 }

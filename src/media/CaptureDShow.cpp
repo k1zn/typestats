@@ -3,6 +3,7 @@
 // Grabber → Null Renderer, with no clock, so that a frame comes as soon as the source gives it.
 
 #include "CaptureDShow.h"
+#include "CaptureMode.h"
 #include "platform/HookClock.h"
 
 #include <windows.h>
@@ -300,9 +301,7 @@ void DShow::run(Camera *q, const QString &id, QSize want, int fps, const std::at
                 }
                 const double w = bh->biWidth, h = std::abs(bh->biHeight);
                 const double rate = caps.MinFrameInterval > 0 ? 1e7 / double(caps.MinFrameInterval) : fps;
-                const bool large = w >= want.width() && h >= want.height();
-                double score = large ? w * h : 1e12 - w * h;
-                score += rate >= fps ? (rate - fps) * 1000 : 1e9 + (fps - rate) * 1000;
+                double score = CaptureMode::score(QSize(int(w), int(h)), rate, want, fps);
                 score += readable(t->subtype) ? 0 : 0.5;
                 if (score < bestScore) {
                     bestScore = score;

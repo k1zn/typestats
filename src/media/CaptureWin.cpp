@@ -3,6 +3,7 @@
 
 #include "Capture.h"
 #include "CaptureDShow.h"
+#include "CaptureMode.h"
 #include "platform/HookClock.h"
 
 #include <windows.h>
@@ -43,7 +44,9 @@ struct Mf
     {
         static const Mf mf = [] {
             Mf m;
-            HMODULE plat = LoadLibraryW(L"mfplat.dll"), mf = LoadLibraryW(L"mf.dll"), rw = LoadLibraryW(L"mfreadwrite.dll");
+            HMODULE plat = LoadLibraryExW(L"mfplat.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32),
+                    mf = LoadLibraryExW(L"mf.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32),
+                    rw = LoadLibraryExW(L"mfreadwrite.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
             if (!plat || !mf || !rw)
                 return m;
             m.startup = resolve<decltype(m.startup)>(plat, "MFStartup");
@@ -217,8 +220,7 @@ void Camera::Impl::run(QString id, QSize want, int fps)
     const DWORD stream = DWORD(MF_SOURCE_READER_FIRST_VIDEO_STREAM);
     bool ok = SUCCEEDED(Mf::get().createSourceReader(source.p, attr.p, reader.out()));
     if (ok) {
-        // The native format nearest to what is asked: the smallest one at least as large (else the largest), at the
-        // rate nearest to the one asked for and not below it when possible.
+        // Frame rate first, then the smallest sufficient size (else the largest smaller one).
         Com<IMFMediaType> best;
         double bestScore = 1e18;
         for (DWORD i = 0;; ++i) {
@@ -229,9 +231,7 @@ void Camera::Impl::run(QString id, QSize want, int fps)
             MFGetAttributeSize(t.p, MF_MT_FRAME_SIZE, &w, &h);
             MFGetAttributeRatio(t.p, MF_MT_FRAME_RATE, &num, &den);
             const double rate = den ? double(num) / den : 0;
-            const bool large = int(w) >= want.width() && int(h) >= want.height();
-            double score = large ? double(w) * h : 1e12 - double(w) * h;
-            score += rate >= fps ? (rate - fps) * 1000 : 1e9 + (fps - rate) * 1000;
+            const double score = CaptureMode::score(QSize(int(w), int(h)), rate, want, fps);
             if (score < bestScore) {
                 bestScore = score;
                 best.reset();

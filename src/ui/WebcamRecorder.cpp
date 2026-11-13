@@ -2,9 +2,12 @@
 
 #include "media/Av1Codec.h"
 #include "media/OpusCodec.h"
+#include "media/VideoEncodeBudget.h"
 
 #include <QCoreApplication>
 #include <QSettings>
+#include <QElapsedTimer>
+#include <QScopeGuard>
 
 #include <algorithm>
 #include <cmath>
@@ -18,6 +21,9 @@ public:
     std::unique_ptr<OpusAudioEncoder> audio;
     Preset preset{};
     int lastGeneration = -1;
+    VideoEncodeBudget budget;
+    QSize frameLimit;
+    bool openFailed = false;
 
     void open(const Preset &p, bool withAudio)
     {
@@ -25,21 +31,30 @@ public:
         video.close(); // opened by the first frame: its size has the camera's aspect
         audio = withAudio ? std::make_unique<OpusAudioEncoder>() : nullptr;
         lastGeneration = -1;
+        budget = {};
+        frameLimit = QSize(p.width, p.height);
+        openFailed = false;
     }
     // The size of the session's video: the camera's picture whole, within the preset's frame (1920×1080 in 640×480 -
     // 640×360), so it is what the preview shows. Later frames of another aspect are cropped to it.
-    QSize openFor(const I420Frame &picture)
+    QSize openFor(const I420Frame &picture, QString *error)
     {
+        if (openFailed)
+            return {};
         if (!video.isOpen()) {
             Av1Settings s;
-            const QSize size = WebcamRecorder::fit(QSize(picture.width, picture.height), QSize(preset.width, preset.height));
+            const QSize limit = frameLimit.boundedTo(QSize(picture.width, picture.height));
+            const QSize size = WebcamRecorder::fit(QSize(picture.width, picture.height), limit);
             s.width = size.width();
             s.height = size.height();
             s.fps = preset.fps;
             s.kbps = preset.kbps;
             if (s.width * s.height > 640 * 480) // larger frames of "Своё": in time for the next one
                 s.threads = 4;
-            video.open(s);
+            if (!video.open(s, error)) {
+                openFailed = true;
+                return {};
+            }
         }
         return QSize(video.settings().width, video.settings().height);
     }
@@ -128,6 +143,13 @@ WebcamRecorder::WebcamRecorder(QObject *parent) : QObject(parent)
     m_thread.setObjectName(QStringLiteral("webcam encoder"));
     m_thread.start();
 
+    // A slow AV1 frame must not hold up microphone buffers or grow their queue.
+    m_audioWorker = new Worker;
+    m_audioWorker->moveToThread(&m_audioThread);
+    connect(&m_audioThread, &QThread::finished, m_audioWorker, &QObject::deleteLater);
+    m_audioThread.setObjectName(QStringLiteral("webcam audio encoder"));
+    m_audioThread.start();
+
     m_camera = new Camera(this);
     m_mic = new Microphone(this);
     connect(m_camera, &Camera::frame, this, [this](const I420Frame &p, qint64 t) { addVideo(p, t); }, Qt::DirectConnection);
@@ -145,6 +167,8 @@ WebcamRecorder::~WebcamRecorder()
     m_mic->stop();
     m_thread.quit();
     m_thread.wait();
+    m_audioThread.quit();
+    m_audioThread.wait();
 }
 
 void WebcamRecorder::setSettings(const Settings &s)
@@ -166,6 +190,7 @@ void WebcamRecorder::setClip(MediaClip *clip)
     ++m_generation;
     m_pending.clear();
     m_clip = clip;
+    m_streamLimitReported = false;
     m_lastPts[0] = m_lastPts[1] = MediaClip::kAll;
     if (m_recording && m_clip) {
         m_videoStream = -1; // with the first frame: its size
@@ -230,6 +255,7 @@ void WebcamRecorder::update()
 void WebcamRecorder::startSession()
 {
     m_recording = true;
+    m_streamLimitReported = false;
     m_preset = m_settings.preset();
     m_fps = m_preset.fps;
     ++m_generation;
@@ -240,7 +266,8 @@ void WebcamRecorder::startSession()
     m_audioStream = m_settings.audio ? m_clip->addStream(MediaStream::audio(OpusAudioEncoder::kRate, 1)) : -1;
     const Preset p = m_preset;
     const bool audio = m_settings.audio;
-    QMetaObject::invokeMethod(m_worker, [w = m_worker, p, audio] { w->open(p, audio); }, Qt::QueuedConnection);
+    QMetaObject::invokeMethod(m_worker, [w = m_worker, p] { w->open(p, false); }, Qt::QueuedConnection);
+    QMetaObject::invokeMethod(m_audioWorker, [w = m_audioWorker, p, audio] { w->open(p, audio); }, Qt::QueuedConnection);
     m_lastFrameUs = 0;
     m_accepting = true;
 }
@@ -252,14 +279,22 @@ void WebcamRecorder::stopSession()
     ++m_generation;
     m_pending.clear();
     QMetaObject::invokeMethod(m_worker, [w = m_worker] { w->close(); }, Qt::QueuedConnection);
+    QMetaObject::invokeMethod(m_audioWorker, [w = m_audioWorker] { w->close(); }, Qt::QueuedConnection);
 }
 
 void WebcamRecorder::addVideo(const I420Frame &picture, qint64 steadyUs)
 {
+    if (picture.isNull())
+        return;
     // The preview: a picture now and then.
     if (m_preview && steadyUs - m_lastPictureUs >= 1000000 / 15) {
         m_lastPictureUs = steadyUs;
-        QMetaObject::invokeMethod(this, [this, image = Yuv::toImage(picture)] { emit this->picture(image); },
+        // The preview window needs a small picture, even when recording Full HD.
+        const QSize preview = fit(QSize(picture.width, picture.height), QSize(640, 480));
+        QMetaObject::invokeMethod(this, [this, sourceSize = QSize(picture.width, picture.height),
+                                        image = Yuv::toImage(Yuv::scaled(picture, preview.width(), preview.height()))] {
+            emit this->picture(image, sourceSize);
+        },
                                   Qt::QueuedConnection);
     }
     if (!m_accepting) {
@@ -291,20 +326,45 @@ void WebcamRecorder::encode(const I420Frame &picture, qint64 steadyUs)
     QMetaObject::invokeMethod(
         m_worker,
         [this, w = m_worker, generation, picture, steadyUs] {
-            --m_queued;
-            const QSize size = w->openFor(picture);
+            const auto release = qScopeGuard([this] { --m_queued; });
+            if (generation != m_generation)
+                return;
+            QString error;
+            const QSize size = w->openFor(picture, &error);
+            if (size.isEmpty()) {
+                if (!error.isEmpty())
+                    QMetaObject::invokeMethod(this, [this, error] { emit failed(error); }, Qt::QueuedConnection);
+                return;
+            }
+            QElapsedTimer timer;
+            timer.start();
             const I420Frame frame = Yuv::scaled(picture, size.width(), size.height());
             const bool key = generation != w->lastGeneration;
             w->lastGeneration = generation;
-            for (const EncodedFrame &f : w->video.encode(frame, steadyUs, key))
+            const QList<EncodedFrame> frames = w->video.encode(frame, steadyUs, key);
+            bool keyFrame = key;
+            for (const EncodedFrame &f : frames) {
+                keyFrame |= f.key;
                 QMetaObject::invokeMethod(this, [this, generation, f, size] { encoded(generation, MediaStream::Video, f, size); },
                                           Qt::QueuedConnection);
+            }
+            const QSize next = w->budget.observe(size, w->preset.fps, timer.nsecsElapsed() / 1000, keyFrame);
+            if (next != size) {
+                w->frameLimit = next;
+                w->video.close(); // the next frame is a key frame with the new dimensions
+                QMetaObject::invokeMethod(this, [this, generation, next] {
+                    if (generation == m_generation && m_recording)
+                        emit resolutionReduced(next);
+                }, Qt::QueuedConnection);
+            }
         },
         Qt::QueuedConnection);
 }
 
 void WebcamRecorder::addAudio(const QVector<float> &pcm, int channels, int rate, qint64 steadyUs)
 {
+    if (channels <= 0 || rate <= 0 || pcm.isEmpty() || pcm.size() % channels != 0)
+        return;
     if (!m_accepting) {
         // Armed: the last moments before the session (the key's own sound may start in a buffer that came before it).
         m_warmAudio.append({pcm, channels, rate, steadyUs});
@@ -324,9 +384,9 @@ void WebcamRecorder::encodeAudio(const QVector<float> &pcm, int channels, int ra
 {
     const int generation = m_generation;
     QMetaObject::invokeMethod(
-        m_worker,
-        [this, w = m_worker, generation, pcm, channels, rate, steadyUs] {
-            if (!w->audio)
+        m_audioWorker,
+        [this, w = m_audioWorker, generation, pcm, channels, rate, steadyUs] {
+            if (generation != m_generation || !w->audio)
                 return;
             for (const EncodedFrame &f : w->audio->push(pcm.constData(), int(pcm.size() / channels), channels, rate, steadyUs))
                 QMetaObject::invokeMethod(this, [this, generation, f] { encoded(generation, MediaStream::Audio, f); },
@@ -338,6 +398,7 @@ void WebcamRecorder::encodeAudio(const QVector<float> &pcm, int channels, int ra
 void WebcamRecorder::drain()
 {
     QMetaObject::invokeMethod(m_worker, [] {}, Qt::BlockingQueuedConnection);
+    QMetaObject::invokeMethod(m_audioWorker, [] {}, Qt::BlockingQueuedConnection);
     QCoreApplication::sendPostedEvents(this, QEvent::MetaCall);
 }
 
@@ -355,11 +416,17 @@ void WebcamRecorder::encoded(int generation, int kind, const EncodedFrame &f, QS
 
 void WebcamRecorder::place(int kind, const EncodedFrame &f, QSize size)
 {
-    if (kind == MediaStream::Video && m_videoStream < 0 && m_withVideo && !size.isEmpty())
+    if (kind == MediaStream::Video && m_withVideo && !size.isEmpty()
+        && (m_videoStream < 0 || m_clip->streams[m_videoStream] != MediaStream::video(size.width(), size.height())))
         m_videoStream = m_clip->addStream(MediaStream::video(size.width(), size.height()));
     const int stream = kind == MediaStream::Video ? m_videoStream : m_audioStream;
-    if (stream < 0)
+    if (stream < 0) {
+        if (m_clip->streams.size() >= 255 && !m_streamLimitReported) {
+            m_streamLimitReported = true;
+            emit failed(tr("Достигнут предел видеопотоков: сохраните запись и начните новую"));
+        }
         return;
+    }
     // In the document's time; it only grows within a stream (a hotkey moves the timer without a record).
     qint64 pts = m_clip->ptsOf(m_docEndUs + (f.ptsUs - *m_timerUs));
     if (m_lastPts[kind] != MediaClip::kAll)

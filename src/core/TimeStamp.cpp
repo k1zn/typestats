@@ -156,6 +156,7 @@ struct GoodToken
     QList<QByteArray> chain;
 };
 QHash<QByteArray, GoodToken> g_goodTokens; // sha256(token, signer) of tokens that passed -> their root and chain
+constexpr qsizetype kMaxSignatureCache = 8192, kMaxTokenCache = 2048;
 
 QByteArray sha256(QByteArrayView a) { return QCryptographicHash::hash(a, QCryptographicHash::Sha256); }
 
@@ -190,6 +191,8 @@ bool signatureValid(QByteArrayView spki, QCryptographicHash::Algorithm alg, QByt
     const std::optional<Rsa::PublicKey> pub = Rsa::fromSpki(spki);
     const bool ok = pub && Rsa::verify(*pub, alg, QCryptographicHash::hash(signedBytes, alg), signature);
     const QMutexLocker lock(&g_cacheMutex);
+    if (g_signatures.size() >= kMaxSignatureCache)
+        g_signatures.clear();
     g_signatures.insert(key, ok);
     return ok;
 }
@@ -533,6 +536,8 @@ Check verify(QByteArrayView token, const QList<QByteArray> &pool, Info *out)
             tst->root = root;
             tst->chain = chain;
             const QMutexLocker lock(&g_cacheMutex);
+            if (g_goodTokens.size() >= kMaxTokenCache)
+                g_goodTokens.clear();
             g_goodTokens.insert(key, {root, chain});
             return Check::Ok;
         }();

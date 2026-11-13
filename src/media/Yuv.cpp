@@ -5,6 +5,11 @@
 
 void I420Frame::resize(int w, int h)
 {
+    if (w < 2 || h < 2 || qint64(w) * h > 4096LL * 2160) {
+        width = height = 0;
+        data.clear();
+        return;
+    }
     width = w & ~1;
     height = h & ~1;
     data.resize(qsizetype(width) * height * 3 / 2);
@@ -68,6 +73,8 @@ I420Frame fromPlanes(const uchar *y, int yStride, const uchar *u, int uStride, c
                      int width, int height)
 {
     I420Frame f(width, height);
+    if (f.isNull())
+        return {};
     copyPlane(y, yStride, f.y(), f.width, f.height);
     copyPlane(u, uStride, f.u(), f.width / 2, f.height / 2);
     copyPlane(v, vStride, f.v(), f.width / 2, f.height / 2);
@@ -77,6 +84,8 @@ I420Frame fromPlanes(const uchar *y, int yStride, const uchar *u, int uStride, c
 I420Frame fromNv12(const uchar *y, int yStride, const uchar *uv, int uvStride, int width, int height)
 {
     I420Frame f(width, height);
+    if (f.isNull())
+        return {};
     copyPlane(y, yStride, f.y(), f.width, f.height);
     const int cw = f.width / 2, chh = f.height / 2;
     uchar *u = f.u(), *v = f.v();
@@ -93,6 +102,8 @@ I420Frame fromNv12(const uchar *y, int yStride, const uchar *uv, int uvStride, i
 I420Frame fromYuyv(const uchar *src, int stride, int width, int height)
 {
     I420Frame f(width, height);
+    if (f.isNull())
+        return {};
     const int cw = f.width / 2;
     uchar *y = f.y(), *u = f.u(), *v = f.v();
     for (int r = 0; r < f.height; ++r) {
@@ -116,6 +127,8 @@ I420Frame fromImage(const QImage &image)
 {
     const QImage rgb = image.convertToFormat(QImage::Format_RGB32);
     I420Frame f(rgb.width(), rgb.height());
+    if (f.isNull())
+        return {};
     const int cw = f.width / 2;
     uchar *y = f.y(), *u = f.u(), *v = f.v();
     for (int r = 0; r < f.height; ++r) {
@@ -169,9 +182,9 @@ I420Frame scaled(const I420Frame &src, int width, int height)
 
 QImage toImage(const I420Frame &frame)
 {
-    QImage image(frame.width, frame.height, QImage::Format_RGB32);
     if (frame.isNull())
-        return image;
+        return {};
+    QImage image(frame.width, frame.height, QImage::Format_RGB32);
     const int cw = frame.width / 2;
     const uchar *y = frame.y(), *u = frame.u(), *v = frame.v();
     for (int r = 0; r < frame.height; ++r) {

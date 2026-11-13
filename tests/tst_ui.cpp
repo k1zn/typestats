@@ -57,6 +57,7 @@
 #include <QFile>
 
 #include "xlsxdocument.h"
+#include "xlsxcell.h"
 #include <QTest>
 #include <QTimer>
 #include <QTextBlock>
@@ -978,6 +979,11 @@ private slots:
             QVERIFY(d.m_estimate->text().contains(QStringLiteral("800×450")));
             d.m_height->setValue(450);
             QVERIFY(!d.m_estimate->text().contains(QStringLiteral("×")));
+            // A reduced preview retains the native dimensions for the size estimate.
+            d.setPicture(wide.scaled(640, 360), QSize(1920, 1080));
+            QCOMPARE(d.recordedSize(d.settings().preset()), QSize(800, 450));
+            d.setPicture(wide.scaled(640, 360), QSize(640, 360));
+            QCOMPARE(d.recordedSize(d.settings().preset()), QSize(640, 360));
         }
         MainWindow w;
         if (QApplication::activeWindow())
@@ -1052,7 +1058,7 @@ private slots:
         QVERIFY(d.m_estimate->text().contains(QStringLiteral("3")));
         QVERIFY(d.m_estimate->text().contains(QStringLiteral("·"))); // too few bits for such a frame
         QVERIFY((d.settings().preset() == WebcamRecorder::Preset{1920, 1080, 30, 300}));
-        // A recording with it: the stream of the clip has the size chosen.
+        // A recording with it: a smaller camera frame is not enlarged just to fill the preset.
         MainWindow w;
         w.m_webcam->setDevicesEnabled(false);
         w.m_webcam->setSettings([&] {
@@ -1067,13 +1073,13 @@ private slots:
         e.ch = u'a';
         e.chars = 1;
         w.keyEvent(e);
-        // The stream comes with the first frame: a camera of the same aspect fills the frame chosen.
+        // The stream comes with the first frame, at its native resolution within the preset.
         w.m_webcam->addVideo(Yuv::fromImage(QImage(640, 360, QImage::Format_RGB32)), 0);
         w.m_webcam->drain();
         const int stream = w.m_clip.streamOf(MediaStream::Video);
         QVERIFY(stream >= 0);
-        QCOMPARE(w.m_clip.streams[stream].a, 1920);
-        QCOMPARE(w.m_clip.streams[stream].b, 1080);
+        QCOMPARE(w.m_clip.streams[stream].a, 640);
+        QCOMPARE(w.m_clip.streams[stream].b, 360);
         w.m_webcam->setCapture(false);
 #else
         QSKIP("built without the webcam");
@@ -1681,6 +1687,75 @@ private slots:
         w.clear();
         QVERIFY(w.askToSave());
         QSettings().remove(QStringLiteral("AskSaveOnExit"));
+    }
+
+    void stampCosignTimeout()
+    {
+        TsfDocument doc;
+        StampRecorder recorder;
+        QList<StampRecorder::Done> answers;
+        QList<QByteArray> imprints;
+        recorder.setSend([&](const QByteArray &imprint, int, StampRecorder::Done done) {
+            imprints.append(imprint);
+            answers.append(std::move(done));
+        });
+        recorder.attach(&doc);
+        recorder.setEnabled(true);
+        KeyRecord record;
+        record.flags = KeyRecord::HasChar | (0x41u << 16) | 0x1e;
+        record.ch = u'a';
+        doc.records.append(record);
+        recorder.recordsAdded();
+        QCOMPARE(answers.size(), 2);
+        answers[0](fakeToken(imprints[0]), {});
+        QTRY_COMPARE_WITH_TIMEOUT(answers.size(), 3, 1800); // reserve before the 5 s timeout
+        QTest::qWait(5100); // the network timeout used to exceed the entire retry window
+        const auto timeout = answers[1];
+        timeout({}, QStringLiteral("timeout"));
+        QCOMPARE(answers.size(), 3);
+        QCOMPARE(imprints[2], imprints[0]);
+        const auto reserve = answers[2];
+        reserve(fakeToken(imprints[2]), {});
+        QVERIFY(!doc.stamps.first().cosign.isEmpty());
+        QVERIFY(!recorder.cosignsAwaited());
+        timeout(fakeToken(imprints[1]), {}); // a late original answer must not replace the reserve
+        QCOMPARE(doc.stamps.size(), 1);
+
+        // Exhausting the reserves also refreshes the UI: it must stop showing a pending cosign.
+        recorder.attach(&doc, true);
+        recorder.captureChanged(true);
+        doc.records.append(record);
+        recorder.recordsAdded();
+        const int start = int(answers.size()) - 2;
+        answers[start](fakeToken(imprints[start]), {});
+        QSignalSpy changed(&recorder, &StampRecorder::changed);
+        for (int i = start + 1; i < answers.size(); ++i) {
+            const auto fail = answers[i];
+            fail({}, QStringLiteral("down"));
+        }
+        QVERIFY(!recorder.cosignsAwaited());
+        QVERIFY(!changed.isEmpty());
+    }
+
+    void exportUntrustedText()
+    {
+        TableExport::Table table;
+        table.header = {QStringLiteral("=1+1"), QStringLiteral("text"), QStringLiteral("number")};
+        table.rows.append({QStringLiteral("=HYPERLINK(\"https://example.test\")"), QStringLiteral(" \t+1+1"), -3});
+        const QString csv = QString::fromUtf8(TableExport::toCsv(table, QLocale::c()).mid(3));
+        QVERIFY(csv.startsWith(QStringLiteral("'=1+1,text,number\r\n")));
+        QVERIFY(csv.contains(QStringLiteral("' \t+1+1,-3\r\n")));
+        QVERIFY(csv.contains(QStringLiteral("\"'=HYPERLINK(")));
+        QTemporaryDir temp;
+        const QString path = temp.filePath(QStringLiteral("text.xlsx"));
+        QVERIFY(TableExport::write(path, table, false, QLocale::c()));
+        QXlsx::Document back(path);
+        QVERIFY(back.load());
+        QCOMPARE(back.read(1, 1).toString(), table.header[0]);
+        QCOMPARE(back.read(2, 1).toString(), table.rows[0][0].toString());
+        QVERIFY(!back.cellAt(1, 1)->hasFormula());
+        QVERIFY(!back.cellAt(2, 1)->hasFormula());
+        QCOMPARE(back.read(2, 3).toInt(), -3);
     }
 
     void stampRecorder()

@@ -3,6 +3,7 @@
 #include "xlsxcellrange.h"
 #include "xlsxchart.h"
 #include "xlsxdocument.h"
+#include "xlsxworksheet.h"
 
 #include <QFile>
 #include <QLocale>
@@ -29,6 +30,11 @@ QString csvCell(const QVariant &v, const QString &point, QChar separator)
         return s.replace(QLatin1Char('.'), point);
     }
     QString s = v.toString();
+    // Quoting CSV does not stop a spreadsheet from executing a cell as a formula.
+    // Check past whitespace too: importers differ in what they trim before parsing.
+    const QString trimmed = s.trimmed();
+    if (!trimmed.isEmpty() && QStringLiteral("=+-@").contains(trimmed.front()))
+        s.prepend(QLatin1Char('\''));
     if (s.contains(separator) || s.contains(QLatin1Char('"')) || s.contains(QLatin1Char('\n'))
         || s.contains(QLatin1Char('\r')) || s.startsWith(QLatin1Char(' ')) || s.endsWith(QLatin1Char(' ')))
         s = QLatin1Char('"') + s.replace(QLatin1Char('"'), QLatin1String("\"\"")) + QLatin1Char('"');
@@ -65,11 +71,16 @@ bool write(const QString &path, const Table &table, bool chart, const QLocale &l
     QXlsx::Format bold;
     bold.setFontBold(true);
     for (int c = 0; c < table.header.size(); ++c)
-        doc.write(1, c + 1, table.header[c], bold);
+        doc.currentWorksheet()->writeString(1, c + 1, table.header[c], bold);
     for (int r = 0; r < table.rows.size(); ++r)
         for (int c = 0; c < table.rows[r].size(); ++c)
-            if (table.rows[r][c].isValid())
-                doc.write(r + 2, c + 1, table.rows[r][c]);
+            if (table.rows[r][c].isValid()) {
+                const QVariant &value = table.rows[r][c];
+                if (value.typeId() == QMetaType::QString)
+                    doc.currentWorksheet()->writeString(r + 2, c + 1, value.toString());
+                else
+                    doc.write(r + 2, c + 1, value);
+            }
     if (!table.header.isEmpty())
         doc.setColumnWidth(1, int(table.header.size()), 16.0);
     if (chart && !table.rows.isEmpty() && table.header.size() > 1) {

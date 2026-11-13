@@ -178,6 +178,14 @@ QByteArray write(const MediaClip &clip)
     QByteArray tracks;
     if (videoStream >= 0) {
         const MediaStream &s = clip.streams[videoStream];
+        // Sessions (and overload adaptation) may change resolution. The track's canvas must
+        // hold the largest picture, rather than taking the dimensions of the last session.
+        int width = s.a, height = s.b;
+        for (const MediaStream &stream : clip.streams)
+            if (stream.kind == MediaStream::Video) {
+                width = std::max(width, int(stream.a));
+                height = std::max(height, int(stream.b));
+            }
         QByteArray t = uintElement(TrackNumber, 1) + uintElement(TrackUID, QRandomGenerator::global()->generate() | 1)
                        + uintElement(TrackType, 1) + stringElement(CodecID, "V_AV1");
         if (firstKey) {
@@ -185,7 +193,7 @@ QByteArray write(const MediaClip &clip)
             if (!config.isEmpty())
                 t += element(CodecPrivate, config);
         }
-        t += element(Video, uintElement(PixelWidth, s.a) + uintElement(PixelHeight, s.b));
+        t += element(Video, uintElement(PixelWidth, width) + uintElement(PixelHeight, height));
         tracks += element(TrackEntry, t);
     }
     if (audioStream >= 0) {

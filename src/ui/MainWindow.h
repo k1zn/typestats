@@ -288,7 +288,7 @@ private:
     bool m_hookStarted = false;   // startCapture: keys can come (the camera is ready for them)
     bool m_cameraStopped = false; // "Остановить запись камеры": this document is typed into without it
     void stopCamera(bool stop);
-    QString m_cameraError; // the last failure of a device
+    QString m_cameraError; // the last device failure or encoder adaptation notice
     QString m_cameraKey;   // what the button shows (redrawn only when it changes)
     QTimer *m_playTimer = nullptr;
     QElapsedTimer m_playClock;

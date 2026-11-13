@@ -2,6 +2,13 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="en_US" sourcelanguage="ru_RU">
 <context>
+    <name>WebcamRecorder</name>
+    <message>
+        <source>Достигнут предел видеопотоков: сохраните запись и начните новую</source>
+        <translation>Video stream limit reached: save the recording and start a new one</translation>
+    </message>
+</context>
+<context>
     <name>AboutDialog</name>
     <message>
         <source>О программе</source>
@@ -496,6 +503,10 @@ Copy the command, paste it into a terminal and enter your password. This is need
 </context>
 <context>
     <name>MainWindow</name>
+    <message>
+        <source>Для плавной записи разрешение видео снижено до %1×%2: кодер не успевает</source>
+        <translation>Video resolution reduced to %1×%2 for smooth recording: the encoder cannot keep up</translation>
+    </message>
     <message>
         <source>Параметр</source>
         <translation>Parameter</translation>
@@ -1281,6 +1292,10 @@ The camera starts recording with the first key.</translation>
 </context>
 <context>
     <name>VideoPropertiesDialog</name>
+    <message>
+        <source>При перегрузке кодера разрешение записи снижается автоматически для сохранения плавности.</source>
+        <translation>If the encoder is overloaded, recording resolution is reduced automatically to keep the video smooth.</translation>
+    </message>
     <message>
         <source>Во время набора</source>
         <translation>While typing</translation>
